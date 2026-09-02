@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SynLogo, LiquidMicIcon, LiquidMicOffIcon, ScreenCastIcon } from './icons/SynIcons';
 import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X } from 'lucide-react';
+import { formatRoomCode } from '../lib/appwrite';
 
 interface GreenRoomProps {
   roomName: string;
@@ -209,9 +210,14 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         <div className="lg:col-span-5 flex flex-col justify-center">
           <div className="p-6 sm:p-8 space-y-6 realistic-glass rounded-3xl">
             <div>
-              <span className="text-xs font-medium text-[var(--accent)] mb-1 block">
-                {isHost ? 'Host Session' : 'Guest Session'}
-              </span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-[var(--accent)]">
+                  {isHost ? 'Host Session' : 'Guest Session'}
+                </span>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)] border border-black/[0.06] dark:border-white/[0.08]">
+                  {formatRoomCode(roomId)}
+                </span>
+              </div>
               <h2 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
                 {roomName}
               </h2>

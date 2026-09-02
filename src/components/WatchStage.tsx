@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DraggableTile } from './DraggableTile';
+import { formatRoomCode } from '../lib/appwrite';
 import {
   SynLogo,
   TheaterLayoutIcon,
@@ -179,6 +180,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             </span>
             <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] shrink-0">
               {isHost ? 'Host' : 'Viewer'}
+            </span>
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-mono font-medium bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 border border-black/[0.06] dark:border-white/[0.08] select-all shrink-0" title="Watchroom Code">
+              {formatRoomCode(roomId)}
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-1.5 shrink-0">
               <MeshNetworkIcon size={12} className="text-black/55 dark:text-white/55" />

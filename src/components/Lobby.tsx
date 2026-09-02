@@ -402,7 +402,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   required
                   value={joinRoomId}
                   onChange={(e) => setJoinRoomId(e.target.value)}
-                  placeholder="Paste room code or invite link"
+                  placeholder="e.g. c7k-9m2-p4q or invite link"
                   maxLength={100}
                   className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
                 />
