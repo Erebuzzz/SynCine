@@ -11,6 +11,7 @@ import {
   RoomDocument,
   MAX_PARTICIPANTS
 } from './lib/appwrite';
+import { getISTCycleState, applyISTReflectionCSS } from './lib/time-cycle';
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
@@ -27,16 +28,22 @@ export const App: React.FC = () => {
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDocsModalOpen, setIsDocsModalOpen] = useState<boolean>(false);
+
+  // Determine initial theme: User manual preference or Indian Standard Time (IST) Day/Night cycle
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('syncine-theme');
-      if (stored) return stored === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const stored = localStorage.getItem('syncine-theme-manual');
+      if (stored === 'dark') return true;
+      if (stored === 'light') return false;
+
+      // Automatic IST cycle: Sunrise 06:00 to Sunset 18:30 IST is Light mode, else Dark mode
+      const { isDaytime } = getISTCycleState();
+      return !isDaytime;
     }
     return true;
   });
 
-  // Apply theme class to html element
+  // Apply theme class and dynamic IST reflection system
   useEffect(() => {
     const root = document.documentElement;
     if (isDark) {
@@ -46,7 +53,17 @@ export const App: React.FC = () => {
       root.classList.remove('dark');
       root.classList.add('light');
     }
-    localStorage.setItem('syncine-theme', isDark ? 'dark' : 'light');
+
+    const state = getISTCycleState();
+    applyISTReflectionCSS(state, isDark);
+
+    // Periodically update the solar reflection angle
+    const interval = setInterval(() => {
+      const currentState = getISTCycleState();
+      applyISTReflectionCSS(currentState, isDark);
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, [isDark]);
 
   useEffect(() => {
@@ -75,6 +92,13 @@ export const App: React.FC = () => {
 
     init();
   }, []);
+
+  const handleToggleTheme = () => {
+    const nextTheme = !isDark;
+    setIsDark(nextTheme);
+    localStorage.setItem('syncine-theme-manual', nextTheme ? 'dark' : 'light');
+    applyISTReflectionCSS(getISTCycleState(), nextTheme);
+  };
 
   const handleCreateRoom = async (name: string, mediaMode: 'screen' | 'local_file', isPermanent: boolean) => {
     if (!currentUser) return;
@@ -209,7 +233,7 @@ export const App: React.FC = () => {
           onOpenDocs={() => setIsDocsModalOpen(true)}
           onLogout={handleLogout}
           isDark={isDark}
-          onToggleTheme={() => setIsDark(!isDark)}
+          onToggleTheme={handleToggleTheme}
           initialRoomId={initialRoomParam}
           isAuthenticating={isAuthenticating}
         />

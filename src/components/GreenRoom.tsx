@@ -122,44 +122,28 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between font-sans select-none z-20 architectural-grid">
+    <div className="relative min-h-screen w-full flex flex-col justify-between select-none z-20">
       {/* Top Header */}
-      <header className="w-full flex items-center justify-between py-3.5 px-6 sm:px-12 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+      <header className="w-full flex items-center justify-between py-4 px-6 sm:px-12 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
         <div className="flex items-center gap-3">
           <SynLogo size={30} className="shrink-0" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-[var(--text-primary)] font-bold text-base tracking-tight leading-none">SynCine</span>
-            <span className="font-mono text-[10px] tracking-wider text-[var(--text-tertiary)] uppercase hidden sm:inline">
-              // PRE-MEETING STAGING
-            </span>
-          </div>
+          <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight leading-none">SynCine</span>
         </div>
 
         <button
           onClick={onCancel}
-          className="flex items-center gap-1.5 text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-3 py-1.5 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+          className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-3 py-1.5 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
         >
-          <X size={14} />
-          <span>LEAVE</span>
+          <X size={15} />
+          <span>Leave</span>
         </button>
       </header>
 
       {/* Center Device Staging Stage */}
-      <main className="w-full max-w-5xl mx-auto my-auto p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Left: Viewfinder Camera & Mic Window */}
+      <main className="w-full max-w-5xl mx-auto my-auto p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-enter-smooth">
+        {/* Left: Clean Camera Preview */}
         <div className="lg:col-span-7 flex flex-col items-center">
-          <div className="w-full aspect-video rounded-2xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
-            {/* Viewfinder Architectural Crosshairs (Pacome / Kenichi inspired) */}
-            <div className="absolute top-4 left-4 font-mono text-[10px] text-white/30 pointer-events-none select-none">
-              + [01_CAM]
-            </div>
-            <div className="absolute top-4 right-4 font-mono text-[10px] text-white/30 pointer-events-none select-none">
-              [REC_READY] +
-            </div>
-            <div className="absolute bottom-16 left-4 font-mono text-[10px] text-white/30 pointer-events-none select-none">
-              + [1080P_60FPS]
-            </div>
-
+          <div className="w-full aspect-video rounded-3xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
             {isVideoOn && previewStream?.getVideoTracks().length ? (
               <video
                 ref={videoPreviewRef}
@@ -170,37 +154,35 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center bg-black text-[var(--text-secondary)] p-6">
-                <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white/50 font-mono font-bold text-2xl mb-3">
-                  {userName ? userName.charAt(0).toUpperCase() : 'C'}
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white/60 font-semibold text-2xl mb-3">
+                  {userName ? userName.charAt(0).toUpperCase() : 'G'}
                 </div>
-                <span className="font-mono text-xs text-white/40 tracking-wider">CAMERA MUTED</span>
+                <span className="text-xs text-white/50">Camera Off</span>
               </div>
             )}
 
             {/* Bottom In-Tile Controls */}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 flex items-center justify-between z-10">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
-                {/* Microphone Toggle */}
                 <button
                   type="button"
                   onClick={() => setIsMicOn(!isMicOn)}
                   className={`p-2.5 rounded-xl transition cursor-pointer ${
                     isMicOn
-                      ? 'bg-white/10 text-white border border-white/15 hover:bg-white/15'
+                      ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
                       : 'bg-[var(--destructive)]/20 text-[var(--destructive)] border border-[var(--destructive)]/30'
                   }`}
-                  title={isMicOn ? 'Turn mic off' : 'Turn mic on'}
+                  title={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
                 >
                   {isMicOn ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
                 </button>
 
-                {/* Camera Toggle */}
                 <button
                   type="button"
                   onClick={() => setIsVideoOn(!isVideoOn)}
                   className={`p-2.5 rounded-xl transition cursor-pointer ${
                     isVideoOn
-                      ? 'bg-white/10 text-white border border-white/15 hover:bg-white/15'
+                      ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
                       : 'bg-[var(--destructive)]/20 text-[var(--destructive)] border border-[var(--destructive)]/30'
                   }`}
                   title={isVideoOn ? 'Turn camera off' : 'Turn camera on'}
@@ -209,40 +191,36 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 </button>
               </div>
 
-              {/* Monospace VU Decibel Indicator */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/60 border border-white/10 font-mono text-[11px] text-white/70">
-                <div className="w-14 h-1 bg-white/15 rounded-full overflow-hidden">
+              {/* Audio Activity Indicator */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs text-white/70">
+                <div className="w-12 h-1 bg-white/20 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[var(--accent)] transition-all duration-75 rounded-full"
                     style={{ width: `${isMicOn ? audioLevel : 0}%` }}
                   />
                 </div>
-                <span>{isMicOn ? `VU: ${audioLevel}%` : 'MUTED'}</span>
+                <span className="text-[11px]">{isMicOn ? 'Mic Ready' : 'Muted'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Watchroom Joining Panel */}
+        {/* Right: Joining Panel */}
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <div className="p-6 sm:p-8 space-y-6 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl backdrop-blur-xl">
+          <div className="p-6 sm:p-8 space-y-6 realistic-glass rounded-3xl">
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] text-[10px] font-mono tracking-wider text-[var(--text-secondary)] mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
-                <span>SESSION READY</span>
-              </div>
+              <span className="text-xs font-medium text-[var(--accent)] mb-1 block">
+                {isHost ? 'Host Session' : 'Guest Session'}
+              </span>
               <h2 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
                 {roomName}
               </h2>
-              <p className="font-mono text-[11px] text-[var(--text-tertiary)] mt-1">
-                PIPELINE: {mediaMode === 'screen' ? 'SCREEN CAST (H.264)' : 'LOCAL FILE SYNC'} // {isHost ? 'HOST' : 'PEER'}
-              </p>
             </div>
 
             {/* Display Name Input */}
             <div>
-              <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
-                [01] Confirm Display Name
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                Your Display Name
               </label>
               <input
                 type="text"
@@ -251,7 +229,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 onChange={(e) => setUserName(e.target.value)}
                 placeholder="Enter your name"
                 maxLength={32}
-                className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+                className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
               />
             </div>
 
@@ -261,9 +239,9 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 type="button"
                 onClick={() => handleJoinClick(false)}
                 disabled={!userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
               >
-                <span>ENTER STAGE</span>
+                <span>Enter Watchroom</span>
                 <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
 
@@ -272,27 +250,27 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                   type="button"
                   onClick={() => handleJoinClick(true)}
                   disabled={!userName.trim()}
-                  className="w-full py-3 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-xs rounded-xl border border-black/[0.06] dark:border-white/[0.08] transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3 bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium rounded-xl border border-black/[0.06] dark:border-white/[0.08] transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ScreenCastIcon size={15} />
-                  <span>PRESENT SCREEN ON ENTRY</span>
+                  <span>Present Screen Immediately</span>
                 </button>
               )}
             </div>
 
             {/* Invite Link */}
-            <div className="pt-4 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between font-mono text-xs text-[var(--text-secondary)]">
+            <div className="pt-4 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5">
-                <Users size={13} />
-                <span>MAX 4 PEERS</span>
+                <Users size={14} />
+                <span>Up to 4 participants</span>
               </span>
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className="flex items-center gap-1.5 hover-underline text-[var(--text-primary)] transition cursor-pointer"
+                className="flex items-center gap-1.5 text-[var(--text-primary)] hover:underline transition cursor-pointer font-medium"
               >
-                {copiedLink ? <CheckCircle2 size={13} className="text-[var(--success)]" /> : <Copy size={13} />}
-                <span>{copiedLink ? 'LINK COPIED' : 'COPY INVITE LINK'}</span>
+                {copiedLink ? <CheckCircle2 size={14} className="text-[var(--success)]" /> : <Copy size={14} />}
+                <span>{copiedLink ? 'Link Copied' : 'Copy Invite Link'}</span>
               </button>
             </div>
           </div>
@@ -300,8 +278,8 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="w-full mx-auto py-4 text-center font-mono text-[11px] text-[var(--text-tertiary)]">
-        <span>ENCRYPTED SRTP MEDIA CHANNELS // ZERO SERVER STORAGE</span>
+      <footer className="w-full mx-auto py-4 text-center text-xs text-[var(--text-tertiary)]">
+        <span>Direct encrypted peer-to-peer media stream</span>
       </footer>
     </div>
   );

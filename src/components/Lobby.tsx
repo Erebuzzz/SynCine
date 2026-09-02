@@ -11,7 +11,7 @@ import {
   LogOut,
   Sun,
   Moon,
-  Terminal
+  BookOpen
 } from 'lucide-react';
 import type { Models } from 'appwrite';
 
@@ -85,89 +85,78 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between font-sans select-none z-10 architectural-grid">
-      {/* Precision Architectural Header */}
-      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-3.5 px-6 sm:px-12 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
-        {/* Left: Brand Identity + Monospace Version Tag */}
+    <div className="relative min-h-screen w-full flex flex-col justify-between select-none z-10">
+      {/* Symmetrical Top Header */}
+      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-4 px-6 sm:px-12 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+        {/* Left: Brand Identity */}
         <div className="flex items-center gap-3">
-          <SynLogo size={32} className="shrink-0" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-[var(--text-primary)] font-bold text-base tracking-tight leading-none">
-              SynCine
-            </span>
-            <span className="font-mono text-[10px] tracking-wider text-[var(--text-tertiary)] uppercase hidden sm:inline">
-              v1.0.4
-            </span>
-          </div>
+          <SynLogo size={32} className="shrink-0 transition-transform duration-300 hover:scale-105" />
+          <span className="text-[var(--text-primary)] font-semibold text-lg tracking-tight leading-none">
+            SynCine
+          </span>
         </div>
 
-        {/* Center: Monospace Navigation Trigger */}
-        <nav className="hidden md:flex items-center gap-2">
+        {/* Center: Documentation Navigation */}
+        <nav className="hidden sm:flex items-center">
           <button
             type="button"
             onClick={onOpenDocs}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono tracking-wide text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
           >
-            <Terminal size={13} className="text-[var(--accent)]" />
-            <span className="hover-underline">DOCS // ARCHITECTURE</span>
+            <BookOpen size={14} className="text-[var(--accent)]" />
+            <span>Documentation</span>
           </button>
         </nav>
 
-        {/* Right: Telemetry State, Theme Switcher & Auth */}
+        {/* Right: Controls & Auth */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Live Telemetry Status Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] text-[10px] font-mono tracking-wider text-[var(--text-secondary)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
-            <span>SYS: READY</span>
-          </div>
-
           {/* Docs Mobile Trigger */}
           <button
             type="button"
             onClick={onOpenDocs}
-            className="md:hidden p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            className="sm:hidden p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
             title="Documentation"
             aria-label="Documentation"
           >
-            <Terminal size={15} />
+            <BookOpen size={16} />
           </button>
 
-          {/* Theme Toggle Capsule */}
+          {/* Theme Switcher (Day/Night Indicator) */}
           <button
             type="button"
             onClick={onToggleTheme}
-            className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle visual theme"
           >
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Authentication Capsule */}
+          {/* Authentication State */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs font-mono text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
                 <span className="font-medium hidden sm:inline">{currentUser?.name || currentUser?.email}</span>
-                <span className="text-[10px] uppercase font-bold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
+                <span className="text-[10px] uppercase font-semibold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
               </div>
               <button
                 type="button"
                 onClick={onLogout}
-                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
                 title="Sign out"
                 aria-label="Sign out"
               >
-                <LogOut size={15} />
+                <LogOut size={16} />
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={onOpenAuth}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
             >
-              <LogIn size={13} />
+              <LogIn size={14} />
               <span>Host Sign In</span>
             </button>
           )}
@@ -175,53 +164,35 @@ export const Lobby: React.FC<LobbyProps> = ({
       </header>
 
       {/* Main Center Stage */}
-      <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center flex-1 justify-center">
-        {/* Editorial Hero Block */}
-        <section className="text-center max-w-2xl mb-10 sm:mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase mb-4">
-            <span className="text-[var(--accent)] font-bold">[01]</span>
-            <span>Synchronized Cinema Protocol</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-[1.12] mb-4">
+      <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center flex-1 justify-center animate-enter-smooth">
+        {/* Clean Hero Presentation */}
+        <section className="text-center max-w-xl mb-10 sm:mb-12">
+          <h1 className="text-3xl sm:text-5xl font-semibold text-[var(--text-primary)] tracking-tight leading-[1.15] mb-4">
             Shared Cinema, Perfectly Synchronized.
           </h1>
 
-          <p className="text-[var(--text-secondary)] text-xs sm:text-sm leading-relaxed max-w-xl mx-auto font-normal mb-5">
-            Real-time peer-to-peer watchrooms with sub-350ms timestamp drift compensation and zero server video storage.
+          <p className="text-[var(--text-secondary)] text-sm sm:text-base leading-relaxed font-normal">
+            Watch movies with friends over private peer-to-peer streams with instant audio and video sync.
           </p>
-
-          {/* Monospace Architecture Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-3 font-mono text-[11px] text-[var(--text-tertiary)]">
-            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
-              LATENCY // &lt;350MS
-            </span>
-            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
-              TOPOLOGY // 4-PEER MESH
-            </span>
-            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
-              STORAGE // ZERO-CLOUD
-            </span>
-          </div>
         </section>
 
-        {/* Action Panel Container */}
-        <div className="w-full max-w-lg p-6 sm:p-8 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl shadow-xl backdrop-blur-xl">
-          {/* Tab Switcher (Watermelon UI Style) */}
-          <div className="grid grid-cols-2 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-6 font-mono text-xs">
+        {/* Realistic Glassmorphic Action Card */}
+        <div className="w-full max-w-lg p-6 sm:p-8 realistic-glass rounded-3xl">
+          {/* Subtle Tab Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-black/[0.03] dark:bg-white/[0.05] rounded-2xl border border-black/[0.06] dark:border-white/[0.08] mb-6 text-xs">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('create');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center font-medium cursor-pointer ${
                 activeTab === 'create'
-                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] font-semibold shadow-sm'
+                  ? 'bg-white dark:bg-white/[0.14] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <span>NEW ROOM</span>
+              <span>Create Watchroom</span>
             </button>
             <button
               type="button"
@@ -229,19 +200,19 @@ export const Lobby: React.FC<LobbyProps> = ({
                 setActiveTab('join');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center font-medium cursor-pointer ${
                 activeTab === 'join'
-                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] font-semibold shadow-sm'
+                  ? 'bg-white dark:bg-white/[0.14] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <span>JOIN WITH CODE</span>
+              <span>Join with Code</span>
             </button>
           </div>
 
           {errorMessage && (
-            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs font-mono flex items-center justify-between">
-              <span>ERR: {errorMessage}</span>
+            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
+              <span>{errorMessage}</span>
               <button
                 type="button"
                 onClick={() => setErrorMessage(null)}
@@ -254,8 +225,8 @@ export const Lobby: React.FC<LobbyProps> = ({
 
           {/* User Display Name */}
           <div className="mb-5">
-            <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
-              [01] Display Name
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+              Display Name
             </label>
             <input
               type="text"
@@ -264,103 +235,103 @@ export const Lobby: React.FC<LobbyProps> = ({
               onChange={(e) => onUserNameChange(e.target.value)}
               placeholder="Your name"
               maxLength={32}
-              className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+              className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
             />
           </div>
 
           {activeTab === 'create' ? (
             <form onSubmit={handleCreate} className="space-y-5">
               <div>
-                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
-                  [02] Watchroom Title
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                  Watchroom Title
                 </label>
                 <input
                   type="text"
                   required
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  placeholder="e.g. Blade Runner 2049"
+                  placeholder="e.g. Movie Night"
                   maxLength={64}
-                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
                 />
               </div>
 
               {/* Streaming Pipeline Selection */}
               <div>
-                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
-                  [03] Streaming Pipeline
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                  Streaming Source
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div
                     onClick={() => setMediaMode('screen')}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 flex flex-col ${
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
                       mediaMode === 'screen'
-                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.14] dark:border-white/[0.18]'
+                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
                         : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className={`p-1.5 rounded-lg ${
+                          className={`p-2 rounded-xl transition ${
                             mediaMode === 'screen'
                               ? 'bg-[var(--accent)] text-black'
                               : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
                           }`}
                         >
-                          <ScreenCastIcon size={15} />
+                          <ScreenCastIcon size={16} />
                         </div>
                         <span className="text-xs font-semibold text-[var(--text-primary)]">Screen Cast</span>
                       </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
-                      Hardware H.264 tab or desktop broadcast.
+                    <span className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                      Share your browser tab or desktop display.
                     </span>
                   </div>
 
                   <div
                     onClick={() => setMediaMode('local_file')}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 flex flex-col ${
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
                       mediaMode === 'local_file'
-                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.14] dark:border-white/[0.18]'
+                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
                         : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className={`p-1.5 rounded-lg ${
+                          className={`p-2 rounded-xl transition ${
                             mediaMode === 'local_file'
                               ? 'bg-[var(--accent)] text-black'
                               : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
                           }`}
                         >
-                          <CinemaReelIcon size={15} />
+                          <CinemaReelIcon size={16} />
                         </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local File Sync</span>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local File</span>
                       </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
-                      Local video file sync with zero server upload.
+                    <span className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                      Sync playback of video files from your device.
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Permanent Room Option */}
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <KeyRound size={15} className={isPermanent ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'} />
+              <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <KeyRound size={16} className={isPermanent ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'} />
                   <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-[var(--text-primary)]">
-                      Permanent Watchroom
+                    <span className="text-xs font-medium text-[var(--text-primary)]">
+                      Permanent Room
                     </span>
                     <span className="text-[11px] text-[var(--text-secondary)]">
                       {isAuthenticated
-                        ? 'Link never expires (Host account active)'
-                        : 'Requires optional Host Sign In (otherwise 3h buffer)'}
+                        ? 'Room URL remains permanently active'
+                        : 'Sign in to keep room URL active beyond 3 hours'}
                     </span>
                   </div>
                 </div>
@@ -382,35 +353,35 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !roomName.trim() || !userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
               >
-                <span>{isLoading ? 'INITIALIZING STAGE...' : 'START WATCHROOM'}</span>
+                <span>{isLoading ? 'Creating Room...' : 'Start Watchroom'}</span>
                 <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </form>
           ) : (
             <form onSubmit={handleJoin} className="space-y-5">
               <div>
-                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
-                  [02] Room Code or URL
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                  Room Code or Link
                 </label>
                 <input
                   type="text"
                   required
                   value={joinRoomId}
                   onChange={(e) => setJoinRoomId(e.target.value)}
-                  placeholder="e.g. 6a97c0ed or paste full link"
+                  placeholder="Paste room code or invite link"
                   maxLength={100}
-                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !joinRoomId.trim() || !userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
               >
-                <span>{isLoading ? 'CONNECTING...' : 'JOIN WATCHROOM'}</span>
+                <span>{isLoading ? 'Connecting...' : 'Join Watchroom'}</span>
                 <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </form>
@@ -418,20 +389,18 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </main>
 
-      {/* Monospace Editorial Footer */}
-      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs font-mono text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Symmetrical Clean Footer */}
+      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-3">
         <div>
-          <span>SYNCINE // P2P WEBRTC CINEMA // (C) 2026</span>
+          <span>SynCine (c) 2026</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span>ZERO CLOUD STORAGE</span>
-          <span>•</span>
+        <div>
           <button
             type="button"
             onClick={onOpenDocs}
-            className="hover-underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
           >
-            [ ARCHITECTURE & SPEC ]
+            Documentation
           </button>
         </div>
       </footer>
