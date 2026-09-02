@@ -9,6 +9,9 @@ This document preserves the current implementation state, architectural decision
 - **Appwrite Endpoint:** `https://sgp.cloud.appwrite.io/v1`
 - **Appwrite Project ID:** `6a97c0ed000188adaed0`
 - **Database ID:** `syncine_db`
+- **Registered Web Platforms:**
+  - `syncine_vercel`: `syncine.vercel.app` (Production deployment)
+  - `syncine_localhost`: `localhost` (Local development)
 - **Capacity Constraint:** Strictly 4 maximum participants per room
 - **Room Lifecycle Policy:** Ephemeral guest rooms reset after 3 hours; authenticated host rooms are permanent. Zero user tracking or invasive data collection.
 

@@ -113,7 +113,14 @@ export const App: React.FC = () => {
   };
 
   const handleCreateRoom = async (name: string, mediaMode: 'screen' | 'local_file', isPermanent: boolean) => {
-    if (!currentUser) return;
+    let user = currentUser;
+    if (!user) {
+      user = await ensureAnonymousSession();
+      setCurrentUser(user);
+    }
+    if (!user) {
+      throw new Error('Unable to initialize user session. Please check your connection.');
+    }
 
     const newRoomId = ID.unique();
     const expiresAt = isPermanent
@@ -126,7 +133,7 @@ export const App: React.FC = () => {
       newRoomId,
       {
         name,
-        hostId: currentUser.$id,
+        hostId: user.$id,
         mediaMode,
         participantCount: 1,
         maxParticipants: MAX_PARTICIPANTS,
@@ -147,6 +154,16 @@ export const App: React.FC = () => {
   };
 
   const handleJoinRoom = async (rawInput: string) => {
+    let user = currentUser;
+    if (!user) {
+      try {
+        user = await ensureAnonymousSession();
+        setCurrentUser(user);
+      } catch (err) {
+        console.warn('Session check on join:', err);
+      }
+    }
+
     let cleanRoomId = rawInput.trim();
     if (cleanRoomId.includes('?room=')) {
       cleanRoomId = cleanRoomId.split('?room=')[1].split('&')[0];
