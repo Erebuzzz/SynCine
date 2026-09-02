@@ -24,7 +24,8 @@ import {
   VolumeX,
   Sliders,
   Video,
-  VideoOff
+  VideoOff,
+  Settings
 } from 'lucide-react';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
@@ -58,10 +59,12 @@ interface WatchStageProps {
   onLeaveRoom: () => void;
   videoRefCallback?: (el: HTMLVideoElement | null) => void;
   childrenChat?: React.ReactNode;
+  childrenSettings?: React.ReactNode;
   unreadChatCount?: number;
   isChatOpen?: boolean;
   onToggleChat?: () => void;
   onCloseChat?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const WatchStage: React.FC<WatchStageProps> = ({
@@ -82,10 +85,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   onLeaveRoom,
   videoRefCallback,
   childrenChat,
+  childrenSettings,
   unreadChatCount = 0,
   isChatOpen: controlledChatOpen,
   onToggleChat,
-  onCloseChat
+  onCloseChat,
+  onOpenSettings
 }) => {
   const [layout, setLayout] = useState<DisplayLayout>('theater');
   const [volumes, setVolumes] = useState<Record<string, number>>({});
@@ -256,6 +261,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               </span>
             )}
           </button>
+
+          {/* Settings Toggle */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+              title="Pipeline Settings & Live Diagnostics"
+              aria-label="Settings"
+            >
+              <Settings size={16} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -643,6 +661,18 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <span className="hidden sm:inline">Select Video File</span>
             </button>
           )}
+          {/* Watchroom Settings */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition cursor-pointer"
+              title="Pipeline Settings & Live Diagnostics"
+            >
+              <Settings size={16} />
+              <span className="hidden md:inline">Settings</span>
+            </button>
+          )}
         </div>
 
         {/* Leave Watchroom */}
@@ -656,6 +686,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </button>
         </div>
       </footer>
+
+      {childrenSettings}
     </div>
   );
 };
