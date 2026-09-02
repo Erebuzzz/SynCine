@@ -1,0 +1,32 @@
+---
+description: Appwrite SDK rules and architectural guidelines for client and server execution
+globs: **/*.{ts,tsx,js,jsx}
+---
+
+# Appwrite Development Rules
+
+## 1. SDK Distinction
+- **Client-Side Code (`src/**`):** Use solely the client SDK `appwrite`.
+  - Never import `node-appwrite` in front-end React components.
+  - Instantiate `Client`, `Account`, `Databases` (or `TablesDB`), and `Realtime` from `appwrite`.
+  - Use `account.createAnonymousSession()` to guarantee frictionless guest entry.
+- **Server-Side & Functions (`scripts/**`, `functions/**`):** Use `node-appwrite`.
+  - Always provide `setKey(APPWRITE_API_KEY)` on server contexts.
+  - Never expose API keys with admin privileges to the React frontend.
+
+## 2. Security & Document-Level Security (DLS)
+- Enable Document-Level Security on collections holding ephemeral or private data (e.g., `signaling`).
+- Always assign granular permissions using the `Permission` and `Role` helpers:
+  - `Permission.read(Role.user(userId))`
+  - `Permission.write(Role.user(userId))`
+  - `Permission.read(Role.any())` for public discovery of active room names.
+- Never default to broad write permissions (`Role.any()`) for transactional entities.
+
+## 3. Realtime Channels
+- Subscribe to documents with the pattern: `databases.[DB_ID].collections.[COLLECTION_ID].documents`
+- Immediately filter payload IDs on the client to avoid handling self-emitted events.
+- Always return the unsubscriber function inside React `useEffect` cleanups to prevent memory leaks and duplicate socket listeners.
+
+## 4. Query & ID Conventions
+- Always generate unique document IDs using `ID.unique()`.
+- Use the `Query` helper class from the respective SDK (`Query.equal()`, `Query.lessThan()`) rather than raw string query filters.

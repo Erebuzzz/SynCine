@@ -1,0 +1,249 @@
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const endpoint = process.env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
+const projectId = process.env.APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
+const apiKey = process.env.APPWRITE_API_KEY;
+const dbId = process.env.APPWRITE_DATABASE_ID || 'syncine_db';
+
+if (!apiKey) {
+  console.warn('APPWRITE_API_KEY is not set in environment or .env file.');
+  console.warn('Provisioning script requires an admin API key with databases.write scope to execute.');
+  process.exit(1);
+}
+
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Appwrite-Project': projectId,
+  'X-Appwrite-Key': apiKey,
+};
+
+async function apiRequest(path: string, method: string = 'GET', body?: any) {
+  const url = `${endpoint}${path}`;
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await response.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { text };
+  }
+
+  if (!response.ok && response.status !== 409) {
+    throw new Error(`API Error [${response.status}] ${data.message || response.statusText}`);
+  }
+
+  return { status: response.status, data };
+}
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function bootstrap() {
+  console.log(`Connecting to Appwrite REST: ${endpoint} (Project: ${projectId})`);
+
+  // 1. Create Database
+  try {
+    const res = await apiRequest('/databases', 'POST', {
+      databaseId: dbId,
+      name: 'SynCine Production Database',
+      enabled: true,
+    });
+    if (res.status === 409) {
+      console.log(`Database '${dbId}' already exists, verifying collections...`);
+    } else {
+      console.log(`Database '${dbId}' created successfully.`);
+    }
+  } catch (err: any) {
+    console.error('Error creating database:', err.message);
+  }
+
+  await sleep(1000);
+
+  // 2. Rooms Collection
+  try {
+    const res = await apiRequest(`/databases/${dbId}/collections`, 'POST', {
+      collectionId: 'rooms',
+      name: 'Rooms',
+      permissions: [
+        'read("any")',
+        'create("users")',
+        'update("users")',
+        'delete("users")',
+      ],
+      documentSecurity: false,
+      enabled: true,
+    });
+    if (res.status === 409) {
+      console.log('Collection "rooms" already exists.');
+    } else {
+      console.log('Collection "rooms" created.');
+    }
+  } catch (err: any) {
+    console.error('Error creating rooms collection:', err.message);
+  }
+
+  await sleep(1000);
+
+  // Attributes for rooms
+  const roomAttributes = [
+    { type: 'string', key: 'name', size: 64, required: true },
+    { type: 'string', key: 'hostId', size: 36, required: true },
+    { type: 'string', key: 'syncState', size: 4096, required: false },
+    { type: 'enum', key: 'mediaMode', elements: ['screen', 'local_file'], required: true },
+    { type: 'integer', key: 'participantCount', required: false, min: 1, max: 4, default: 1 },
+    { type: 'integer', key: 'maxParticipants', required: false, min: 1, max: 4, default: 4 },
+  ];
+
+  for (const attr of roomAttributes) {
+    try {
+      let path = `/databases/${dbId}/collections/rooms/attributes/${attr.type}`;
+      if (attr.type === 'string') {
+        await apiRequest(path, 'POST', {
+          key: attr.key,
+          size: attr.size,
+          required: attr.required,
+        });
+      } else if (attr.type === 'enum') {
+        await apiRequest(path, 'POST', {
+          key: attr.key,
+          elements: (attr as any).elements,
+          required: attr.required,
+        });
+      } else if (attr.type === 'integer') {
+        await apiRequest(path, 'POST', {
+          key: attr.key,
+          required: attr.required,
+          min: attr.min,
+          max: attr.max,
+          default: attr.default,
+        });
+      }
+      console.log(`Attribute rooms.${attr.key} created.`);
+      await sleep(500);
+    } catch (err: any) {
+      if (err.message?.includes('already exists') || err.message?.includes('409')) {
+        console.log(`Attribute rooms.${attr.key} already exists.`);
+      } else {
+        console.warn(`Attribute rooms.${attr.key} warning:`, err.message);
+      }
+    }
+  }
+
+  // 3. Signaling Collection (DLS Enabled)
+  try {
+    const res = await apiRequest(`/databases/${dbId}/collections`, 'POST', {
+      collectionId: 'signaling',
+      name: 'Signaling',
+      permissions: ['create("users")'],
+      documentSecurity: true,
+      enabled: true,
+    });
+    if (res.status === 409) {
+      console.log('Collection "signaling" already exists.');
+    } else {
+      console.log('Collection "signaling" created with Document-Level Security.');
+    }
+  } catch (err: any) {
+    console.error('Error creating signaling collection:', err.message);
+  }
+
+  await sleep(1000);
+
+  // Attributes for signaling
+  const signalingAttributes = [
+    { type: 'string', key: 'roomId', size: 36, required: true },
+    { type: 'string', key: 'senderId', size: 36, required: true },
+    { type: 'string', key: 'receiverId', size: 36, required: true },
+    { type: 'enum', key: 'type', elements: ['offer', 'answer', 'candidate'], required: true },
+    { type: 'string', key: 'payload', size: 8192, required: true },
+  ];
+
+  for (const attr of signalingAttributes) {
+    try {
+      let path = `/databases/${dbId}/collections/signaling/attributes/${attr.type}`;
+      if (attr.type === 'string') {
+        await apiRequest(path, 'POST', {
+          key: attr.key,
+          size: attr.size,
+          required: attr.required,
+        });
+      } else if (attr.type === 'enum') {
+        await apiRequest(path, 'POST', {
+          key: attr.key,
+          elements: (attr as any).elements,
+          required: attr.required,
+        });
+      }
+      console.log(`Attribute signaling.${attr.key} created.`);
+      await sleep(500);
+    } catch (err: any) {
+      if (err.message?.includes('already exists') || err.message?.includes('409')) {
+        console.log(`Attribute signaling.${attr.key} already exists.`);
+      } else {
+        console.warn(`Attribute signaling.${attr.key} warning:`, err.message);
+      }
+    }
+  }
+
+  // 4. Messages Collection
+  try {
+    const res = await apiRequest(`/databases/${dbId}/collections`, 'POST', {
+      collectionId: 'messages',
+      name: 'Messages',
+      permissions: ['read("any")', 'create("users")'],
+      documentSecurity: false,
+      enabled: true,
+    });
+    if (res.status === 409) {
+      console.log('Collection "messages" already exists.');
+    } else {
+      console.log('Collection "messages" created.');
+    }
+  } catch (err: any) {
+    console.error('Error creating messages collection:', err.message);
+  }
+
+  await sleep(1000);
+
+  // Attributes for messages
+  const messageAttributes = [
+    { type: 'string', key: 'roomId', size: 36, required: true },
+    { type: 'string', key: 'senderId', size: 36, required: true },
+    { type: 'string', key: 'senderName', size: 32, required: true },
+    { type: 'string', key: 'content', size: 1000, required: true },
+  ];
+
+  for (const attr of messageAttributes) {
+    try {
+      let path = `/databases/${dbId}/collections/messages/attributes/${attr.type}`;
+      await apiRequest(path, 'POST', {
+        key: attr.key,
+        size: attr.size,
+        required: attr.required,
+      });
+      console.log(`Attribute messages.${attr.key} created.`);
+      await sleep(500);
+    } catch (err: any) {
+      if (err.message?.includes('already exists') || err.message?.includes('409')) {
+        console.log(`Attribute messages.${attr.key} already exists.`);
+      } else {
+        console.warn(`Attribute messages.${attr.key} warning:`, err.message);
+      }
+    }
+  }
+
+  console.log('\nSynCine Appwrite schema setup finished successfully.');
+}
+
+bootstrap().catch((err) => {
+  console.error('Fatal bootstrap error:', err);
+  process.exit(1);
+});
