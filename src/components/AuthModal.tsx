@@ -50,12 +50,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-lg">
       <div className="relative w-full max-w-md">
-        <LiquidGlassCard variant="modal" className="p-6 sm:p-8">
+        <LiquidGlassCard variant="modal" className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1.5 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition cursor-pointer"
+            className="absolute top-4 sm:top-5 right-4 sm:right-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1.5 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition cursor-pointer"
           >
             <X size={18} />
           </button>

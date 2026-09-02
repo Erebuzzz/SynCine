@@ -52,8 +52,10 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging.current) return;
-    const newX = Math.max(0, Math.min(window.innerWidth - 256, e.clientX - dragOffset.current.x));
-    const newY = Math.max(0, Math.min(window.innerHeight - 160, e.clientY - dragOffset.current.y));
+    const width = tileRef.current ? tileRef.current.offsetWidth : 180;
+    const height = tileRef.current ? tileRef.current.offsetHeight : 120;
+    const newX = Math.max(8, Math.min(window.innerWidth - width - 8, e.clientX - dragOffset.current.x));
+    const newY = Math.max(64, Math.min(window.innerHeight - height - 72, e.clientY - dragOffset.current.y));
     setPosition({ x: newX, y: newY });
   }, []);
 
@@ -67,7 +69,7 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
   return (
     <div
       ref={tileRef}
-      className={`fixed w-64 h-40 rounded-2xl overflow-hidden z-50 transition-shadow duration-200 ${
+      className={`fixed w-44 sm:w-64 h-28 sm:h-40 rounded-xl sm:rounded-2xl overflow-hidden z-50 transition-shadow duration-200 ${
         isGrabbing
           ? 'cursor-grabbing shadow-2xl border-[var(--text-tertiary)] ring-1 ring-white/20 dark:ring-white/15 scale-[1.02]'
           : 'cursor-grab shadow-xl'
@@ -100,7 +102,7 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
 
       {/* Bottom controls overlay */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3.5 py-2.5 flex items-center justify-between gap-1.5">
-        <span className="text-white text-xs font-semibold truncate max-w-[85px]">
+        <span className="text-white text-[11px] sm:text-xs font-semibold truncate max-w-[65px] sm:max-w-[85px]">
           {participant.name}
         </span>
         <div className="flex items-center gap-1">
@@ -120,6 +122,7 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
                 type="button"
                 onClick={() => setIsMuted(!isMuted)}
                 className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                aria-label={isMuted ? 'Unmute participant' : 'Mute participant'}
               >
                 {isMuted ? <VolumeX size={13} className="text-[var(--destructive)]" /> : <Volume2 size={13} />}
               </button>
@@ -133,7 +136,8 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
                   setVolume(Number(e.target.value));
                   if (isMuted) setIsMuted(false);
                 }}
-                className="w-14 h-1 accent-white/50 cursor-pointer pointer-events-auto"
+                className="hidden sm:block w-14 h-1 accent-white/50 cursor-pointer pointer-events-auto"
+                title="Participant volume"
               />
             </>
           )}

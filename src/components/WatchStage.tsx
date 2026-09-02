@@ -173,34 +173,34 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       className="relative w-screen h-screen bg-white dark:bg-black overflow-hidden flex flex-col font-sans select-none text-[#1D1D1F] dark:text-[#F5F5F7]"
     >
       {/* Top Floating Glass Navigation Header */}
-      <header className="h-16 px-4 sm:px-6 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative">
+      <header className="h-14 sm:h-16 px-3 sm:px-6 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative gap-2">
         {/* Room Info */}
-        <div className="flex items-center gap-3 min-w-0">
-          <SynLogo size={28} className="shrink-0" />
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <SynLogo size={24} className="sm:w-7 sm:h-7 shrink-0" />
           <div className="h-4 w-px bg-black/10 dark:bg-white/10 hidden sm:block" />
 
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-sm font-bold truncate max-w-[130px] sm:max-w-[200px]" title={roomName}>
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs sm:text-sm font-bold truncate max-w-[80px] min-[400px]:max-w-[120px] sm:max-w-[200px]" title={roomName}>
               {roomName}
             </span>
-            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] shrink-0">
+            <span className="px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] shrink-0">
               {isHost ? 'Host' : 'Viewer'}
             </span>
-            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-mono font-medium bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 border border-black/[0.06] dark:border-white/[0.08] select-all shrink-0" title="Watchroom Code">
+            <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-mono font-medium bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 border border-black/[0.06] dark:border-white/[0.08] select-all shrink-0" title="Watchroom Code">
               {formatRoomCode(roomId)}
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-1.5 shrink-0">
-              <MeshNetworkIcon size={12} className="text-black/55 dark:text-white/55" />
+            <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-1 shrink-0">
+              <MeshNetworkIcon size={11} className="text-black/55 dark:text-white/55" />
               <span>{totalUsersInRoom}/4</span>
             </span>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <button
             onClick={handleCopyInviteLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
             title="Copy watchroom link"
           >
             {copiedLink ? <CheckCircle2 size={14} className="text-[#30D158]" /> : <Share2 size={14} />}
@@ -208,53 +208,53 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </button>
 
           {/* Layout Mode Switcher */}
-          <div className="flex gap-1 bg-black/[0.03] dark:bg-white/[0.04] p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
+          <div className="flex gap-0.5 sm:gap-1 bg-black/[0.03] dark:bg-white/[0.04] p-0.5 sm:p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
             <button
               onClick={() => setLayout('theater')}
-              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'theater'
                   ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7]'
                   : 'text-black/30 dark:text-white/30 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
               }`}
               title="Theater View"
             >
-              <TheaterLayoutIcon size={16} />
+              <TheaterLayoutIcon size={15} />
             </button>
             <button
               onClick={() => setLayout('grid')}
-              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'grid'
                   ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7]'
                   : 'text-black/30 dark:text-white/30 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
               }`}
               title="Grid View"
             >
-              <GridLayoutIcon size={16} />
+              <GridLayoutIcon size={15} />
             </button>
             <button
               onClick={() => setLayout('floating')}
-              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
+              className={`p-1 sm:p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'floating'
                   ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7]'
                   : 'text-black/30 dark:text-white/30 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
               }`}
               title="Floating Viewports"
             >
-              <FloatingLayoutIcon size={16} />
+              <FloatingLayoutIcon size={15} />
             </button>
           </div>
 
           {/* Chat Toggle */}
           <button
             onClick={toggleChat}
-            className={`relative p-2 rounded-xl border transition cursor-pointer ${
+            className={`relative p-1.5 sm:p-2 rounded-xl border transition cursor-pointer ${
               isChatOpen
                 ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7] border-black/[0.08] dark:border-white/[0.1]'
                 : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08]'
             }`}
             title="Toggle Watchroom Chat"
           >
-            <MessageSquare size={16} />
+            <MessageSquare size={15} />
             {unreadChatCount > 0 && !isChatOpen && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF453A] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                 {unreadChatCount}
@@ -267,22 +267,24 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
               title="Pipeline Settings & Live Diagnostics"
               aria-label="Settings"
             >
-              <Settings size={16} />
+              <Settings size={15} />
             </button>
           )}
         </div>
       </header>
 
       {/* Main Cinema Viewport */}
-      <main className="flex-1 relative flex overflow-hidden">
+      <main className="flex-1 relative flex flex-col md:flex-row overflow-hidden">
         {/* Stage Area */}
         <div
-          className={`transition-all duration-300 flex-1 h-full relative bg-white dark:bg-black flex flex-col justify-center items-center ${
-            layout === 'theater' && participants.length > 0 ? 'w-[calc(100%-19rem)]' : 'w-full'
+          className={`transition-all duration-300 flex-1 relative bg-white dark:bg-black flex flex-col justify-center items-center w-full ${
+            layout === 'theater' && participants.length > 0
+              ? 'md:w-[calc(100%-19rem)] h-[calc(100%-8.5rem)] sm:h-[calc(100%-10.5rem)] md:h-full'
+              : 'h-full'
           }`}
         >
           {localFileUrl ? (
@@ -403,10 +405,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         </div>
 
-        {/* Theater View Lateral Sidebar */}
+        {/* Theater View Lateral Sidebar on Desktop, Horizontal Strip on Mobile/Tablet */}
         {layout === 'theater' && participants.length > 0 && (
-          <aside className="w-76 h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl border-l border-black/[0.06] dark:border-white/[0.06] p-4 overflow-y-auto space-y-3.5 shrink-0 z-20">
-            <div className="flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2 px-1">
+          <aside className="w-full md:w-76 h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 md:p-4 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 md:gap-3.5 shrink-0 z-20">
+            <div className="hidden md:flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2 px-1">
               <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
                 <Sliders size={13} className="text-black/55 dark:text-white/55" />
                 <span>Participants ({participants.length})</span>
@@ -422,7 +424,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="relative aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08]"
+                  className="relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] shrink-0"
                 >
                   {hasVideo ? (
                     <video
@@ -441,20 +443,20 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
-                      <div className="w-12 h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-xs sm:text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
                         {p.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
+                      <span className="text-[9px] sm:text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
                     </div>
                   )}
 
-                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate max-w-[105px]" title={p.name}>
+                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2 sm:p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                    <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                      <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate max-w-[80px] sm:max-w-[105px]" title={p.name}>
                         {p.name}
                       </span>
                       {p.isSelf && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
+                        <span className="text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
                           YOU
                         </span>
                       )}
@@ -463,17 +465,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     {p.isSelf ? (
                       <div className="flex items-center gap-1">
                         {p.isMicActive ? (
-                          <span className="p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
+                          <span className="p-0.5 sm:p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
                             <LiquidMicIcon size={12} />
                           </span>
                         ) : (
-                          <span className="p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
+                          <span className="p-0.5 sm:p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
                             <LiquidMicOffIcon size={12} />
                           </span>
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
                         <button
                           type="button"
                           onClick={() => toggleMutePeer(p.id)}
@@ -495,7 +497,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                             const val = parseFloat(e.target.value);
                             setVolumes((prev) => ({ ...prev, [p.id]: val }));
                           }}
-                          className="w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                          className="hidden md:block w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
                           title="Peer Volume"
                         />
                       </div>
@@ -509,7 +511,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
         {/* Grid View Layout */}
         {layout === 'grid' && participants.length > 0 && (
-          <div className="absolute inset-x-6 bottom-24 grid grid-cols-2 md:grid-cols-4 gap-4 z-30 pointer-events-none">
+          <div className="absolute inset-x-3 sm:inset-x-6 bottom-20 sm:bottom-24 grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 z-30 pointer-events-none">
             {participants.map((p) => {
               const hasVideo = Boolean(
                 p.stream &&
@@ -519,7 +521,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="pointer-events-auto aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
+                  className="pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
                 >
                   {hasVideo ? (
                     <video
@@ -538,15 +540,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
-                      <div className="w-12 h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-xs sm:text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
                         {p.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
+                      <span className="text-[9px] sm:text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
                     </div>
                   )}
 
-                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl px-3 py-2 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                    <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate">
+                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl px-2.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                    <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate">
                       {p.name}
                     </span>
                     {!p.isSelf && (
@@ -560,7 +562,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                           const val = parseFloat(e.target.value);
                           setVolumes((prev) => ({ ...prev, [p.id]: val }));
                         }}
-                        className="w-16 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                        className="hidden sm:block w-14 md:w-16 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
                       />
                     )}
                   </div>
@@ -587,10 +589,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             />
           ))}
 
-
         {/* Room Chat Drawer */}
         {childrenChat && isChatOpen && (
-          <div className="h-full shrink-0 z-30">
+          <div className="fixed md:relative inset-y-0 right-0 w-full sm:w-80 h-full shrink-0 z-50">
             {React.isValidElement(childrenChat)
               ? React.cloneElement(childrenChat as React.ReactElement<any>, {
                   onClose: closeChat,
@@ -602,12 +603,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       </main>
 
       {/* Bottom Liquid Glass Control Dock */}
-      <footer className="h-18 px-5 sm:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative">
-        <div className="flex items-center gap-2.5">
+      <footer className="h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1">
           {/* Studio Microphone Toggle */}
           <button
             onClick={onToggleMic}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isMicActive
                 ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
                 : 'bg-[#FF453A]/15 text-[#FF453A] border border-[#FF453A]/20 hover:bg-[#FF453A]/25'
@@ -622,7 +623,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {onToggleCamera && (
             <button
               onClick={onToggleCamera}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isCameraActive
                   ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
                   : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
@@ -638,7 +639,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {mediaMode === 'screen' && isHost && (
             <button
               onClick={onToggleScreenShare}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isSharingScreen
                   ? 'bg-[#8B7355]/15 dark:bg-[#C8A97E]/15 text-[#8B7355] dark:text-[#C8A97E] border border-[#8B7355]/20 dark:border-[#C8A97E]/20 hover:bg-[#8B7355]/25 dark:hover:bg-[#C8A97E]/25'
                   : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
@@ -655,18 +656,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {mediaMode === 'local_file' && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]"
             >
               <CinemaReelIcon size={16} />
               <span className="hidden sm:inline">Select Video File</span>
             </button>
           )}
+
           {/* Watchroom Settings */}
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition cursor-pointer shrink-0 min-h-[40px]"
               title="Pipeline Settings & Live Diagnostics"
             >
               <Settings size={16} />
@@ -676,13 +678,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         </div>
 
         {/* Leave Watchroom */}
-        <div>
+        <div className="shrink-0">
           <button
             onClick={onLeaveRoom}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-[#FF453A]/15 hover:bg-[#FF453A]/25 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/15 hover:bg-[#FF453A]/25 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer min-h-[40px]"
           >
-            <LogOut size={16} />
-            <span>Leave Watchroom</span>
+            <LogOut size={15} />
+            <span className="hidden sm:inline">Leave</span>
           </button>
         </div>
       </footer>

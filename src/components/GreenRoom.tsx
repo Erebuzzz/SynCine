@@ -141,10 +141,10 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       </header>
 
       {/* Center Device Staging Stage */}
-      <main className="w-full max-w-5xl mx-auto my-auto p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-enter-smooth">
+      <main className="w-full max-w-5xl mx-auto my-auto p-4 sm:p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center animate-enter-smooth">
         {/* Left: Clean Camera Preview */}
         <div className="lg:col-span-7 flex flex-col items-center">
-          <div className="w-full aspect-video rounded-3xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
+          <div className="w-full aspect-video rounded-2xl sm:rounded-3xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
             {isVideoOn && previewStream?.getVideoTracks().length ? (
               <video
                 ref={videoPreviewRef}
@@ -163,17 +163,18 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
             )}
 
             {/* Bottom In-Tile Controls */}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex items-center justify-between z-10">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsMicOn(!isMicOn)}
-                  className={`p-2.5 rounded-xl transition cursor-pointer ${
+                  className={`p-2.5 rounded-xl transition cursor-pointer min-h-[42px] min-w-[42px] flex items-center justify-center ${
                     isMicOn
                       ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
                       : 'bg-[var(--destructive)]/20 text-[var(--destructive)] border border-[var(--destructive)]/30'
                   }`}
                   title={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
+                  aria-label={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
                 >
                   {isMicOn ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
                 </button>
@@ -181,12 +182,13 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsVideoOn(!isVideoOn)}
-                  className={`p-2.5 rounded-xl transition cursor-pointer ${
+                  className={`p-2.5 rounded-xl transition cursor-pointer min-h-[42px] min-w-[42px] flex items-center justify-center ${
                     isVideoOn
                       ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
                       : 'bg-[var(--destructive)]/20 text-[var(--destructive)] border border-[var(--destructive)]/30'
                   }`}
                   title={isVideoOn ? 'Turn camera off' : 'Turn camera on'}
+                  aria-label={isVideoOn ? 'Turn camera off' : 'Turn camera on'}
                 >
                   {isVideoOn ? <Video size={16} /> : <VideoOff size={16} />}
                 </button>
@@ -208,7 +210,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
 
         {/* Right: Joining Panel */}
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <div className="p-6 sm:p-8 space-y-6 realistic-glass rounded-3xl">
+          <div className="p-5 sm:p-8 space-y-5 sm:space-y-6 realistic-glass rounded-2xl sm:rounded-3xl">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-medium text-[var(--accent)]">

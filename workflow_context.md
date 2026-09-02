@@ -101,7 +101,23 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - **Video & Quality:** Camera hardware selector, 4 resolution quality cards (`1080p`, `720p`, `480p`, `360p`) with live mirror preview and dynamic encoding bitrate adaptation.
   - **Diagnostics:** HTML5 Canvas rolling sparkline graph plotting 30 seconds of RTT latency, WebRTC telemetry cards (RTT, Jitter, Loss %, Bitrate), CPU/UI thread responsiveness meter, and smart root-cause analysis banner.
 
-## 7. Verification & Validation Status
+## 7. Adaptive Mobile & Tablet Experience
+- **Cinema Viewport & Theater Mode:**
+  - On desktop (`md:`): Video stage with vertical participant sidebar on the right (`md:w-76 md:h-full md:border-l`).
+  - On mobile/tablet (`< md`): Video stage maintains full width with participants docked beneath as a swipeable horizontal thumbnail carousel (`w-full border-t flex-row overflow-x-auto`), preventing movie display distortion.
+- **Header & Action Bar:**
+  - Fluid typography, truncated room names (`max-w-[80px] sm:max-w-[200px]`), and compact touch controls (minimum 40-44px touch targets).
+  - Watchroom invite code hidden on small phones to preserve critical controls.
+- **Bottom Control Dock:**
+  - Non-wrapping, horizontally scrollable button bar with safe-area spacing ensuring buttons (Mic, Camera, Screen share/file, Settings, Leave) never clip or overflow.
+- **Chat Drawer:**
+  - Full-width slide-over drawer on mobile devices (`w-full sm:w-80`) with dedicated close button and message composer.
+- **Draggable Viewports (`DraggableTile`):**
+  - Viewport-relative boundary clamping on touch pointer move, ensuring floating participant tiles never get dragged outside screen boundaries or under navigation bars.
+- **Modals & Dialogs (`SettingsModal`, `PrivacyModal`, `TermsModal`, `DocsModal`, `AuthModal`):**
+  - Responsive dialog envelopes (`p-2.5 sm:p-4`, `max-h-[92vh]`), touch-friendly tabs, and stacked mobile actions.
+
+## 8. Verification & Validation Status
 - **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.42s.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.77s.
 - **Main Branch:** Synced and pushed to GitHub repository `origin/main`.

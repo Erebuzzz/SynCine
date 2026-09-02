@@ -176,24 +176,25 @@ export const Lobby: React.FC<LobbyProps> = ({
             <button
               type="button"
               onClick={onOpenAuth}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
             >
               <LogIn size={14} />
-              <span>Host Sign In</span>
+              <span className="hidden min-[400px]:inline">Host Sign In</span>
+              <span className="min-[400px]:hidden">Sign In</span>
             </button>
           )}
         </div>
       </header>
 
       {/* Main Center Stage */}
-      <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center flex-1 justify-center animate-enter-smooth">
+      <main className="w-full max-w-4xl mx-auto px-3.5 sm:px-6 py-8 sm:py-16 flex flex-col items-center flex-1 justify-center animate-enter-smooth">
         {/* Clean Hero Presentation */}
-        <section className="text-center max-w-xl mb-10 sm:mb-12">
-          <h1 className="text-3xl sm:text-5xl font-semibold text-[var(--text-primary)] tracking-tight leading-[1.15] mb-4">
+        <section className="text-center max-w-xl mb-8 sm:mb-12">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-[var(--text-primary)] tracking-tight leading-[1.15] mb-3 sm:mb-4">
             Shared Cinema, Perfectly Synchronized.
           </h1>
 
-          <p className="text-[var(--text-secondary)] text-sm sm:text-base leading-relaxed font-normal">
+          <p className="text-[var(--text-secondary)] text-xs sm:text-base leading-relaxed font-normal">
             Watch movies with friends over private peer-to-peer streams with instant audio and video sync.
           </p>
         </section>
@@ -203,7 +204,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           ref={cardRef}
           onMouseMove={handleMouseMoveCard}
           onMouseLeave={handleMouseLeaveCard}
-          className="w-full max-w-lg p-6 sm:p-8 realistic-glass rounded-3xl relative overflow-hidden transition-shadow duration-300"
+          className="w-full max-w-lg p-5 sm:p-8 realistic-glass rounded-2xl sm:rounded-3xl relative overflow-hidden transition-shadow duration-300"
           style={{
             backgroundImage: cardSheen.active
               ? `radial-gradient(circle 350px at ${cardSheen.x}% ${cardSheen.y}%, rgba(200, 169, 126, 0.08), transparent 80%)`
@@ -422,11 +423,11 @@ export const Lobby: React.FC<LobbyProps> = ({
       </main>
 
       {/* Symmetrical Clean Footer with Privacy & Terms */}
-      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="w-full mx-auto py-5 sm:py-6 px-4 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
         <div>
           <span>SynCine (c) 2026</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px] sm:text-xs">
           <button
             type="button"
             onClick={onOpenPrivacy}

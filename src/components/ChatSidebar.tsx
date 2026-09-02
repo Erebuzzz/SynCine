@@ -116,9 +116,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="w-80 h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl border-l border-black/[0.06] dark:border-white/[0.06] flex flex-col z-30 transition-all shadow-none relative">
+    <aside className="w-full sm:w-80 h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl border-l border-black/[0.06] dark:border-white/[0.06] flex flex-col z-30 transition-all shadow-2xl sm:shadow-none relative">
       {/* Header */}
-      <div className="h-16 px-5 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0">
+      <div className="h-14 sm:h-16 px-4 sm:px-5 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-black/55 dark:text-white/55">
             <MessageSquare size={16} />
