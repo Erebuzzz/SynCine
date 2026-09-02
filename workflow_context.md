@@ -124,7 +124,21 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Added track-level toggle handlers (`handleToggleMic`, `handleToggleVideo`) allowing user to mute or unmute their camera without destroying the active media stream or triggering browser permission re-prompts.
   - Added robust fallback cascade in `captureUserMedia` (`exact` -> `ideal` -> basic `{ video: true, audio: true }` -> audio-only) so external webcams and virtual cameras never fail silently.
 
-## 9. Verification & Validation Status
+## 9. Stage Layout Architecture & Stream Smoothness
+- **Separated Screen Cast (3:1 / 4:1 Ratio):**
+  - When screen share or local file video is active: Left container occupies 75% to 80% width (`flex-1 md:flex-[3] lg:flex-[4]`) dedicated to the shared screen/video, while the right container (`md:w-76 lg:w-80 xl:w-96`) houses participant camera feeds cleanly separated by a vertical border.
+  - This 3:1 / 4:1 separated layout is preserved in Fullscreen mode (`mainStageContainerRef`), ensuring zero overlap or hindrance between camera feeds and the broadcast.
+- **Symmetrical Stage Coverage when Screen Share is Off:**
+  - When screen cast is inactive (`!hasActiveMedia`), the stage symmetrically distributes participant camera feeds across the entire stage (1 tile centered, 2 tiles side-by-side, 3 or 4 in 2x2 grid) with a floating standby pill at the top, maximizing camera visibility without squished sidebars.
+- **Stream Refresh / Blinking Prevention:**
+  - Prevented decoder resets and stream blinking by guarding all video elements with `if (el.srcObject !== mediaStream) el.srcObject = mediaStream;`.
+  - Gated live WebRTC telemetry polling behind `isSettingsOpen` in `RoomView.tsx` to eliminate 40 unneeded re-renders per minute during normal watching.
+- **Accurate Participant Count:**
+  - Fixed `totalUsersInRoom` in `WatchStage.tsx` from `participants.length + 1` to `participants.length` (since `participants` already includes self and remote users), accurately displaying `1/4` when alone.
+- **Right-Docked Floating Layout:**
+  - Floating draggable tiles now default to `x: window.innerWidth - 280`, keeping them docked along the right edge to avoid obstructing the primary video stage.
+
+## 10. Verification & Validation Status
 - **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.28s.
-- **Main Branch:** Synced and pushed to GitHub repository `origin/main` (commit `69e565c`).
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.38s.
+- **Main Branch:** Synced and pushed to GitHub repository `origin/main`.

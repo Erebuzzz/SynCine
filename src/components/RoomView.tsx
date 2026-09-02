@@ -177,9 +177,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
     };
   }, []);
 
-  // Poll live WebRTC and system telemetry every 1.5 seconds once on stage
+  // Poll live WebRTC and system telemetry only while Settings modal is open
   useEffect(() => {
-    if (!hasEnteredStage) return;
+    if (!hasEnteredStage || !isSettingsOpen) return;
 
     let isMounted = true;
     const interval = setInterval(async () => {
@@ -206,7 +206,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [hasEnteredStage]);
+  }, [hasEnteredStage, isSettingsOpen]);
 
   // WebRTC and Synchronizer Setup once user enters through the Green Room
   useEffect(() => {

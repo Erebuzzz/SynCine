@@ -165,7 +165,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     }
   };
 
-  const totalUsersInRoom = participants.length + 1;
+  const totalUsersInRoom = participants.length;
+  const hasActiveMedia = Boolean(mediaStream || localFileUrl);
 
   return (
     <div
@@ -279,234 +280,345 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
       {/* Main Cinema Viewport */}
       <main className="flex-1 relative flex flex-col md:flex-row overflow-hidden">
-        {/* Stage Area */}
-        <div
-          className={`transition-all duration-300 flex-1 relative bg-white dark:bg-black flex flex-col justify-center items-center w-full ${
-            layout === 'theater' && participants.length > 0
-              ? 'md:w-[calc(100%-19rem)] h-[calc(100%-8.5rem)] sm:h-[calc(100%-10.5rem)] md:h-full'
-              : 'h-full'
-          }`}
-        >
-          {localFileUrl ? (
-            <div className="relative w-full h-full flex items-center justify-center bg-white dark:bg-black">
-              <video
-                ref={(el) => {
-                  mainVideoRef.current = el;
-                  if (videoRefCallback) videoRefCallback(el);
-                }}
-                src={localFileUrl}
-                controls
-                playsInline
-                className="w-full h-full object-contain max-h-full"
-              />
-            </div>
-          ) : mediaStream ? (
-            <div className="relative w-full h-full flex items-center justify-center bg-white dark:bg-black">
-              <video
-                ref={(el) => {
-                  mainVideoRef.current = el;
-                  if (el) {
-                    el.srcObject = mediaStream;
-                    el.volume = mainVideoMuted ? 0 : mainVideoVolume;
-                  }
-                  if (videoRefCallback) videoRefCallback(el);
-                }}
-                autoPlay
-                playsInline
-                className="w-full h-full object-contain max-h-full"
-              />
+        {hasActiveMedia ? (
+          /* State 1: Active Screen Share or Local File Media (Separated 3:1 / 4:1 Layout) */
+          <>
+            {/* Left: Screen Share Feed (Dominant 3:1 to 4:1 Ratio) */}
+            <div className="flex-1 md:flex-[3] lg:flex-[4] h-full relative flex items-center justify-center bg-black overflow-hidden min-w-0">
+              {localFileUrl ? (
+                <video
+                  ref={(el) => {
+                    mainVideoRef.current = el;
+                    if (videoRefCallback) videoRefCallback(el);
+                  }}
+                  src={localFileUrl}
+                  controls
+                  playsInline
+                  className="w-full h-full object-contain max-h-full"
+                />
+              ) : mediaStream ? (
+                <video
+                  ref={(el) => {
+                    mainVideoRef.current = el;
+                    if (el && mediaStream) {
+                      if (el.srcObject !== mediaStream) {
+                        el.srcObject = mediaStream;
+                      }
+                      el.play().catch(() => {});
+                      el.volume = mainVideoMuted ? 0 : mainVideoVolume;
+                    }
+                    if (videoRefCallback) videoRefCallback(el);
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain max-h-full"
+                />
+              ) : null}
 
               {/* Movie Audio Track Slider */}
-              <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] px-3.5 py-2 rounded-2xl flex items-center gap-2.5 shadow-sm z-20">
-                <button
-                  type="button"
-                  onClick={() => setMainVideoMuted(!mainVideoMuted)}
-                  className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition cursor-pointer"
-                >
-                  {mainVideoMuted || mainVideoVolume === 0 ? (
-                    <VolumeX size={15} className="text-[#FF453A]" />
-                  ) : (
-                    <Volume2 size={15} />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={mainVideoMuted ? 0 : mainVideoVolume}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setMainVideoVolume(val);
-                    if (mainVideoRef.current) mainVideoRef.current.volume = val;
-                  }}
-                  className="w-20 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
-                  title="Media Stream Volume"
-                />
-              </div>
-            </div>
-          ) : (
-            /* Atmospheric Standby Stage */
-            <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden">
-              <div className="relative z-10 w-20 h-20 rounded-2xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl flex items-center justify-center text-black/30 dark:text-white/30 mb-6">
-                {mediaMode === 'screen' ? <ScreenCastIcon size={38} /> : <CinemaReelIcon size={38} />}
-              </div>
-              <h2 className="relative z-10 text-2xl sm:text-3xl font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2 tracking-tight">
-                {mediaMode === 'screen' ? 'Screen Stream Stage' : 'Local File Synchronization Stage'}
-              </h2>
-              <p className="relative z-10 text-black/55 dark:text-white/55 text-xs sm:text-sm max-w-md mb-8 leading-relaxed font-normal">
-                {mediaMode === 'screen'
-                  ? isHost
-                    ? 'Click "Start Screen Cast" below to broadcast your video stream with hardware-accelerated H.264 transmission.'
-                    : 'Awaiting host screen broadcast. Grab your popcorn.'
-                  : 'Load the identical video file into your player. SynCine will maintain sub-frame playback synchronization with zero upload.'}
-              </p>
-
-              {mediaMode === 'local_file' && (
-                <div className="relative z-10">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) onSelectLocalFile(file);
-                    }}
-                    className="hidden"
-                  />
+              {mediaStream && (
+                <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] px-3.5 py-2 rounded-2xl flex items-center gap-2.5 shadow-sm z-20">
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-6 py-3.5 rounded-xl bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black font-bold text-xs transition flex items-center gap-2 mx-auto cursor-pointer"
+                    type="button"
+                    onClick={() => setMainVideoMuted(!mainVideoMuted)}
+                    className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition cursor-pointer"
                   >
-                    <CinemaReelIcon size={18} />
-                    <span>Choose Local Video File</span>
+                    {mainVideoMuted || mainVideoVolume === 0 ? (
+                      <VolumeX size={15} className="text-[#FF453A]" />
+                    ) : (
+                      <Volume2 size={15} />
+                    )}
                   </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={mainVideoMuted ? 0 : mainVideoVolume}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setMainVideoVolume(val);
+                      if (mainVideoRef.current) mainVideoRef.current.volume = val;
+                    }}
+                    className="w-20 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                    title="Media Stream Volume"
+                  />
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Picture in Picture & Fullscreen Action Pill */}
-          <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20">
-            <button
-              onClick={togglePictureInPicture}
-              className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
-              title="Picture in Picture"
-            >
-              <PictureInPicture2 size={16} />
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Theater View Lateral Sidebar on Desktop, Horizontal Strip on Mobile/Tablet */}
-        {layout === 'theater' && participants.length > 0 && (
-          <aside className="w-full md:w-76 h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 md:p-4 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 md:gap-3.5 shrink-0 z-20">
-            <div className="hidden md:flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2 px-1">
-              <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
-                <Sliders size={13} className="text-black/55 dark:text-white/55" />
-                <span>Participants ({participants.length})</span>
-              </span>
-            </div>
-
-            {participants.map((p) => {
-              const hasVideo = Boolean(
-                p.stream &&
-                p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
-              );
-
-              return (
-                <div
-                  key={p.id}
-                  className="relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] shrink-0"
+              {/* Picture in Picture & Fullscreen Action Pill */}
+              <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20">
+                <button
+                  onClick={togglePictureInPicture}
+                  className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
+                  title="Picture in Picture"
                 >
-                  {hasVideo ? (
-                    <video
-                      ref={(v) => {
-                        if (v && p.stream) {
-                          v.srcObject = p.stream;
-                          if (!p.isSelf) {
-                            v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                          }
-                        }
-                      }}
-                      autoPlay
-                      playsInline
-                      muted={p.isSelf}
-                      className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-xs sm:text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
-                        {p.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
-                    </div>
-                  )}
+                  <PictureInPicture2 size={16} />
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                >
+                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+              </div>
+            </div>
 
-                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2 sm:p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                    <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                      <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate max-w-[80px] sm:max-w-[105px]" title={p.name}>
-                        {p.name}
-                      </span>
-                      {p.isSelf && (
-                        <span className="text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
-                          YOU
-                        </span>
+            {/* Right: Participant Cameras (Clean Separated Column) */}
+            {layout === 'theater' && participants.length > 0 && (
+              <aside className="w-full md:w-76 lg:w-80 xl:w-96 h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 shrink-0 z-20">
+                <div className="hidden md:flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1 px-1">
+                  <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
+                    <Sliders size={13} className="text-black/55 dark:text-white/55" />
+                    <span>Participants ({participants.length})</span>
+                  </span>
+                </div>
+
+                {participants.map((p) => {
+                  const hasVideo = Boolean(
+                    p.stream &&
+                    p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                  );
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] shrink-0"
+                    >
+                      {hasVideo ? (
+                        <video
+                          ref={(v) => {
+                            if (v && p.stream) {
+                              if (v.srcObject !== p.stream) {
+                                v.srcObject = p.stream;
+                              }
+                              v.play().catch(() => {});
+                              if (!p.isSelf) {
+                                v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
+                              }
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted={p.isSelf}
+                          className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-xs sm:text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
+                            {p.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-[9px] sm:text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
+                        </div>
                       )}
-                    </div>
 
-                    {p.isSelf ? (
-                      <div className="flex items-center gap-1">
+                      <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2 sm:p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                          <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate max-w-[80px] sm:max-w-[105px]" title={p.name}>
+                            {p.name}
+                          </span>
+                          {p.isSelf && (
+                            <span className="text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
+                              YOU
+                            </span>
+                          )}
+                        </div>
+
+                        {p.isSelf ? (
+                          <div className="flex items-center gap-1">
+                            {p.isMicActive ? (
+                              <span className="p-0.5 sm:p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
+                                <LiquidMicIcon size={12} />
+                              </span>
+                            ) : (
+                              <span className="p-0.5 sm:p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
+                                <LiquidMicOffIcon size={12} />
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 sm:gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleMutePeer(p.id)}
+                              className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+                            >
+                              {mutedPeers[p.id] ? (
+                                <VolumeX size={13} className="text-[#FF453A]" />
+                              ) : (
+                                <Volume2 size={13} />
+                              )}
+                            </button>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                              }}
+                              className="hidden md:block w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                              title="Peer Volume"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </aside>
+            )}
+          </>
+        ) : (
+          /* State 2: Screen Cast is OFF (Symmetrical Full Stage Camera Feed Coverage) */
+          <div className="flex-1 w-full h-full relative flex flex-col items-center justify-center p-3 sm:p-6 md:p-8 overflow-hidden bg-white dark:bg-black">
+            {/* Top Standby Notification Pill */}
+            <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none z-20">
+              <div className="pointer-events-auto px-4 py-1.5 rounded-full bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.1] text-xs text-black/65 dark:text-white/65 flex items-center gap-2 shadow-sm">
+                <ScreenCastIcon size={14} className="text-[var(--accent)]" />
+                <span>
+                  {mediaMode === 'screen'
+                    ? isHost
+                      ? 'Screen Cast Standby • Click "Start Screen Cast" below to broadcast'
+                      : 'Screen Cast Standby • Awaiting host broadcast'
+                    : isHost
+                    ? 'Local Video Standby • Choose a video file below to synchronize'
+                    : 'Local Video Standby • Awaiting host video selection'}
+                </span>
+              </div>
+            </div>
+
+            {/* Symmetrical Stage Coverage */}
+            <div
+              className={`w-full h-full max-h-[84vh] mx-auto grid gap-3 sm:gap-6 items-center justify-center ${
+                participants.length <= 1
+                  ? 'grid-cols-1 max-w-5xl'
+                  : participants.length === 2
+                  ? 'grid-cols-1 md:grid-cols-2 max-w-6xl'
+                  : 'grid-cols-2 max-w-6xl'
+              }`}
+            >
+              {participants.map((p) => {
+                const hasVideo = Boolean(
+                  p.stream &&
+                  p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                );
+
+                return (
+                  <div
+                    key={p.id}
+                    className="relative w-full h-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl flex items-center justify-center"
+                  >
+                    {hasVideo ? (
+                      <video
+                        ref={(v) => {
+                          if (v && p.stream) {
+                            if (v.srcObject !== p.stream) {
+                              v.srcObject = p.stream;
+                            }
+                            v.play().catch(() => {});
+                            if (!p.isSelf) {
+                              v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
+                            }
+                          }
+                        }}
+                        autoPlay
+                        playsInline
+                        muted={p.isSelf}
+                        className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
+                        <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-xl sm:text-2xl font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2">
+                          {p.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs text-black/50 dark:text-white/50 font-medium">Camera off</span>
+                      </div>
+                    )}
+
+                    {/* Bottom Info Pill */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4 flex items-center justify-between z-10">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-white text-xs sm:text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px]">
+                          {p.name} {p.isSelf && '(You)'}
+                        </span>
                         {p.isMicActive ? (
-                          <span className="p-0.5 sm:p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
+                          <span className="p-1 rounded-md bg-[#30D158]/20 text-[#30D158]">
                             <LiquidMicIcon size={12} />
                           </span>
                         ) : (
-                          <span className="p-0.5 sm:p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
+                          <span className="p-1 rounded-md bg-[#FF453A]/20 text-[#FF453A]">
                             <LiquidMicOffIcon size={12} />
                           </span>
                         )}
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 sm:gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleMutePeer(p.id)}
-                          className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
-                        >
-                          {mutedPeers[p.id] ? (
-                            <VolumeX size={13} className="text-[#FF453A]" />
-                          ) : (
-                            <Volume2 size={13} />
-                          )}
-                        </button>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            setVolumes((prev) => ({ ...prev, [p.id]: val }));
-                          }}
-                          className="hidden md:block w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
-                          title="Peer Volume"
-                        />
-                      </div>
-                    )}
+
+                      {!p.isSelf && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleMutePeer(p.id)}
+                            className="text-white/80 hover:text-white p-1 rounded transition cursor-pointer"
+                          >
+                            {mutedPeers[p.id] ? <VolumeX size={14} className="text-[#FF453A]" /> : <Volume2 size={14} />}
+                          </button>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                            }}
+                            className="hidden sm:block w-16 h-1 accent-white cursor-pointer"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </aside>
+                );
+              })}
+            </div>
+
+            {/* Local File Picker Button when in local_file mode */}
+            {mediaMode === 'local_file' && isHost && (
+              <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none z-20">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onSelectLocalFile(file);
+                  }}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="pointer-events-auto px-6 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black font-semibold text-xs transition flex items-center gap-2 shadow-lg cursor-pointer"
+                >
+                  <CinemaReelIcon size={16} />
+                  <span>Choose Video File to Broadcast</span>
+                </button>
+              </div>
+            )}
+
+            {/* Fullscreen Button */}
+            <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20">
+              <button
+                onClick={toggleFullscreen}
+                className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Grid View Layout */}
@@ -527,7 +639,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     <video
                       ref={(v) => {
                         if (v && p.stream) {
-                          v.srcObject = p.stream;
+                          if (v.srcObject !== p.stream) {
+                            v.srcObject = p.stream;
+                          }
+                          v.play().catch(() => {});
                           if (!p.isSelf) {
                             v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
                           }
@@ -572,7 +687,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         )}
 
-        {/* Floating Draggable Viewports */}
+        {/* Floating Draggable Viewports (Docked along right edge to never obstruct shared screen) */}
         {layout === 'floating' &&
           participants.map((p, idx) => (
             <DraggableTile
@@ -584,8 +699,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isMicActive: p.isMicActive,
                 isSelf: p.isSelf
               }}
-              initialX={24 + idx * 280}
-              initialY={90}
+              initialX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 280) : 24}
+              initialY={80 + idx * 170}
             />
           ))}
 
