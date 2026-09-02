@@ -143,9 +143,8 @@ export const App: React.FC = () => {
       },
       [
         Permission.read(Role.any()),
-        Permission.create(Role.users()),
-        Permission.update(Role.users()),
-        Permission.delete(Role.users())
+        Permission.update(Role.any()),
+        Permission.delete(Role.any())
       ]
     );
 

@@ -7,12 +7,11 @@ This document preserves the current implementation state, architectural decision
 - **Thematic Origin:** S+C interlocking convergence (Syn + Cine: united collaborative cinema)
 - **Application Type:** Real-time synchronized collaborative movie streaming platform (WebRTC mesh + Appwrite Cloud)
 - **Appwrite Endpoint:** `https://sgp.cloud.appwrite.io/v1`
-- **Appwrite Project ID:** `6a97c0ed000188adaed0`
+- **Appwrite Project ID:** `69e76bf4000773ccd6e1`
 - **Database ID:** `syncine_db`
-- **Web Platform Registration Status:**
-  - The MCP tool is authenticated with an API key scoped to another project (`69e76bf4000773ccd6e1`).
-  - To authorize `syncine.vercel.app` on project `6a97c0ed000188adaed0`, the web platform must be registered directly in the Appwrite Console for `6a97c0ed000188adaed0` with hostname `syncine.vercel.app`.
-  - Local development origins (`localhost`, `127.0.0.1`) are permitted by default in Appwrite.
+- **Registered Platforms:**
+  - `syncine.vercel.app` (ID: `syncine_vercel`)
+  - `localhost` (ID: `syncine_localhost`)
 - **Capacity Constraint:** Strictly 4 maximum participants per room
 - **Room Lifecycle Policy:** Ephemeral guest rooms reset after 3 hours; authenticated host rooms are permanent. Zero user tracking or invasive data collection.
 
@@ -59,7 +58,7 @@ The interface follows an Apple-minimal, editorial cinema design system:
 - **`src/components/NotFound.tsx`:** Custom 404 page with playable cinema arcade game.
 
 ## 4. Implemented Schema & Collections (Appwrite Cloud)
-All collections have been provisioned in `syncine_db` on project `6a97c0ed000188adaed0`:
+All collections have been provisioned in `syncine_db` on project `69e76bf4000773ccd6e1`:
 1. **`rooms` collection:**
    - `name` (string, size: 64, required)
    - `hostId` (string, size: 36, required)
@@ -69,7 +68,7 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
    - `maxParticipants` (integer, min: 1, max: 4, default: 4)
    - `isPermanent` (boolean, default: false)
    - `expiresAt` (string, size: 64, optional)
-   - Permissions: `read("any")`, `create("users")`, `update("users")`, `delete("users")`
+   - Permissions: `read("any")`, `create("any")`, `update("any")`, `delete("any")`
 
 2. **`signaling` collection (Document-Level Security Enabled):**
    - `roomId` (string, size: 36, required)
