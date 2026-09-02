@@ -199,10 +199,29 @@ export async function captureUserMedia(
     }
   }
 
-  return navigator.mediaDevices.getUserMedia({
-    audio: audioConstraint,
-    video: videoConstraint
-  });
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraint,
+      video: videoConstraint
+    });
+  } catch (err) {
+    console.warn('Constrained getUserMedia failed, retrying with standard constraints:', err);
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: withVideo ? true : false
+      });
+    } catch (fallbackErr) {
+      if (withVideo) {
+        console.warn('Video + Audio capture failed, falling back to audio-only stream:', fallbackErr);
+        return await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        });
+      }
+      throw fallbackErr;
+    }
+  }
 }
 
 /**

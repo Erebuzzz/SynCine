@@ -34,16 +34,35 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
+  // Initialize camera and microphone preview
   useEffect(() => {
     let stream: MediaStream | null = null;
     let isCancelled = false;
 
     async function setupPreview() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: isVideoOn ? { width: 640, height: 360 } : false,
-          audio: true
-        });
+        const constraints: MediaStreamConstraints = {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            facingMode: 'user'
+          }
+        };
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (initialErr) {
+          console.warn('Initial getUserMedia constraints failed, falling back to basic:', initialErr);
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: true
+          });
+        }
 
         if (isCancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -51,12 +70,17 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         }
 
         setPreviewStream(stream);
+        setIsVideoOn(stream.getVideoTracks().length > 0);
+        setIsMicOn(stream.getAudioTracks().length > 0);
+
         if (videoPreviewRef.current) {
           videoPreviewRef.current.srcObject = stream;
+          videoPreviewRef.current.play().catch(() => {});
         }
 
         try {
-          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const audioCtx = new AudioCtx();
           audioContextRef.current = audioCtx;
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 64;
@@ -67,7 +91,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
 
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           const updateAudioMeter = () => {
-            if (!analyserRef.current || !isMicOn) {
+            if (!analyserRef.current) {
               setAudioLevel(0);
             } else {
               analyserRef.current.getByteFrequencyData(dataArray);
@@ -85,6 +109,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         }
       } catch (err) {
         console.warn('Media preview unavailable:', err);
+        setIsVideoOn(false);
       }
     }
 
@@ -98,15 +123,54 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         stream.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [isVideoOn]);
+  }, []);
 
+  // Ensure video element receives stream as soon as it mounts or changes
   useEffect(() => {
+    if (videoPreviewRef.current && previewStream && isVideoOn) {
+      if (videoPreviewRef.current.srcObject !== previewStream) {
+        videoPreviewRef.current.srcObject = previewStream;
+      }
+      videoPreviewRef.current.play().catch(() => {});
+    }
+  }, [previewStream, isVideoOn]);
+
+  const handleToggleMic = () => {
+    const nextState = !isMicOn;
+    setIsMicOn(nextState);
     if (previewStream) {
       previewStream.getAudioTracks().forEach((t) => {
-        t.enabled = isMicOn;
+        t.enabled = nextState;
       });
     }
-  }, [isMicOn, previewStream]);
+  };
+
+  const handleToggleVideo = async () => {
+    const nextState = !isVideoOn;
+    setIsVideoOn(nextState);
+    if (previewStream) {
+      const videoTracks = previewStream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        videoTracks.forEach((t) => {
+          t.enabled = nextState;
+        });
+      } else if (nextState) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+          });
+          const newTrack = newStream.getVideoTracks()[0];
+          if (newTrack) {
+            previewStream.addTrack(newTrack);
+            setPreviewStream(new MediaStream(previewStream.getTracks()));
+          }
+        } catch (err) {
+          console.warn('Unable to enable camera:', err);
+          setIsVideoOn(false);
+        }
+      }
+    }
+  };
 
   const handleCopyLink = () => {
     const inviteUrl = `${window.location.origin}?room=${roomId}`;
@@ -147,7 +211,15 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
           <div className="w-full aspect-video rounded-2xl sm:rounded-3xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
             {isVideoOn && previewStream?.getVideoTracks().length ? (
               <video
-                ref={videoPreviewRef}
+                ref={(el) => {
+                  videoPreviewRef.current = el;
+                  if (el && previewStream) {
+                    if (el.srcObject !== previewStream) {
+                      el.srcObject = previewStream;
+                    }
+                    el.play().catch(() => {});
+                  }
+                }}
                 autoPlay
                 playsInline
                 muted
@@ -167,7 +239,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsMicOn(!isMicOn)}
+                  onClick={handleToggleMic}
                   className={`p-2.5 rounded-xl transition cursor-pointer min-h-[42px] min-w-[42px] flex items-center justify-center ${
                     isMicOn
                       ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
@@ -181,7 +253,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsVideoOn(!isVideoOn)}
+                  onClick={handleToggleVideo}
                   className={`p-2.5 rounded-xl transition cursor-pointer min-h-[42px] min-w-[42px] flex items-center justify-center ${
                     isVideoOn
                       ? 'bg-white/10 text-white border border-white/15 hover:bg-white/20'

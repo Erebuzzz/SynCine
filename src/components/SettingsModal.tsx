@@ -495,7 +495,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="w-full aspect-video rounded-2xl bg-black overflow-hidden relative flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1]">
                   {previewStream && previewStream.getVideoTracks().length > 0 ? (
                     <video
-                      ref={videoPreviewRef}
+                      ref={(el) => {
+                        videoPreviewRef.current = el;
+                        if (el && previewStream) {
+                          if (el.srcObject !== previewStream) {
+                            el.srcObject = previewStream;
+                          }
+                          el.play().catch(() => {});
+                        }
+                      }}
                       autoPlay
                       playsInline
                       muted
