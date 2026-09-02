@@ -1,0 +1,215 @@
+import React, { useState } from 'react';
+import { SynLogo, MeshNetworkIcon, LatencySyncIcon, ScreenCastIcon } from './icons/SynIcons';
+import { X, Shield, Clock, HardDrive, Cpu } from 'lucide-react';
+
+interface DocsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
+  const [activeSection, setActiveSection] = useState<'architecture' | 'sync' | 'lifecycle' | 'privacy'>('architecture');
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="docs-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 dark:bg-black/85 backdrop-blur-xl animate-fade-in"
+    >
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#0A0A0A] border border-black/[0.08] dark:border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+          <div className="flex items-center gap-3">
+            <SynLogo size={28} />
+            <div>
+              <h2 id="docs-modal-title" className="text-sm font-semibold text-[var(--text-primary)]">
+                System Documentation & Architecture
+              </h2>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Technical overview of SynCine protocol and synchronization engine
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            aria-label="Close documentation"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Section Tabs */}
+        <div className="flex px-6 pt-3 border-b border-black/[0.06] dark:border-white/[0.06] gap-2 shrink-0 overflow-x-auto">
+          {[
+            { id: 'architecture', label: 'P2P Mesh Network', icon: MeshNetworkIcon },
+            { id: 'sync', label: 'Drift Sync Engine', icon: LatencySyncIcon },
+            { id: 'lifecycle', label: 'Room Lifecycle & 3h Buffer', icon: Clock },
+            { id: 'privacy', label: 'Zero-Storage Privacy', icon: Shield },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSection(tab.id as any)}
+                className={`pb-3 px-2 text-xs font-medium border-b-2 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'border-[var(--accent)] text-[var(--text-primary)]'
+                    : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <Icon size={14} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-4 text-xs text-[var(--text-secondary)] leading-relaxed">
+          {activeSection === 'architecture' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  Full Mesh WebRTC Topology
+                </h3>
+                <p>
+                  SynCine operates on a browser-to-browser WebRTC mesh network. Video and audio streams flow directly between connected participants through encrypted SRTP channels rather than routing through an intermediary media relay.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold mb-1">
+                    <Cpu size={14} />
+                    <span>4-Peer Capacity Limit</span>
+                  </div>
+                  <p className="text-[11px]">
+                    To maintain optimal uplink bandwidth and prevent CPU throttling on mobile devices, rooms are strictly bounded to a maximum of 4 concurrent peers.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold mb-1">
+                    <ScreenCastIcon size={14} />
+                    <span>Hardware H.264 Acceleration</span>
+                  </div>
+                  <p className="text-[11px]">
+                    Screen broadcasts prefer hardware-accelerated H.264 encoding with automatic fallback to VP8 across Chrome, Safari, Firefox, Edge, and mobile browsers.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'sync' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  Sub-350ms Drift Compensation
+                </h3>
+                <p>
+                  Collaborative playback across distributed networks experiences variable latency. SynCine implements a continuous timestamp synchronization engine to maintain synchronized playback.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] space-y-2">
+                <div className="font-semibold text-[var(--text-primary)]">Sync Algorithm Overview</div>
+                <ul className="list-disc pl-4 space-y-1.5 text-[11px]">
+                  <li>
+                    <strong>Network Latency Benchmarking:</strong> The host continuously broadcasts playback state packets (current timestamp, playback rate, paused state) over Appwrite Realtime.
+                  </li>
+                  <li>
+                    <strong>Jitter Threshold:</strong> If a viewer's local playback deviates by more than 350 milliseconds from the host's compensated reference time, a discrete seek correction is applied.
+                  </li>
+                  <li>
+                    <strong>Micro-Rate Smoothing:</strong> Smaller deviations (&lt;350ms) are corrected transparently by modulating the HTML5 video playback rate between 0.98x and 1.02x to avoid audio clipping.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'lifecycle' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  Ephemeral 3-Hour Buffer & Permanent Rooms
+                </h3>
+                <p>
+                  To balance frictionless zero-login access with database maintenance, watchrooms follow two distinct lifecycle models:
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="font-semibold text-[var(--text-primary)] mb-0.5">
+                    Ephemeral Guest Rooms (Default)
+                  </div>
+                  <p className="text-[11px]">
+                    Created instantly without credentials. An automatic 3-hour expiration buffer is provisioned upon room creation. Once the 3-hour buffer lapses, signaling and room records are purged automatically.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="font-semibold text-[var(--text-primary)] mb-0.5">
+                    Permanent Vanity Rooms
+                  </div>
+                  <p className="text-[11px]">
+                    Hosts signed in via Appwrite Auth can create permanent room URLs that remain active indefinitely for recurring group viewing sessions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'privacy' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  Zero Cloud Video Storage Privacy
+                </h3>
+                <p>
+                  SynCine does not store, transcode, or cache your video content on any server.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] space-y-2.5">
+                <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
+                  <HardDrive size={15} />
+                  <span>Privacy Guarantees</span>
+                </div>
+                <ul className="list-disc pl-4 space-y-1.5 text-[11px]">
+                  <li>
+                    <strong>Local File Mode:</strong> Video files selected from your device are rendered entirely client-side via the HTML5 File API and object URLs. Only timing synchronization metadata is shared.
+                  </li>
+                  <li>
+                    <strong>Screen Cast Mode:</strong> Display capture is streamed peer-to-peer through encrypted WebRTC data and media channels.
+                  </li>
+                  <li>
+                    <strong>Ephemeral Signaling:</strong> WebRTC SDP offers, answers, and ICE candidate records are protected with Document-Level Security (DLS) and purged every 10 minutes.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-6 py-3 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 text-[11px] text-[var(--text-tertiary)]">
+          <span>SynCine Architecture Specification v1.0</span>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-primary)] font-medium rounded-lg transition cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

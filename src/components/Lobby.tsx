@@ -2,17 +2,16 @@ import React, { useState } from 'react';
 import {
   SynLogo,
   ScreenCastIcon,
-  CinemaReelIcon,
-  MeshNetworkIcon,
-  LatencySyncIcon
+  CinemaReelIcon
 } from './icons/SynIcons';
 import {
-  Shield,
   ArrowRight,
-  Clock,
   KeyRound,
   LogIn,
-  LogOut
+  LogOut,
+  BookOpen,
+  Sun,
+  Moon
 } from 'lucide-react';
 import type { Models } from 'appwrite';
 
@@ -23,7 +22,10 @@ interface LobbyProps {
   onCreateRoom: (name: string, mode: 'screen' | 'local_file', isPermanent: boolean) => Promise<void>;
   onJoinRoom: (roomId: string) => Promise<void>;
   onOpenAuth: () => void;
+  onOpenDocs: () => void;
   onLogout: () => Promise<void>;
+  isDark: boolean;
+  onToggleTheme: () => void;
   initialRoomId?: string;
   isAuthenticating: boolean;
 }
@@ -35,7 +37,10 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCreateRoom,
   onJoinRoom,
   onOpenAuth,
+  onOpenDocs,
   onLogout,
+  isDark,
+  onToggleTheme,
   initialRoomId = '',
   isAuthenticating
 }) => {
@@ -81,86 +86,108 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between font-sans select-none z-10">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-3 px-5 sm:px-8 bg-white/90 dark:bg-black/80 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+      {/* Symmetrical Top Navigation Bar */}
+      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-3.5 px-6 sm:px-10 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+        {/* Left: Brand Identity */}
         <div className="flex items-center gap-3">
-          <SynLogo size={34} className="shrink-0" />
-          <div className="flex flex-col">
-            <span className="text-[var(--text-primary)] font-bold text-lg tracking-tight leading-none flex items-center gap-1.5">
-              <span>SynCine</span>
-            </span>
-            <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-              From Greek "Syn" (Together)
-            </span>
-          </div>
+          <SynLogo size={32} className="shrink-0" />
+          <span className="text-[var(--text-primary)] font-bold text-base tracking-tight leading-none">
+            SynCine
+          </span>
         </div>
 
-        {/* Auth / Guest Status Indicator */}
-        <div className="flex items-center gap-3">
+        {/* Center: System Architecture & Docs Link */}
+        <nav className="hidden md:flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onOpenDocs}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+          >
+            <BookOpen size={13} />
+            <span>Architecture & Documentation</span>
+          </button>
+        </nav>
+
+        {/* Right: Controls & Auth */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Documentation Mobile Trigger */}
+          <button
+            type="button"
+            onClick={onOpenDocs}
+            className="md:hidden p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            title="Documentation"
+            aria-label="Documentation"
+          >
+            <BookOpen size={16} />
+          </button>
+
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle visual theme"
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
+          {/* Auth State Button */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
-                <span className="w-2 h-2 rounded-full bg-white/50 dark:bg-white/50" />
-                <span className="font-semibold hidden sm:inline">{currentUser?.name || currentUser?.email}</span>
-                <span className="text-[10px] uppercase font-bold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+                <span className="font-medium hidden sm:inline">{currentUser?.name || currentUser?.email}</span>
+                <span className="text-[10px] font-bold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
               </div>
               <button
+                type="button"
                 onClick={onLogout}
-                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-full hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
-                title="Sign out to Guest"
+                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+                title="Sign out"
+                aria-label="Sign out"
               >
                 <LogOut size={16} />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    currentUser ? 'bg-white/50' : 'bg-white/30'
-                  }`}
-                />
-                <span className="font-medium hidden sm:inline">
-                  {isAuthenticating ? 'Connecting...' : 'Guest Session (3h Buffer)'}
-                </span>
-              </div>
-              <button
-                onClick={onOpenAuth}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] text-xs font-semibold border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
-              >
-                <LogIn size={13} />
-                <span>Host Sign In</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+            >
+              <LogIn size={13} />
+              <span>Host Sign In</span>
+            </button>
           )}
         </div>
       </header>
 
-      {/* Main Content Area (Smoothly Scrollable) */}
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16 flex flex-col items-center flex-1">
-        {/* Hero */}
-        <section className="text-center max-w-3xl mb-12 sm:mb-16 mt-8">
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold text-[var(--text-primary)] tracking-tight leading-[1.08] mb-6">
+      {/* Main Content Area */}
+      <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center flex-1 justify-center">
+        {/* Editorial Hero */}
+        <section className="text-center max-w-2xl mb-10 sm:mb-12">
+          <h1 className="text-3xl sm:text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-[1.12] mb-4">
             Shared Cinema, Perfectly Synchronized.
           </h1>
-          <p className="text-[var(--text-secondary)] text-sm sm:text-lg leading-relaxed max-w-2xl mx-auto font-normal">
-            Watch movies with friends with zero latency. Direct browser-to-browser WebRTC transmission with sub-350ms seek synchronization and strict 4-peer capacity.
+          <p className="text-[var(--text-secondary)] text-sm sm:text-base leading-relaxed max-w-xl mx-auto font-normal">
+            Real-time peer-to-peer watchrooms with sub-350ms timestamp synchronization and zero server video storage.
           </p>
         </section>
 
         {/* Action Panel Container */}
-        <div className="w-full max-w-xl mb-16 p-6 sm:p-8 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-          {/* Tab Header */}
-          <div className="grid grid-cols-2 p-1.5 bg-black/[0.04] dark:bg-white/[0.06] rounded-xl border border-black/[0.08] dark:border-white/[0.08] mb-6">
+        <div className="w-full max-w-lg p-6 sm:p-8 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl shadow-xl">
+          {/* Tab Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-6">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('create');
                 setErrorMessage(null);
               }}
-              className={`py-3 text-xs font-bold rounded-lg transition duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 text-xs font-semibold rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'create'
-                  ? 'bg-white dark:bg-white/[0.1] text-[var(--text-primary)] shadow-sm dark:shadow-none'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
@@ -172,9 +199,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                 setActiveTab('join');
                 setErrorMessage(null);
               }}
-              className={`py-3 text-xs font-bold rounded-lg transition duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 text-xs font-semibold rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'join'
-                  ? 'bg-white dark:bg-white/[0.1] text-[var(--text-primary)] shadow-sm dark:shadow-none'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
@@ -183,21 +210,21 @@ export const Lobby: React.FC<LobbyProps> = ({
           </div>
 
           {errorMessage && (
-            <div className="mb-5 p-4 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
+            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
               <span>{errorMessage}</span>
               <button
                 type="button"
                 onClick={() => setErrorMessage(null)}
-                className="font-bold ml-2 opacity-80 hover:opacity-100"
+                className="font-bold ml-2 opacity-70 hover:opacity-100 cursor-pointer"
               >
-                X
+                ✕
               </button>
             </div>
           )}
 
-          {/* Display Name */}
+          {/* User Display Name */}
           <div className="mb-5">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
               Your Display Name
             </label>
             <input
@@ -205,16 +232,16 @@ export const Lobby: React.FC<LobbyProps> = ({
               required
               value={userName}
               onChange={(e) => onUserNameChange(e.target.value)}
-              placeholder="e.g. Alex"
+              placeholder="Your name"
               maxLength={32}
-              className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3.5 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+              className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
             />
           </div>
 
           {activeTab === 'create' ? (
             <form onSubmit={handleCreate} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Watchroom Title
                 </label>
                 <input
@@ -222,62 +249,62 @@ export const Lobby: React.FC<LobbyProps> = ({
                   required
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  placeholder="e.g. Dune Part Two Night"
+                  placeholder="e.g. Blade Runner 2049"
                   maxLength={64}
-                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3.5 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
                 />
               </div>
 
-              {/* Media Transmission Mode */}
+              {/* Streaming Pipeline Selection */}
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Streaming Pipeline
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div
                     onClick={() => setMediaMode('screen')}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col ${
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 flex flex-col ${
                       mediaMode === 'screen'
-                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.12] dark:border-white/[0.15]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06]'
+                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.14] dark:border-white/[0.18]'
+                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <div
-                        className={`p-2 rounded-lg ${
+                        className={`p-1.5 rounded-lg ${
                           mediaMode === 'screen'
-                            ? 'bg-[var(--accent)] text-black dark:text-black'
+                            ? 'bg-[var(--accent)] text-black'
                             : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
                         }`}
                       >
-                        <ScreenCastIcon size={18} />
+                        <ScreenCastIcon size={16} />
                       </div>
-                      <span className="text-xs font-bold text-[var(--text-primary)]">Screen Cast</span>
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">Screen Cast</span>
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
-                      Hardware-accelerated H.264 tab or desktop broadcast.
+                      Hardware H.264 tab or desktop broadcast.
                     </span>
                   </div>
 
                   <div
                     onClick={() => setMediaMode('local_file')}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col ${
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 flex flex-col ${
                       mediaMode === 'local_file'
-                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.12] dark:border-white/[0.15]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06]'
+                        ? 'bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.14] dark:border-white/[0.18]'
+                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <div
-                        className={`p-2 rounded-lg ${
+                        className={`p-1.5 rounded-lg ${
                           mediaMode === 'local_file'
-                            ? 'bg-[var(--accent)] text-black dark:text-black'
+                            ? 'bg-[var(--accent)] text-black'
                             : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
                         }`}
                       >
-                        <CinemaReelIcon size={18} />
+                        <CinemaReelIcon size={16} />
                       </div>
-                      <span className="text-xs font-bold text-[var(--text-primary)]">Local File Sync</span>
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">Local File Sync</span>
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
                       Local video file sync with zero server upload.
@@ -286,10 +313,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </div>
               </div>
 
-              {/* Permanent Room Option (For Authenticated Hosts) */}
-              <div className="p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+              {/* Permanent Room Option */}
+              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <KeyRound size={16} className={isPermanent ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} />
+                  <KeyRound size={15} className={isPermanent ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} />
                   <div className="flex flex-col">
                     <span className="text-xs font-semibold text-[var(--text-primary)]">
                       Permanent Watchroom
@@ -319,16 +346,16 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !roomName.trim() || !userName.trim()}
-                className="w-full py-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black dark:text-black font-semibold text-sm rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>{isLoading ? 'Creating Watchroom...' : 'Start Watchroom'}</span>
-                <ArrowRight size={16} />
+                <ArrowRight size={15} />
               </button>
             </form>
           ) : (
             <form onSubmit={handleJoin} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wide">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
                   Room Code or URL
                 </label>
                 <input
@@ -336,83 +363,35 @@ export const Lobby: React.FC<LobbyProps> = ({
                   required
                   value={joinRoomId}
                   onChange={(e) => setJoinRoomId(e.target.value)}
-                  placeholder="e.g. 6a97c0ed or paste link"
+                  placeholder="e.g. 6a97c0ed or paste full link"
                   maxLength={100}
-                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3.5 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
+                  className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !joinRoomId.trim() || !userName.trim()}
-                className="w-full py-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black dark:text-black font-semibold text-sm rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
               >
                 <span>{isLoading ? 'Connecting...' : 'Join Watchroom'}</span>
-                <ArrowRight size={16} />
+                <ArrowRight size={15} />
               </button>
             </form>
           )}
-
-          {/* Capacity & Security Badges */}
-          <div className="mt-6 pt-5 border-t border-black/[0.08] dark:border-white/[0.08] grid grid-cols-3 gap-2 text-[11px] text-[var(--text-secondary)] text-center">
-            <div className="flex flex-col items-center gap-1">
-              <MeshNetworkIcon size={16} />
-              <span>Max 4 Peers</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <Clock size={16} />
-              <span>3h Auto Reset</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <Shield size={16} />
-              <span>Zero Cloud Video</span>
-            </div>
-          </div>
         </div>
-
-        {/* Feature Showcase Grid */}
-        <section className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-          <div className="p-6 sm:p-8 space-y-3 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-            <div className="w-12 h-12 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-[var(--text-secondary)]">
-              <MeshNetworkIcon size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
-              P2P WebRTC Mesh
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-normal">
-              Media flows directly peer-to-peer over encrypted SRTP streams. No centralized video proxy or server transcoding bill.
-            </p>
-          </div>
-
-          <div className="p-6 sm:p-8 space-y-3 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-            <div className="w-12 h-12 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-[var(--text-secondary)]">
-              <LatencySyncIcon size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
-              Drift-Compensated Sync
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-normal">
-              Continuous round-trip latency benchmarking and a 350ms seek jitter threshold guarantee seamless synchronized cinema playback.
-            </p>
-          </div>
-
-          <div className="p-6 sm:p-8 space-y-3 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl">
-            <div className="w-12 h-12 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-[var(--text-secondary)]">
-              <Clock size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
-              3-Hour Ephemeral Buffer
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-normal">
-              Guest links automatically reset 3 hours after creation to respect database quotas and ensure zero user data residue.
-            </p>
-          </div>
-        </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full mx-auto py-6 px-4 border-t border-black/[0.06] dark:border-white/[0.06] text-center text-xs text-[var(--text-tertiary)] font-medium">
-        <span>SynCine (c) 2026 / Real-Time P2P Synchronized Cinema / Powered by Appwrite Cloud</span>
+      {/* Clean Minimal Footer */}
+      <footer className="w-full mx-auto py-6 px-6 border-t border-black/[0.06] dark:border-white/[0.06] text-center text-xs text-[var(--text-tertiary)] font-normal flex flex-col sm:flex-row items-center justify-between gap-2 max-w-4xl">
+        <span>SynCine (c) 2026</span>
+        <button
+          type="button"
+          onClick={onOpenDocs}
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+        >
+          Documentation
+        </button>
       </footer>
     </div>
   );

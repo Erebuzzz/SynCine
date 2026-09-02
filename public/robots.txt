@@ -1,0 +1,6 @@
+# SynCine Robots Configuration
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://syncine.app/sitemap.xml

@@ -1,0 +1,17 @@
+# SynCine
+
+> Real-Time P2P Synchronized Cinema Platform
+
+SynCine is a web-based collaborative cinema and video synchronization platform engineered for low-latency group viewing.
+
+## Core Features
+- Full Mesh WebRTC: Encrypted browser-to-browser media transmission strictly capped at 4 peers per room.
+- Sub-350ms Drift Compensation: Real-time latency benchmarking and playback synchronization engine.
+- Dual Streaming Modes: Hardware-accelerated screen casting (H.264) and client-side local video file synchronization.
+- Privacy First: Zero server-side video transcoding, caching, or cloud storage.
+- Ephemeral Lifecycle: Guest watchrooms automatically reset after a 3-hour buffer; optional Appwrite accounts provide permanent vanity rooms.
+
+## Technology Stack
+- Frontend: React, TypeScript, Tailwind CSS, WebRTC API, Web Audio API
+- Backend & Signaling: Appwrite Cloud (Databases, Realtime, Document-Level Security, Auth)
+- Synchronization: Custom discrete-seek and micro-rate drift correction algorithm

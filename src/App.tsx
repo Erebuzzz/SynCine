@@ -14,18 +14,19 @@ import {
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
+import { DocsModal } from './components/DocsModal';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
 import { ShaderCanvas } from './components/ShaderCanvas';
-import { Sun, Moon } from 'lucide-react';
 import type { Models } from 'appwrite';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Models.User<Models.Preferences> | null>(null);
-  const [userName, setUserName] = useState<string>('Cinephile ' + Math.floor(1000 + Math.random() * 9000));
+  const [userName, setUserName] = useState<string>('');
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isDocsModalOpen, setIsDocsModalOpen] = useState<boolean>(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('syncine-theme');
@@ -158,7 +159,7 @@ export const App: React.FC = () => {
     try {
       const guestUser = await logoutUser();
       setCurrentUser(guestUser);
-      setUserName('Cinephile ' + Math.floor(1000 + Math.random() * 9000));
+      setUserName('');
     } catch (err) {
       console.warn('Logout error:', err);
     } finally {
@@ -168,7 +169,7 @@ export const App: React.FC = () => {
 
   return (
     <>
-      {/* Barely perceptible atmospheric canvas */}
+      {/* Subtle atmospheric canvas */}
       <ShaderCanvas />
 
       {/* Procedural SVG filters */}
@@ -177,17 +178,13 @@ export const App: React.FC = () => {
       {/* Film grain texture at reduced opacity */}
       <div className="film-grain-layer" />
 
-      {/* Dark/Light mode toggle -- fixed position */}
-      <button
-        type="button"
-        onClick={() => setIsDark(!isDark)}
-        className="fixed top-4 right-4 z-[60] p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition-all duration-200 cursor-pointer backdrop-blur-xl"
-        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {isDark ? <Sun size={16} /> : <Moon size={16} />}
-      </button>
+      {/* Technical Documentation Modal */}
+      <DocsModal
+        isOpen={isDocsModalOpen}
+        onClose={() => setIsDocsModalOpen(false)}
+      />
 
-      {/* Auth modal */}
+      {/* Host Authentication Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -198,7 +195,7 @@ export const App: React.FC = () => {
         <RoomView
           roomId={activeRoomId}
           currentUserId={currentUser.$id}
-          currentUserName={userName}
+          currentUserName={userName || 'Host'}
           onLeave={handleLeaveRoom}
         />
       ) : (
@@ -209,7 +206,10 @@ export const App: React.FC = () => {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenDocs={() => setIsDocsModalOpen(true)}
           onLogout={handleLogout}
+          isDark={isDark}
+          onToggleTheme={() => setIsDark(!isDark)}
           initialRoomId={initialRoomParam}
           isAuthenticating={isAuthenticating}
         />

@@ -2,14 +2,37 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='22' fill='%23000' stroke='%23C8A97E' stroke-width='1.5'/%3E%3Cpath d='M14 14H34L22 24L34 34H14' stroke='%23F5F5F7' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Cpolygon points='21,20 28,24 21,28' fill='%23C8A97E'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='22' fill='%23000' stroke='%23C8A97E' stroke-width='1.5'/%3E%3Cpath d='M33 16C33 13 30 11 25 11C18 11 15 15 15 19C15 25 33 23 33 29C33 34 29 37 23 37C17 37 14 34 14 31' stroke='%23C8A97E' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Cpolygon points='22,20 28,24 22,28' fill='%23C8A97E'/%3E%3C/svg%3E" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="A real-time peer-to-peer synchronized cinema platform with sub-350ms playback drift compensation and zero server video storage." />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
-    <title>SynCine -- Real-Time P2P Synchronized Cinema</title>
+    <link rel="canonical" href="https://syncine.app/" />
+
+    <title>SynCine: Real-Time Synchronized Cinema</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    {/* JSON-LD Schema Markup */}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "SynCine",
+      "url": "https://syncine.app/",
+      "description": "Real-time synchronized cinema platform featuring WebRTC peer-to-peer transmission and sub-350ms drift compensation.",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires WebRTC and HTML5 video support.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
   </head>
   <body class="bg-white dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7] antialiased overflow-x-hidden min-h-screen">
     <div id="root"></div>

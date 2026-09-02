@@ -6,11 +6,11 @@ interface IconProps {
 }
 
 /**
- * SynCine Norse-inspired S+C merged logo mark.
- * The Sigma path doubles as both S (Syn) and C (Cine) in a runic convergence stroke,
- * with a single warm accent play triangle at the center.
+ * SynCine S+C Interlocking Convergence Logo.
+ * Merges the letters 'S' (Syn) and 'C' (Cine) as two interlocking geometric arcs
+ * with an integrated central playback triangle.
  */
-export const SynLogo: React.FC<IconProps> = ({ size = 40, className = '' }) => (
+export const SynLogo: React.FC<IconProps> = ({ size = 36, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -20,31 +20,38 @@ export const SynLogo: React.FC<IconProps> = ({ size = 40, className = '' }) => (
     className={className}
     aria-label="SynCine logo"
   >
-    {/* Outer ring -- thin, restrained */}
+    {/* Outer subtle ring */}
     <circle
       cx="24"
       cy="24"
       r="22"
       stroke="currentColor"
-      strokeWidth="1"
+      strokeWidth="1.25"
       strokeOpacity="0.2"
     />
 
-    {/* Norse S+C merged rune stroke -- single warm accent line */}
+    {/* Letter 'S' arc (top loop sweeping to center) */}
     <path
-      d="M14 13.5H34L22 24L34 34.5H14"
+      d="M33 16C33 13 30 11 25 11C18 11 15 15 15 19C15 25 33 23 33 29C33 34 29 37 23 37C17 37 14 34 14 31"
       stroke="var(--accent, #C8A97E)"
-      strokeWidth="3"
+      strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
-      fill="none"
     />
 
-    {/* Play triangle -- subtle, filled with current text color */}
+    {/* Letter 'C' arc (interlocking right-side aperture) */}
+    <path
+      d="M31 17.5C28.5 14.5 24 13.5 20 16C15 19 15 29 20 32C24 34.5 28.5 33.5 31 30.5"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeOpacity="0.45"
+    />
+
+    {/* Center playback triangle */}
     <polygon
-      points="21,20 28,24 21,28"
-      fill="currentColor"
-      fillOpacity="0.5"
+      points="22,20 28,24 22,28"
+      fill="var(--accent, #C8A97E)"
     />
   </svg>
 );
