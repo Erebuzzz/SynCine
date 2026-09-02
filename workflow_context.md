@@ -25,12 +25,23 @@ The interface follows an Apple-minimal, editorial cinema design system:
      - Afternoon to Sunset (12:00 - 18:30 IST): Sun sweeps west from 135deg to 165deg.
      - Night (18:30 - 06:00 IST): Moonlit specular reflection at 135deg with subtle cool specular edge.
    - Specular top edge highlight (`box-shadow: inset 0 1px 0 0 var(--glass-specular-edge)`).
-3. **Typography (Geist Sans):**
+3. **Custom Transparent Accent Cursor ([`CustomCursor.tsx`](file:///d:/SynCine/src/components/CustomCursor.tsx)):**
+   - Trailing outer ring with semi-transparent accent color (`var(--accent)`) and precision inner accent dot.
+   - Smooth lerp follower physics (0.18 factor) running at 60/120fps via `requestAnimationFrame`.
+   - Automatic hover scaling (1.8x - 2.2x) on interactive elements (`button`, `a`, `input`, `[role="button"]`, `.cursor-pointer`).
+   - Automatically disabled on touch devices (`pointer: coarse`) and when `prefers-reduced-motion` is active.
+4. **Interactive 404 Cinema Mini-Game ([`NotFound.tsx`](file:///d:/SynCine/src/components/NotFound.tsx)):**
+   - Embedded "Cinema Reel Sync Runner" canvas game on the 404 page.
+   - Player controls a rolling gold film reel jumping over glitch obstacles and collecting sync diamonds.
+   - Synthesized audio effects via Web Audio API, keyboard (Space / ArrowUp) and touch controls, with high score persisted in `localStorage`.
+5. **Privacy Policy & Terms of Service ([`PrivacyModal.tsx`](file:///d:/SynCine/src/components/PrivacyModal.tsx), [`TermsModal.tsx`](file:///d:/SynCine/src/components/TermsModal.tsx)):**
+   - Production-ready legal disclosures covering peer-to-peer WebRTC encryption, zero cloud video storage, and 10-minute ephemeral signaling cleanup.
+6. **Typography (Geist Sans):**
    - Modern, elegant Geist font loaded via Google Fonts with optical weights.
    - Elimination of hacker `//` symbols, terminal prompts, and unnecessary technical claim badges.
-4. **S+C Interlocking Convergence Logo ([`SynIcons.tsx`](file:///d:/SynCine/src/components/icons/SynIcons.tsx)):**
+7. **S+C Interlocking Convergence Logo ([`SynIcons.tsx`](file:///d:/SynCine/src/components/icons/SynIcons.tsx)):**
    - Clean geometric convergence merging the letters 'S' (Syn) and 'C' (Cine) with a central playback triangle.
-5. **Atmospheric Canvas ([`ShaderCanvas.tsx`](file:///d:/SynCine/src/components/ShaderCanvas.tsx)):**
+8. **Atmospheric Canvas ([`ShaderCanvas.tsx`](file:///d:/SynCine/src/components/ShaderCanvas.tsx)):**
    - Barely perceptible warm atmospheric drift on pure black with reduced-motion support and tab visibility pause.
 
 ## 3. SEO, Metadata & Production Assets
@@ -39,7 +50,9 @@ The interface follows an Apple-minimal, editorial cinema design system:
 - **`public/sitemap.xml`:** XML sitemap index.
 - **`public/llms.txt`:** Machine-readable platform architecture for AI discovery.
 - **`src/components/DocsModal.tsx`:** Dedicated technical documentation modal detailing the WebRTC mesh, drift sync algorithm, and ephemeral room buffer.
-- **`src/components/NotFound.tsx`:** Production 404 error boundary.
+- **`src/components/PrivacyModal.tsx`:** Production Privacy Policy modal.
+- **`src/components/TermsModal.tsx`:** Production Terms of Service modal.
+- **`src/components/NotFound.tsx`:** Custom 404 page with playable cinema arcade game.
 
 ## 4. Implemented Schema & Collections (Appwrite Cloud)
 All collections have been provisioned in `syncine_db` on project `6a97c0ed000188adaed0`:
@@ -76,6 +89,7 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - `src/lib/media-capture.ts`: Cross-browser display/mic capture with Safari user agent detection to omit audio constraints and prevent `DOMException`.
 - `src/lib/webrtc.ts`: P2P mesh WebRTC engine with H.264 transceiver codec preference, dynamic track replacement, and Appwrite signaling exchange.
 - `src/lib/sync-engine.ts`: Drift-compensated playback synchronizer with network latency benchmarking and 350ms seek jitter threshold.
+- `src/components/CustomCursor.tsx`: Custom transparent accent cursor with fluid lerp physics and interactive element scaling.
 - `src/components/DraggableTile.tsx`: Floating draggable participant overlay with pointer capture and independent audio volume controls.
 - `src/components/WatchStage.tsx`: Unified stage supporting Theater (4/5 width), Grid (2x2), and Floating layouts with Picture-in-Picture, Fullscreen, and live multi-peer audio mixer.
 - `src/components/ChatSidebar.tsx`: Real-time room text chat with auto-scroll and unread counter badges.
@@ -83,11 +97,13 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - `src/components/GreenRoom.tsx`: Pre-meeting camera and microphone staging screen.
 - `src/components/AuthModal.tsx`: Optional host sign in / sign up dialog for permanent rooms.
 - `src/components/DocsModal.tsx`: System architecture & technical documentation modal.
-- `src/components/NotFound.tsx`: Custom 404 error component.
+- `src/components/PrivacyModal.tsx`: Privacy Policy modal with zero-video-storage guarantees.
+- `src/components/TermsModal.tsx`: Terms of Service modal.
+- `src/components/NotFound.tsx`: Custom 404 page with playable cinema arcade game.
 - `src/components/RoomView.tsx`: Main room container coordinating Green Room, WebRTC, synchronizer, media capture, and stage views.
 - `functions/cleanup-stale-signals/`: Node.js serverless cron function (`*/5 * * * *`) purging signaling documents older than 10 minutes.
 
 ## 6. Verification & Validation Status
 - **Vitest Suites:** 3/3 test files passed (9/9 unit tests) covering media capture constraints, synchronizer jitter thresholds, and WebRTC signaling.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 5.88s.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 5.71s.
 - **Main Branch:** Synced and pushed to GitHub repository `origin/main`.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   SynLogo,
   ScreenCastIcon,
@@ -11,7 +11,9 @@ import {
   LogOut,
   Sun,
   Moon,
-  BookOpen
+  BookOpen,
+  Shield,
+  FileText
 } from 'lucide-react';
 import type { Models } from 'appwrite';
 
@@ -23,6 +25,8 @@ interface LobbyProps {
   onJoinRoom: (roomId: string) => Promise<void>;
   onOpenAuth: () => void;
   onOpenDocs: () => void;
+  onOpenPrivacy: () => void;
+  onOpenTerms: () => void;
   onLogout: () => Promise<void>;
   isDark: boolean;
   onToggleTheme: () => void;
@@ -38,6 +42,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   onJoinRoom,
   onOpenAuth,
   onOpenDocs,
+  onOpenPrivacy,
+  onOpenTerms,
   onLogout,
   isDark,
   onToggleTheme,
@@ -51,6 +57,22 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isPermanent, setIsPermanent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Card mouse-tracking interactive sheen
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [cardSheen, setCardSheen] = useState({ x: 50, y: 50, active: false });
+
+  const handleMouseMoveCard = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setCardSheen({ x, y, active: true });
+  };
+
+  const handleMouseLeaveCard = () => {
+    setCardSheen((prev) => ({ ...prev, active: false }));
+  };
 
   const isAuthenticated = Boolean(currentUser?.email && currentUser.email.length > 0);
 
@@ -176,8 +198,18 @@ export const Lobby: React.FC<LobbyProps> = ({
           </p>
         </section>
 
-        {/* Realistic Glassmorphic Action Card */}
-        <div className="w-full max-w-lg p-6 sm:p-8 realistic-glass rounded-3xl">
+        {/* Realistic Glassmorphic Action Card with Interactive Sheen */}
+        <div
+          ref={cardRef}
+          onMouseMove={handleMouseMoveCard}
+          onMouseLeave={handleMouseLeaveCard}
+          className="w-full max-w-lg p-6 sm:p-8 realistic-glass rounded-3xl relative overflow-hidden transition-shadow duration-300"
+          style={{
+            backgroundImage: cardSheen.active
+              ? `radial-gradient(circle 350px at ${cardSheen.x}% ${cardSheen.y}%, rgba(200, 169, 126, 0.08), transparent 80%)`
+              : undefined,
+          }}
+        >
           {/* Subtle Tab Switcher */}
           <div className="grid grid-cols-2 p-1 bg-black/[0.03] dark:bg-white/[0.05] rounded-2xl border border-black/[0.06] dark:border-white/[0.08] mb-6 text-xs">
             <button
@@ -389,12 +421,30 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </main>
 
-      {/* Symmetrical Clean Footer */}
-      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Symmetrical Clean Footer with Privacy & Terms */}
+      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <span>SynCine (c) 2026</span>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={onOpenPrivacy}
+            className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+          >
+            <Shield size={13} />
+            <span>Privacy Policy</span>
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onOpenTerms}
+            className="flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+          >
+            <FileText size={13} />
+            <span>Terms of Service</span>
+          </button>
+          <span>•</span>
           <button
             type="button"
             onClick={onOpenDocs}

@@ -16,6 +16,10 @@ import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
 import { DocsModal } from './components/DocsModal';
+import { PrivacyModal } from './components/PrivacyModal';
+import { TermsModal } from './components/TermsModal';
+import { NotFound } from './components/NotFound';
+import { CustomCursor } from './components/CustomCursor';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
 import { ShaderCanvas } from './components/ShaderCanvas';
 import type { Models } from 'appwrite';
@@ -28,6 +32,9 @@ export const App: React.FC = () => {
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isDocsModalOpen, setIsDocsModalOpen] = useState<boolean>(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
+  const [is404, setIs404] = useState<boolean>(false);
 
   // Determine initial theme: User manual preference or Indian Standard Time (IST) Day/Night cycle
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -69,6 +76,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     async function init() {
       try {
+        // Check for 404 route
+        if (window.location.pathname === '/404') {
+          setIs404(true);
+        }
+
         const user = await ensureAnonymousSession();
         setCurrentUser(user);
         if (user.name && !user.name.startsWith('Guest ')) {
@@ -140,29 +152,36 @@ export const App: React.FC = () => {
       cleanRoomId = cleanRoomId.split('?room=')[1].split('&')[0];
     }
 
-    const doc = await databases.getDocument<RoomDocument>(
-      APPWRITE_DATABASE_ID,
-      COLLECTIONS.ROOMS,
-      cleanRoomId
-    );
+    try {
+      const doc = await databases.getDocument<RoomDocument>(
+        APPWRITE_DATABASE_ID,
+        COLLECTIONS.ROOMS,
+        cleanRoomId
+      );
 
-    if (!doc) {
-      throw new Error('Watchroom not found. Please verify the Room Code.');
-    }
-
-    if (!doc.isPermanent && doc.expiresAt) {
-      const expirationTime = new Date(doc.expiresAt).getTime();
-      if (Date.now() > expirationTime) {
-        throw new Error('This watchroom has expired (3-hour guest buffer exceeded).');
+      if (!doc) {
+        throw new Error('Watchroom not found. Please verify the Room Code.');
       }
-    }
 
-    if ((doc.participantCount || 1) >= MAX_PARTICIPANTS && doc.hostId !== currentUser?.$id) {
-      throw new Error(`Watchroom is full (Maximum ${MAX_PARTICIPANTS} participants allowed).`);
-    }
+      if (!doc.isPermanent && doc.expiresAt) {
+        const expirationTime = new Date(doc.expiresAt).getTime();
+        if (Date.now() > expirationTime) {
+          throw new Error('This watchroom has expired (3-hour guest buffer exceeded).');
+        }
+      }
 
-    window.history.pushState({}, '', `?room=${cleanRoomId}`);
-    setActiveRoomId(cleanRoomId);
+      if ((doc.participantCount || 1) >= MAX_PARTICIPANTS && doc.hostId !== currentUser?.$id) {
+        throw new Error(`Watchroom is full (Maximum ${MAX_PARTICIPANTS} participants allowed).`);
+      }
+
+      window.history.pushState({}, '', `?room=${cleanRoomId}`);
+      setActiveRoomId(cleanRoomId);
+    } catch (err: any) {
+      if (err?.code === 404 || err?.message?.includes('not found')) {
+        setIs404(true);
+      }
+      throw err;
+    }
   };
 
   const handleLeaveRoom = () => {
@@ -191,8 +210,25 @@ export const App: React.FC = () => {
     }
   };
 
+  if (is404) {
+    return (
+      <>
+        <CustomCursor />
+        <NotFound
+          onReturnHome={() => {
+            window.history.pushState({}, '', '/');
+            setIs404(false);
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <>
+      {/* Custom transparent accent cursor */}
+      <CustomCursor />
+
       {/* Subtle atmospheric canvas */}
       <ShaderCanvas />
 
@@ -206,6 +242,18 @@ export const App: React.FC = () => {
       <DocsModal
         isOpen={isDocsModalOpen}
         onClose={() => setIsDocsModalOpen(false)}
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+      />
+
+      {/* Terms of Service Modal */}
+      <TermsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
       />
 
       {/* Host Authentication Modal */}
@@ -231,6 +279,8 @@ export const App: React.FC = () => {
           onJoinRoom={handleJoinRoom}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           onOpenDocs={() => setIsDocsModalOpen(true)}
+          onOpenPrivacy={() => setIsPrivacyModalOpen(true)}
+          onOpenTerms={() => setIsTermsModalOpen(true)}
           onLogout={handleLogout}
           isDark={isDark}
           onToggleTheme={handleToggleTheme}
