@@ -1,8 +1,129 @@
 export const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+export type VideoResolution = '1080p' | '720p' | '480p' | '360p';
+
+export interface ResolutionPreset {
+  width: number;
+  height: number;
+  frameRate: number;
+  maxBitrate: number;
+  label: string;
+  recommendedFor: string;
+}
+
+export const RESOLUTION_PRESETS: Record<VideoResolution, ResolutionPreset> = {
+  '1080p': {
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    maxBitrate: 3_500_000,
+    label: '1080p Full HD',
+    recommendedFor: 'High-speed broadband or fiber (>20 Mbps)'
+  },
+  '720p': {
+    width: 1280,
+    height: 720,
+    frameRate: 30,
+    maxBitrate: 1_800_000,
+    label: '720p HD (Balanced)',
+    recommendedFor: 'Standard broadband or fast 4G/5G (>8 Mbps)'
+  },
+  '480p': {
+    width: 854,
+    height: 480,
+    frameRate: 30,
+    maxBitrate: 900_000,
+    label: '480p Standard',
+    recommendedFor: 'Moderate connection or mobile data (>3 Mbps)'
+  },
+  '360p': {
+    width: 640,
+    height: 360,
+    frameRate: 24,
+    maxBitrate: 450_000,
+    label: '360p Low Bandwidth',
+    recommendedFor: 'Weak connection, hotspot, or high packet loss'
+  }
+};
+
+export interface MediaDeviceInfoItem {
+  deviceId: string;
+  label: string;
+  groupId: string;
+}
+
+export interface UserMediaOptions {
+  withVideo?: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  resolution?: VideoResolution;
+  noiseSuppression?: boolean;
+  echoCancellation?: boolean;
+}
+
 export interface ScreenCaptureResult {
   stream: MediaStream;
   hasAudio: boolean;
+}
+
+/**
+ * Enumerates audio input devices (microphones).
+ */
+export async function getAudioInputDevices(): Promise<MediaDeviceInfoItem[]> {
+  if (!navigator?.mediaDevices?.enumerateDevices) return [];
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+      .filter((d) => d.kind === 'audioinput')
+      .map((d, index) => ({
+        deviceId: d.deviceId,
+        label: d.label || `Microphone ${index + 1}`,
+        groupId: d.groupId
+      }));
+  } catch (err) {
+    console.warn('Failed to enumerate audio input devices:', err);
+    return [];
+  }
+}
+
+/**
+ * Enumerates audio output devices (speakers, headphones).
+ */
+export async function getAudioOutputDevices(): Promise<MediaDeviceInfoItem[]> {
+  if (!navigator?.mediaDevices?.enumerateDevices) return [];
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+      .filter((d) => d.kind === 'audiooutput')
+      .map((d, index) => ({
+        deviceId: d.deviceId,
+        label: d.label || `Speaker / Headphone ${index + 1}`,
+        groupId: d.groupId
+      }));
+  } catch (err) {
+    console.warn('Failed to enumerate audio output devices:', err);
+    return [];
+  }
+}
+
+/**
+ * Enumerates video input devices (cameras).
+ */
+export async function getVideoInputDevices(): Promise<MediaDeviceInfoItem[]> {
+  if (!navigator?.mediaDevices?.enumerateDevices) return [];
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+      .filter((d) => d.kind === 'videoinput')
+      .map((d, index) => ({
+        deviceId: d.deviceId,
+        label: d.label || `Camera ${index + 1}`,
+        groupId: d.groupId
+      }));
+  } catch (err) {
+    console.warn('Failed to enumerate video input devices:', err);
+    return [];
+  }
 }
 
 /**
@@ -36,25 +157,139 @@ export async function captureDisplayMedia(): Promise<ScreenCaptureResult> {
 }
 
 /**
- * Captures microphone audio with low-latency acoustic echo cancellation.
+ * Captures microphone audio and webcam video with customizable devices and resolution.
+ * Supports legacy signature captureUserMedia(boolean) for backwards compatibility.
  */
-export async function captureUserMedia(withVideo: boolean = false): Promise<MediaStream> {
+export async function captureUserMedia(
+  optionsOrWithVideo: boolean | UserMediaOptions = false
+): Promise<MediaStream> {
   if (!navigator?.mediaDevices?.getUserMedia) {
     throw new Error('User media API is not supported on this browser or device.');
   }
 
+  const options: UserMediaOptions =
+    typeof optionsOrWithVideo === 'boolean'
+      ? { withVideo: optionsOrWithVideo }
+      : optionsOrWithVideo;
+
+  const withVideo = Boolean(options.withVideo);
+  const resolution = options.resolution || '720p';
+  const preset = RESOLUTION_PRESETS[resolution];
+
+  const audioConstraint: MediaTrackConstraints = {
+    echoCancellation: options.echoCancellation ?? true,
+    noiseSuppression: options.noiseSuppression ?? true,
+    autoGainControl: true
+  };
+
+  if (options.audioDeviceId) {
+    audioConstraint.deviceId = { exact: options.audioDeviceId };
+  }
+
+  let videoConstraint: MediaTrackConstraints | boolean = false;
+  if (withVideo) {
+    videoConstraint = {
+      width: { ideal: preset.width },
+      height: { ideal: preset.height },
+      frameRate: { ideal: preset.frameRate },
+      facingMode: 'user'
+    };
+    if (options.videoDeviceId) {
+      videoConstraint.deviceId = { exact: options.videoDeviceId };
+    }
+  }
+
   return navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
-    },
-    video: withVideo
-      ? {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        }
-      : false
+    audio: audioConstraint,
+    video: videoConstraint
   });
+}
+
+/**
+ * Dynamically adjusts resolution constraints on an active video track without reconnecting.
+ */
+export async function applyTrackResolution(
+  videoTrack: MediaStreamTrack,
+  resolution: VideoResolution
+): Promise<void> {
+  if (videoTrack.kind !== 'video') return;
+  const preset = RESOLUTION_PRESETS[resolution];
+  try {
+    await videoTrack.applyConstraints({
+      width: { ideal: preset.width },
+      height: { ideal: preset.height },
+      frameRate: { ideal: preset.frameRate }
+    });
+  } catch (err) {
+    console.warn(`Failed to apply ${resolution} constraints to video track:`, err);
+  }
+}
+
+/**
+ * Routes an HTMLMediaElement (video or audio) to a specific audio output sink device.
+ * Supported in modern Chromium browsers and Safari 17+.
+ */
+export async function setElementAudioOutput(
+  element: HTMLMediaElement,
+  deviceId: string
+): Promise<boolean> {
+  if (typeof (element as any).setSinkId === 'function') {
+    try {
+      await (element as any).setSinkId(deviceId);
+      return true;
+    } catch (err) {
+      console.warn('Failed to setSinkId on media element:', err);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Synthesizes a clean two-tone cinema chime to test audio output on the chosen device.
+ */
+export async function playAudioOutputTestChime(deviceId?: string): Promise<void> {
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return;
+
+  const ctx = new AudioCtx();
+  if (deviceId && typeof (ctx as any).setSinkId === 'function') {
+    try {
+      await (ctx as any).setSinkId(deviceId);
+    } catch {
+      // Ignore if sink assignment on context is not supported
+    }
+  }
+
+  const now = ctx.currentTime;
+
+  // Tone 1: 523.25 Hz (C5)
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(523.25, now);
+  gain1.gain.setValueAtTime(0, now);
+  gain1.gain.linearRampToValueAtTime(0.18, now + 0.05);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(now);
+  osc1.stop(now + 0.35);
+
+  // Tone 2: 783.99 Hz (G5)
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(783.99, now + 0.15);
+  gain2.gain.setValueAtTime(0, now + 0.15);
+  gain2.gain.linearRampToValueAtTime(0.22, now + 0.2);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(now + 0.15);
+  osc2.stop(now + 0.6);
+
+  setTimeout(() => {
+    ctx.close().catch(() => {});
+  }, 1000);
 }

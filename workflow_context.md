@@ -88,37 +88,20 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
    - Permissions: `read("any")`, `create("users")`
 
 ## 5. Core Modules & Engine Structure
-- `src/lib/appwrite.ts`: Appwrite client, optional email/password auth, anonymous session fallback, 3-hour TTL room manager.
+- `src/lib/appwrite.ts`: Appwrite client, optional email/password auth, anonymous session fallback, 3-hour TTL room manager, 9-character code generator (`generateRoomCode()`, `formatRoomCode()`, `normalizeRoomCode()`).
 - `src/lib/time-cycle.ts`: Indian Standard Time (IST) sunrise/sunset cycle and dynamic glass reflection angle generator.
-- `src/lib/media-capture.ts`: Cross-browser display/mic capture with Safari user agent detection to omit audio constraints and prevent `DOMException`.
-- `src/lib/webrtc.ts`: P2P mesh WebRTC engine with H.264 transceiver codec preference, dynamic track replacement, and Appwrite signaling exchange.
+- `src/lib/media-capture.ts`: Cross-browser display/mic capture, device enumeration (`getAudioInputDevices`, `getAudioOutputDevices`, `getVideoInputDevices`), resolution presets (`1080p`, `720p`, `480p`, `360p`), audio output routing (`setSinkId`), and acoustic test chime.
+- `src/lib/diagnostics.ts`: Live WebRTC telemetry collector (RTT, Jitter, Packet Loss, Bitrate), frame loop jitter benchmark for CPU/system rendering load, and root cause analysis advisor.
+- `src/lib/webrtc.ts`: P2P mesh WebRTC engine with dynamic track replacement, encoding bitrate adaptation, and Appwrite signaling exchange.
 - `src/lib/sync-engine.ts`: Drift-compensated playback synchronizer with network latency benchmarking and 350ms seek jitter threshold.
 
-## 5. Media & WebRTC Mesh Streaming Details
-- **Camera Feed & Multi-party Video:**
-  - `WebRTCEngine` supports both microphone (`attachMicStream`) and camera (`attachCameraStream`, `removeCameraStream`).
-  - Automatic peer discovery via `announceJoin`: When any participant enters the room, an announcement is broadcast over Appwrite Realtime so all active peers proactively initiate peer connections.
-  - Distinct stream tracking ensures screen broadcasts (the movie) are separated from participant webcam video feeds via stream ID matching and signaling metadata.
-  - Local user camera feed ("You") is rendered in the Theater lateral sidebar, Grid view, and Floating draggable tiles with mirror styling (`scale-x-[-1]`), mute safeguards, and camera-off avatar fallbacks.
-  - Bottom dock features a dedicated Camera Toggle button alongside the Microphone Toggle button for real-time webcam activation.
-- **Watchroom Chat Drawer:**
-  - `ChatSidebar` close button ('X') explicitly wired with event propagation guards to toggle and close drawer smoothly.
+## 6. Stage Settings & Performance Diagnostics
+- **Settings Modal (`SettingsModal.tsx`):**
+  - **Audio:** Microphone selector with live input meter, output speaker selector with acoustic chime test, noise suppression & echo cancellation toggle.
+  - **Video & Quality:** Camera hardware selector, 4 resolution quality cards (`1080p`, `720p`, `480p`, `360p`) with live mirror preview and dynamic encoding bitrate adaptation.
+  - **Diagnostics:** HTML5 Canvas rolling sparkline graph plotting 30 seconds of RTT latency, WebRTC telemetry cards (RTT, Jitter, Loss %, Bitrate), CPU/UI thread responsiveness meter, and smart root-cause analysis banner.
 
-- `src/components/CustomCursor.tsx`: Custom transparent accent cursor with fluid lerp physics and interactive element scaling.
-- `src/components/DraggableTile.tsx`: Floating draggable participant overlay with pointer capture and independent audio volume controls.
-- `src/components/WatchStage.tsx`: Unified stage supporting Theater (4/5 width), Grid (2x2), and Floating layouts with Picture-in-Picture, Fullscreen, and live multi-peer audio mixer.
-- `src/components/ChatSidebar.tsx`: Real-time room text chat with auto-scroll and unread counter badges.
-- `src/components/Lobby.tsx`: Clean, human-centered watchroom creation and code joining flow with realistic glass reflections.
-- `src/components/GreenRoom.tsx`: Pre-meeting camera and microphone staging screen.
-- `src/components/AuthModal.tsx`: Optional host sign in / sign up dialog for permanent rooms.
-- `src/components/DocsModal.tsx`: System architecture & technical documentation modal.
-- `src/components/PrivacyModal.tsx`: Privacy Policy modal with zero-video-storage guarantees.
-- `src/components/TermsModal.tsx`: Terms of Service modal.
-- `src/components/NotFound.tsx`: Custom 404 page with playable cinema arcade game.
-- `src/components/RoomView.tsx`: Main room container coordinating Green Room, WebRTC, synchronizer, media capture, and stage views.
-- `functions/cleanup-stale-signals/`: Node.js serverless cron function (`*/5 * * * *`) purging signaling documents older than 10 minutes.
-
-## 6. Verification & Validation Status
-- **Vitest Suites:** 3/3 test files passed (9/9 unit tests) covering media capture constraints, synchronizer jitter thresholds, and WebRTC signaling.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 5.71s.
+## 7. Verification & Validation Status
+- **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.42s.
 - **Main Branch:** Synced and pushed to GitHub repository `origin/main`.

@@ -10,10 +10,28 @@ import {
 } from '../lib/appwrite';
 import { WebRTCEngine } from '../lib/webrtc';
 import { PlaybackSynchronizer, SyncPacket } from '../lib/sync-engine';
-import { captureDisplayMedia, captureUserMedia } from '../lib/media-capture';
+import {
+  captureDisplayMedia,
+  captureUserMedia,
+  getAudioInputDevices,
+  getAudioOutputDevices,
+  getVideoInputDevices,
+  applyTrackResolution,
+  setElementAudioOutput,
+  RESOLUTION_PRESETS,
+  VideoResolution,
+  MediaDeviceInfoItem
+} from '../lib/media-capture';
+import {
+  SystemLoadMonitor,
+  collectTelemetry,
+  TelemetryStats,
+  LatencyDataPoint
+} from '../lib/diagnostics';
 import { WatchStage, Participant } from './WatchStage';
 import { ChatSidebar } from './ChatSidebar';
 import { GreenRoom } from './GreenRoom';
+import { SettingsModal } from './SettingsModal';
 
 interface RoomViewProps {
   roomId: string;
@@ -40,6 +58,34 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [errorState, setErrorState] = useState<string | null>(null);
+
+  // In-room Settings & Telemetry state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>('');
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string>('');
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string>('');
+  const [selectedResolution, setSelectedResolution] = useState<VideoResolution>('720p');
+  const [isNoiseSuppressionEnabled, setIsNoiseSuppressionEnabled] = useState(true);
+
+  const [telemetry, setTelemetry] = useState<TelemetryStats>({
+    rtt: 28,
+    jitter: 3,
+    packetLoss: 0,
+    downstreamKbps: 0,
+    upstreamKbps: 0,
+    systemLoad: 12,
+    cpuCores: typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 4,
+    memoryUsedMb: null,
+    memoryLimitMb: null,
+    status: 'healthy',
+    verdict: 'Optimal Connection & Performance',
+    recommendation: 'Your stream pipeline and local system are running smoothly.'
+  });
+  const [latencyHistory, setLatencyHistory] = useState<LatencyDataPoint[]>([]);
+  const systemMonitorRef = useRef<SystemLoadMonitor | null>(null);
 
   // Google Meet Green Room preview state
   const [hasEnteredStage, setHasEnteredStage] = useState(false);
@@ -95,6 +141,72 @@ export const RoomView: React.FC<RoomViewProps> = ({
       isMounted = false;
     };
   }, [roomId, currentUserId]);
+
+  // Enumerate Audio/Video Devices and initialize CPU/system load monitor
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDevices() {
+      try {
+        const [audIn, audOut, vidIn] = await Promise.all([
+          getAudioInputDevices(),
+          getAudioOutputDevices(),
+          getVideoInputDevices()
+        ]);
+        if (!isMounted) return;
+        setAudioInputDevices(audIn);
+        setAudioOutputDevices(audOut);
+        setVideoInputDevices(vidIn);
+
+        if (audIn.length > 0) setSelectedAudioDeviceId((prev) => prev || audIn[0].deviceId);
+        if (audOut.length > 0) setSelectedAudioOutputDeviceId((prev) => prev || audOut[0].deviceId);
+        if (vidIn.length > 0) setSelectedVideoDeviceId((prev) => prev || vidIn[0].deviceId);
+      } catch (err) {
+        console.warn('Device enumeration failed:', err);
+      }
+    }
+    loadDevices();
+
+    const monitor = new SystemLoadMonitor();
+    monitor.start();
+    systemMonitorRef.current = monitor;
+
+    return () => {
+      isMounted = false;
+      monitor.stop();
+      systemMonitorRef.current = null;
+    };
+  }, []);
+
+  // Poll live WebRTC and system telemetry every 1.5 seconds once on stage
+  useEffect(() => {
+    if (!hasEnteredStage) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const pcs = webrtcRef.current?.getPeerConnections();
+        const report = await collectTelemetry(pcs, systemMonitorRef.current || undefined);
+        if (isMounted) {
+          setTelemetry(report);
+          setLatencyHistory((prev) => {
+            const next = [
+              ...prev,
+              { timestamp: Date.now(), rtt: report.rtt, systemLoad: report.systemLoad }
+            ];
+            if (next.length > 30) next.shift();
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn('Telemetry polling error:', err);
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [hasEnteredStage]);
 
   // WebRTC and Synchronizer Setup once user enters through the Green Room
   useEffect(() => {
@@ -376,6 +488,85 @@ export const RoomView: React.FC<RoomViewProps> = ({
     setLocalFileUrl(objectUrl);
   };
 
+  // Settings Change Handlers
+  const handleSelectAudioInputDevice = async (deviceId: string) => {
+    setSelectedAudioDeviceId(deviceId);
+    if (isMicActive) {
+      try {
+        const newStream = await captureUserMedia({
+          withVideo: isCameraActive,
+          audioDeviceId: deviceId,
+          videoDeviceId: selectedVideoDeviceId,
+          resolution: selectedResolution,
+          noiseSuppression: isNoiseSuppressionEnabled
+        });
+        localUserMediaRef.current?.getAudioTracks().forEach((t) => t.stop());
+        const audioTrack = newStream.getAudioTracks()[0];
+        if (audioTrack && localUserMediaRef.current) {
+          localUserMediaRef.current.addTrack(audioTrack);
+          await webrtcRef.current?.replaceTracks(audioTrack, undefined);
+          setLocalUserMediaStream(new MediaStream(localUserMediaRef.current.getTracks()));
+        }
+      } catch (err) {
+        console.warn('Failed to switch audio input device:', err);
+      }
+    }
+  };
+
+  const handleSelectAudioOutputDevice = async (deviceId: string) => {
+    setSelectedAudioOutputDeviceId(deviceId);
+    document.querySelectorAll('video, audio').forEach((el) => {
+      setElementAudioOutput(el as HTMLMediaElement, deviceId).catch(() => {});
+    });
+  };
+
+  const handleSelectVideoInputDevice = async (deviceId: string) => {
+    setSelectedVideoDeviceId(deviceId);
+    if (isCameraActive) {
+      try {
+        const newStream = await captureUserMedia({
+          withVideo: true,
+          audioDeviceId: selectedAudioDeviceId,
+          videoDeviceId: deviceId,
+          resolution: selectedResolution,
+          noiseSuppression: isNoiseSuppressionEnabled
+        });
+        localUserMediaRef.current?.getVideoTracks().forEach((t) => t.stop());
+        const videoTrack = newStream.getVideoTracks()[0];
+        if (videoTrack && localUserMediaRef.current) {
+          localUserMediaRef.current.addTrack(videoTrack);
+          await webrtcRef.current?.replaceTracks(undefined, videoTrack);
+          setLocalUserMediaStream(new MediaStream(localUserMediaRef.current.getTracks()));
+        }
+      } catch (err) {
+        console.warn('Failed to switch video input device:', err);
+      }
+    }
+  };
+
+  const handleSelectResolution = async (resolution: VideoResolution) => {
+    setSelectedResolution(resolution);
+    const preset = RESOLUTION_PRESETS[resolution];
+    const videoTrack = localUserMediaRef.current?.getVideoTracks()[0];
+    if (videoTrack) {
+      await applyTrackResolution(videoTrack, resolution);
+    }
+    await webrtcRef.current?.updateVideoEncodings(preset.maxBitrate);
+  };
+
+  const handleToggleNoiseSuppression = async (enabled: boolean) => {
+    setIsNoiseSuppressionEnabled(enabled);
+    const audioTrack = localUserMediaRef.current?.getAudioTracks()[0];
+    if (audioTrack) {
+      await audioTrack
+        .applyConstraints({
+          noiseSuppression: enabled,
+          echoCancellation: enabled
+        })
+        .catch(console.warn);
+    }
+  };
+
   const handleVideoRef = useCallback((videoElement: HTMLVideoElement | null) => {
     if (videoElement && synchronizerRef.current) {
       synchronizerRef.current.mount(videoElement);
@@ -425,7 +616,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
       />
     );
   }
-
 
   const displayedParticipants: Participant[] = useMemo(() => {
     const list: Participant[] = [];
@@ -479,6 +669,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         }
       }}
       onCloseChat={() => setIsChatOpen(false)}
+      onOpenSettings={() => setIsSettingsOpen(true)}
       childrenChat={
         <ChatSidebar
           roomId={roomId}
@@ -491,6 +682,28 @@ export const RoomView: React.FC<RoomViewProps> = ({
               setUnreadChatCount((prev) => prev + 1);
             }
           }}
+        />
+      }
+      childrenSettings={
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          audioInputDevices={audioInputDevices}
+          audioOutputDevices={audioOutputDevices}
+          selectedAudioDeviceId={selectedAudioDeviceId}
+          selectedAudioOutputDeviceId={selectedAudioOutputDeviceId}
+          onSelectAudioInputDevice={handleSelectAudioInputDevice}
+          onSelectAudioOutputDevice={handleSelectAudioOutputDevice}
+          isNoiseSuppressionEnabled={isNoiseSuppressionEnabled}
+          onToggleNoiseSuppression={handleToggleNoiseSuppression}
+          videoInputDevices={videoInputDevices}
+          selectedVideoDeviceId={selectedVideoDeviceId}
+          onSelectVideoInputDevice={handleSelectVideoInputDevice}
+          selectedResolution={selectedResolution}
+          onSelectResolution={handleSelectResolution}
+          previewStream={localUserMediaStream}
+          telemetry={telemetry}
+          latencyHistory={latencyHistory}
         />
       }
     />

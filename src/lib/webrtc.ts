@@ -342,6 +342,44 @@ export class WebRTCEngine {
     }).catch(console.warn);
   }
 
+  public getPeerConnections(): Map<string, RTCPeerConnection> {
+    return this.peers;
+  }
+
+  public async updateVideoEncodings(maxBitrate: number): Promise<void> {
+    for (const pc of this.peers.values()) {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = maxBitrate;
+            await sender.setParameters(params);
+          } catch (err) {
+            console.warn('Failed to update RTCRtpSender encoding bitrate:', err);
+          }
+        }
+      }
+    }
+  }
+
+  public async replaceTracks(newAudioTrack?: MediaStreamTrack, newVideoTrack?: MediaStreamTrack): Promise<void> {
+    for (const pc of this.peers.values()) {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track?.kind === 'audio' && newAudioTrack) {
+          await sender.replaceTrack(newAudioTrack).catch(console.warn);
+        }
+        if (sender.track?.kind === 'video' && newVideoTrack) {
+          await sender.replaceTrack(newVideoTrack).catch(console.warn);
+        }
+      }
+    }
+  }
+
   public async announceJoin(userName: string) {
     try {
       await this.sendSignal('all', 'candidate', {
