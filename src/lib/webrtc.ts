@@ -8,6 +8,7 @@ export interface WebRTCEngineOptions {
   onRemoteTrackAdded: (peerId: string, stream: MediaStream) => void;
   onPeerDisconnected: (peerId: string) => void;
   onPeerConnected?: (peerId: string) => void;
+  onScreenShareChanged?: (peerId: string, streamId: string | undefined, active: boolean) => void;
 }
 
 export class WebRTCEngine {
@@ -17,6 +18,7 @@ export class WebRTCEngine {
   private db: Databases;
   private unsubscribe?: () => void;
   private localMicStream?: MediaStream;
+  private localCameraStream?: MediaStream;
   private localScreenStream?: MediaStream;
 
   private rtcConfiguration: RTCConfiguration = {
@@ -52,7 +54,25 @@ export class WebRTCEngine {
         } else if (doc.type === 'answer') {
           await this.handleAnswer(doc.senderId, payload);
         } else if (doc.type === 'candidate') {
-          await this.handleCandidate(doc.senderId, payload);
+          if (payload && payload.action === 'announce-join') {
+            if (doc.senderId !== this.opts.currentUserId) {
+              await this.initiateConnection(doc.senderId);
+              if (this.localScreenStream) {
+                await this.sendSignal(doc.senderId, 'candidate', {
+                  action: 'screen-cast-started',
+                  streamId: this.localScreenStream.id
+                });
+              }
+            }
+          } else if (payload && payload.action === 'screen-cast-started') {
+            this.opts.onScreenShareChanged?.(doc.senderId, payload.streamId, true);
+          } else if (payload && payload.action === 'screen-cast-stopped') {
+            this.opts.onScreenShareChanged?.(doc.senderId, payload.streamId, false);
+          } else if (payload && payload.candidate) {
+            await this.handleCandidate(doc.senderId, payload.candidate);
+          } else {
+            await this.handleCandidate(doc.senderId, payload);
+          }
         }
       } catch (err) {
         console.error('Failed to parse and process signaling payload:', err);
@@ -68,7 +88,7 @@ export class WebRTCEngine {
 
     pc.onicecandidate = async (e) => {
       if (e.candidate) {
-        await this.sendSignal(peerId, 'candidate', e.candidate.toJSON());
+        await this.sendSignal(peerId, 'candidate', { candidate: e.candidate.toJSON() });
       }
     };
 
@@ -108,8 +128,15 @@ export class WebRTCEngine {
 
     // Attach active local audio tracks to the peer connection
     if (this.localMicStream) {
-      this.localMicStream.getTracks().forEach((track) => {
+      this.localMicStream.getAudioTracks().forEach((track) => {
         pc.addTrack(track, this.localMicStream!);
+      });
+    }
+
+    // Attach active local camera video tracks to the peer connection
+    if (this.localCameraStream) {
+      this.localCameraStream.getVideoTracks().forEach((track) => {
+        pc.addTrack(track, this.localCameraStream!);
       });
     }
 
@@ -233,7 +260,48 @@ export class WebRTCEngine {
 
   public attachMicStream(stream: MediaStream) {
     this.localMicStream = stream;
-    this.replaceTrack(stream, 'audio');
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+
+    this.peers.forEach((pc) => {
+      const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+      if (sender) {
+        sender.replaceTrack(track);
+      } else {
+        pc.addTrack(track, stream);
+      }
+    });
+  }
+
+  public attachCameraStream(stream: MediaStream) {
+    this.localCameraStream = stream;
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    this.peers.forEach((pc) => {
+      const sender = pc.getSenders().find(
+        (s) => s.track?.kind === 'video' && s.track?.id !== this.localScreenStream?.getVideoTracks()[0]?.id
+      );
+      if (sender) {
+        sender.replaceTrack(videoTrack);
+      } else {
+        pc.addTrack(videoTrack, stream);
+      }
+    });
+  }
+
+  public removeCameraStream() {
+    if (!this.localCameraStream) return;
+    const videoTracks = this.localCameraStream.getVideoTracks();
+    this.peers.forEach((pc) => {
+      pc.getSenders().forEach((sender) => {
+        if (sender.track && videoTracks.some((t) => t.id === sender.track!.id)) {
+          pc.removeTrack(sender);
+        }
+      });
+    });
+    this.localCameraStream.getTracks().forEach((t) => t.stop());
+    this.localCameraStream = undefined;
   }
 
   public attachScreenStream(stream: MediaStream) {
@@ -247,10 +315,16 @@ export class WebRTCEngine {
         }
       });
     });
+
+    this.sendSignal('all', 'candidate', {
+      action: 'screen-cast-started',
+      streamId: stream.id
+    }).catch(console.warn);
   }
 
   public removeScreenStream() {
     if (!this.localScreenStream) return;
+    const screenStreamId = this.localScreenStream.id;
     const screenTracks = this.localScreenStream.getTracks();
     this.peers.forEach((pc) => {
       pc.getSenders().forEach((sender) => {
@@ -261,20 +335,23 @@ export class WebRTCEngine {
     });
     this.localScreenStream.getTracks().forEach((t) => t.stop());
     this.localScreenStream = undefined;
+
+    this.sendSignal('all', 'candidate', {
+      action: 'screen-cast-stopped',
+      streamId: screenStreamId
+    }).catch(console.warn);
   }
 
-  private replaceTrack(stream: MediaStream, kind: 'audio' | 'video') {
-    const track = stream.getTracks().find((t) => t.kind === kind);
-    if (!track) return;
-
-    this.peers.forEach((pc) => {
-      const sender = pc.getSenders().find((s) => s.track?.kind === kind);
-      if (sender) {
-        sender.replaceTrack(track);
-      } else {
-        pc.addTrack(track, stream);
-      }
-    });
+  public async announceJoin(userName: string) {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'announce-join',
+        userId: this.opts.currentUserId,
+        userName
+      });
+    } catch (err) {
+      console.warn('Failed to announce join:', err);
+    }
   }
 
   public destroy() {
@@ -291,6 +368,11 @@ export class WebRTCEngine {
     if (this.localMicStream) {
       this.localMicStream.getTracks().forEach((t) => t.stop());
       this.localMicStream = undefined;
+    }
+
+    if (this.localCameraStream) {
+      this.localCameraStream.getTracks().forEach((t) => t.stop());
+      this.localCameraStream = undefined;
     }
 
     if (this.localScreenStream) {

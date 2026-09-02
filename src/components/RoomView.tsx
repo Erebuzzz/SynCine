@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   databases,
   realtime,
@@ -31,9 +31,13 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [room, setRoom] = useState<RoomDocument | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [mediaStream, setMediaStream] = useState<MediaStream | undefined>(undefined);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | undefined>(undefined);
   const [localFileUrl, setLocalFileUrl] = useState<string | undefined>(undefined);
+  const [localUserMediaStream, setLocalUserMediaStream] = useState<MediaStream | null>(null);
   const [isMicActive, setIsMicActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [errorState, setErrorState] = useState<string | null>(null);
 
@@ -43,7 +47,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
-  const localMicStreamRef = useRef<MediaStream | null>(null);
+  const localUserMediaRef = useRef<MediaStream | null>(null);
+  const screenStreamIdRef = useRef<string | null>(null);
   const isHost = room?.hostId === currentUserId;
 
   // Initial Room Document Fetch & Expiration Validation
@@ -118,6 +123,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
         roomId,
         currentUserId,
         onRemoteTrackAdded: (peerId, stream) => {
+          // Check if this stream is the screen broadcast
+          if (screenStreamIdRef.current && stream.id === screenStreamIdRef.current) {
+            setRemoteScreenStream(stream);
+            return;
+          }
+
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
             if (existingIndex >= 0) {
@@ -125,12 +136,24 @@ export const RoomView: React.FC<RoomViewProps> = ({
               updated[existingIndex] = { ...updated[existingIndex], stream };
               return updated;
             }
-            return [...prev, { id: peerId, name: `Viewer ${peerId.slice(-4)}`, stream }];
+            return [
+              ...prev,
+              {
+                id: peerId,
+                name: `Viewer ${peerId.slice(-4)}`,
+                stream,
+                isMicActive: stream.getAudioTracks().some((t) => t.enabled),
+                isCameraActive: stream.getVideoTracks().some((t) => t.enabled)
+              }
+            ];
           });
-
-          // Host screen share stream display
-          if (stream.getVideoTracks().length > 0 && room.hostId !== currentUserId) {
-            setMediaStream(stream);
+        },
+        onScreenShareChanged: (_peerId, streamId, active) => {
+          if (active && streamId) {
+            screenStreamIdRef.current = streamId;
+          } else {
+            screenStreamIdRef.current = null;
+            setRemoteScreenStream(undefined);
           }
         },
         onPeerDisconnected: (peerId) => {
@@ -142,6 +165,19 @@ export const RoomView: React.FC<RoomViewProps> = ({
       });
 
       webrtcRef.current = engine;
+
+      // Attach local mic and camera tracks if captured
+      if (localUserMediaRef.current) {
+        if (isMicActive) {
+          engine.attachMicStream(localUserMediaRef.current);
+        }
+        if (isCameraActive && localUserMediaRef.current.getVideoTracks().length > 0) {
+          engine.attachCameraStream(localUserMediaRef.current);
+        }
+      }
+
+      // Announce presence to entire room so existing peers connect
+      await engine.announceJoin(effectiveUserName);
 
       // Handshake with host if viewer
       if (room.hostId !== currentUserId) {
@@ -201,9 +237,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
         synchronizerRef.current.destroy();
         synchronizerRef.current = null;
       }
-      if (localMicStreamRef.current) {
-        localMicStreamRef.current.getTracks().forEach((t) => t.stop());
-        localMicStreamRef.current = null;
+      if (localUserMediaRef.current) {
+        localUserMediaRef.current.getTracks().forEach((t) => t.stop());
+        localUserMediaRef.current = null;
       }
     };
   }, [hasEnteredStage, roomId, currentUserId]);
@@ -215,40 +251,97 @@ export const RoomView: React.FC<RoomViewProps> = ({
     presentImmediately: boolean
   ) => {
     setEffectiveUserName(name);
-    setHasEnteredStage(true);
 
-    if (micEnabled) {
+    if (micEnabled || videoEnabled) {
       try {
         const stream = await captureUserMedia(videoEnabled);
-        localMicStreamRef.current = stream;
-        webrtcRef.current?.attachMicStream(stream);
-        setIsMicActive(true);
+        stream.getAudioTracks().forEach((t) => {
+          t.enabled = micEnabled;
+        });
+        stream.getVideoTracks().forEach((t) => {
+          t.enabled = videoEnabled;
+        });
+        localUserMediaRef.current = stream;
+        setLocalUserMediaStream(stream);
+        setIsMicActive(micEnabled);
+        setIsCameraActive(videoEnabled);
       } catch (err) {
-        console.warn('Microphone capture failed:', err);
+        console.warn('Media capture failed in green room join:', err);
       }
     }
 
+    setHasEnteredStage(true);
+
     if (presentImmediately && room?.mediaMode === 'screen' && room?.hostId === currentUserId) {
-      handleToggleScreenShare();
+      setTimeout(() => {
+        handleToggleScreenShare();
+      }, 500);
     }
   };
 
   // Microphone toggle handler
   const handleToggleMic = async () => {
     if (isMicActive) {
-      if (localMicStreamRef.current) {
-        localMicStreamRef.current.getTracks().forEach((t) => t.stop());
-        localMicStreamRef.current = null;
+      if (localUserMediaRef.current) {
+        localUserMediaRef.current.getAudioTracks().forEach((t) => {
+          t.enabled = false;
+        });
       }
       setIsMicActive(false);
     } else {
       try {
-        const stream = await captureUserMedia(false);
-        localMicStreamRef.current = stream;
+        let stream = localUserMediaRef.current;
+        if (!stream || stream.getAudioTracks().length === 0) {
+          stream = await captureUserMedia(isCameraActive);
+          localUserMediaRef.current = stream;
+          setLocalUserMediaStream(stream);
+        } else {
+          stream.getAudioTracks().forEach((t) => {
+            t.enabled = true;
+          });
+        }
         webrtcRef.current?.attachMicStream(stream);
         setIsMicActive(true);
       } catch (err) {
-        console.error('Failed to capture microphone:', err);
+        console.error('Failed to enable microphone:', err);
+      }
+    }
+  };
+
+  // Camera toggle handler
+  const handleToggleCamera = async () => {
+    if (isCameraActive) {
+      if (localUserMediaRef.current) {
+        localUserMediaRef.current.getVideoTracks().forEach((t) => {
+          t.enabled = false;
+        });
+      }
+      webrtcRef.current?.removeCameraStream();
+      setIsCameraActive(false);
+    } else {
+      try {
+        let stream = localUserMediaRef.current;
+        const existingVideoTrack = stream?.getVideoTracks()[0];
+        if (existingVideoTrack && existingVideoTrack.readyState === 'live') {
+          existingVideoTrack.enabled = true;
+        } else {
+          const newStream = await captureUserMedia(true);
+          const newVideoTrack = newStream.getVideoTracks()[0];
+          if (stream) {
+            stream.getVideoTracks().forEach((t) => stream!.removeTrack(t));
+            if (newVideoTrack) stream.addTrack(newVideoTrack);
+          } else {
+            stream = newStream;
+            localUserMediaRef.current = stream;
+            setLocalUserMediaStream(stream);
+          }
+        }
+        if (stream) {
+          webrtcRef.current?.attachCameraStream(stream);
+        }
+        setIsCameraActive(true);
+      } catch (err) {
+        console.error('Failed to enable camera:', err);
       }
     }
   };
@@ -334,6 +427,29 @@ export const RoomView: React.FC<RoomViewProps> = ({
   }
 
 
+  const displayedParticipants: Participant[] = useMemo(() => {
+    const list: Participant[] = [];
+    // Self participant tile
+    list.push({
+      id: currentUserId,
+      name: `${effectiveUserName}`,
+      stream: localUserMediaStream || undefined,
+      isSelf: true,
+      isMicActive,
+      isCameraActive
+    });
+    // Remote participants
+    participants.forEach((p) => {
+      list.push({
+        ...p,
+        isSelf: false
+      });
+    });
+    return list;
+  }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, participants]);
+
+  const effectiveMediaStream = isHost ? mediaStream : remoteScreenStream;
+
   return (
     <WatchStage
       roomName={room.name}
@@ -342,25 +458,39 @@ export const RoomView: React.FC<RoomViewProps> = ({
       isHost={isHost}
       currentUserId={currentUserId}
       currentUserName={effectiveUserName}
-      mediaStream={mediaStream}
+      mediaStream={effectiveMediaStream}
       localFileUrl={localFileUrl}
-      participants={participants}
+      participants={displayedParticipants}
       isMicActive={isMicActive}
+      isCameraActive={isCameraActive}
       isSharingScreen={isSharingScreen}
       onToggleMic={handleToggleMic}
+      onToggleCamera={handleToggleCamera}
       onToggleScreenShare={handleToggleScreenShare}
       onSelectLocalFile={handleSelectLocalFile}
       onLeaveRoom={onLeave}
       videoRefCallback={handleVideoRef}
       unreadChatCount={unreadChatCount}
+      isChatOpen={isChatOpen}
+      onToggleChat={() => {
+        setIsChatOpen((prev) => !prev);
+        if (!isChatOpen) {
+          setUnreadChatCount(0);
+        }
+      }}
+      onCloseChat={() => setIsChatOpen(false)}
       childrenChat={
         <ChatSidebar
           roomId={roomId}
           currentUserId={currentUserId}
           currentUserName={effectiveUserName}
-          isOpen={true}
-          onClose={() => {}}
-          onNewMessageReceived={() => setUnreadChatCount((prev) => prev + 1)}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          onNewMessageReceived={() => {
+            if (!isChatOpen) {
+              setUnreadChatCount((prev) => prev + 1);
+            }
+          }}
         />
       }
     />
