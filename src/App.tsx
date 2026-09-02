@@ -256,14 +256,14 @@ export const App: React.FC = () => {
       {/* Custom transparent accent cursor */}
       <CustomCursor />
 
-      {/* Subtle atmospheric canvas */}
-      <ShaderCanvas />
-
-      {/* Procedural SVG filters */}
-      <LiquidGlassFilters />
-
-      {/* Film grain texture at reduced opacity */}
-      <div className="film-grain-layer" />
+      {/* Subtle atmospheric canvas and film grain on Lobby only (disabled in watchrooms to guarantee smooth, zero-flicker hardware video playback) */}
+      {!activeRoomId && (
+        <>
+          <ShaderCanvas />
+          <LiquidGlassFilters />
+          <div className="film-grain-layer" />
+        </>
+      )}
 
       {/* Technical Documentation Modal */}
       <DocsModal

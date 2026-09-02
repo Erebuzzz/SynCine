@@ -102,6 +102,15 @@ body {
   filter: url(#film-grain-filter);
 }
 
+/* Isolated Hardware-Accelerated Video Rendering (Prevents GPU Compositor Flickering) */
+video {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
 /* Gentle Entry Animation (High Performance) */
 @keyframes enterSmooth {
   from {

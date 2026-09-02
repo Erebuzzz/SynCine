@@ -130,15 +130,12 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - This 3:1 / 4:1 separated layout is preserved in Fullscreen mode (`mainStageContainerRef`), ensuring zero overlap or hindrance between camera feeds and the broadcast.
 - **Symmetrical Stage Coverage when Screen Share is Off:**
   - When screen cast is inactive (`!hasActiveMedia`), the stage symmetrically distributes participant camera feeds across the entire stage (1 tile centered, 2 tiles side-by-side, 3 or 4 in 2x2 grid) with a floating standby pill at the top, maximizing camera visibility without squished sidebars.
-- **Stream Refresh / Blinking Prevention:**
-  - Prevented decoder resets and stream blinking by guarding all video elements with `if (el.srcObject !== mediaStream) el.srcObject = mediaStream;`.
-  - Gated live WebRTC telemetry polling behind `isSettingsOpen` in `RoomView.tsx` to eliminate 40 unneeded re-renders per minute during normal watching.
-- **Accurate Participant Count:**
-  - Fixed `totalUsersInRoom` in `WatchStage.tsx` from `participants.length + 1` to `participants.length` (since `participants` already includes self and remote users), accurately displaying `1/4` when alone.
-- **Right-Docked Floating Layout:**
-  - Floating draggable tiles now default to `x: window.innerWidth - 280`, keeping them docked along the right edge to avoid obstructing the primary video stage.
+- **Video Stream Flicker Elimination (Camera & Screen Share):**
+  - **Root Cause 1 (GPU Compositor Invalidation):** `App.tsx` rendered a global `.film-grain-layer` with `position: fixed; inset: 0; z-index: 40; filter: url(#film-grain-filter)` and a 60fps `ShaderCanvas`. The procedural SVG displacement filter sitting at `z-40` directly on top of hardware-decoded video surfaces forced Chromium's GPU compositor to constantly invalidate DirectComposition overlays and fall back to software rasterization 60 times a second, causing severe video flickering on both camera feeds and screen sharing. Fixed by gating `ShaderCanvas`, `LiquidGlassFilters`, and `.film-grain-layer` behind `!activeRoomId` so they only run in the Lobby and are disabled in watchrooms.
+  - **Root Cause 2 (Inline Callback Ref Playback Interruptions):** Inline `<video ref={(v) => { ... }}>` callbacks caused React to invoke `ref(null)` followed by `ref(videoElement)` on every render, triggering repeated `.play()` calls that interrupted the active media decoder pipeline. Fixed by creating a dedicated, memoized `StreamVideoPlayer` component that isolates `srcObject` binding and volume adjustments from parent render cycles.
+  - **Root Cause 3 (Hardware Overlay Clipping):** Added CSS isolation rules (`transform: translateZ(0); backface-visibility: hidden; will-change: transform;`) in `index.css` to ensure video elements get their own dedicated hardware compositing plane.
 
 ## 10. Verification & Validation Status
 - **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.38s.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 4.55s.
 - **Main Branch:** Synced and pushed to GitHub repository `origin/main`.

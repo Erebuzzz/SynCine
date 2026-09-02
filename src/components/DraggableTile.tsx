@@ -31,7 +31,10 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
 
   useEffect(() => {
     if (videoRef.current && participant.stream) {
-      videoRef.current.srcObject = participant.stream;
+      if (videoRef.current.srcObject !== participant.stream) {
+        videoRef.current.srcObject = participant.stream;
+        videoRef.current.play().catch(() => {});
+      }
     }
   }, [participant.stream]);
 
