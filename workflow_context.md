@@ -13,6 +13,7 @@ This document preserves the current implementation state, architectural decision
   - `syncine.vercel.app`
   - `localhost`
 - **Capacity Constraint:** Strictly 4 maximum participants per room
+- **Room Code Format:** 9-character memorable codes (e.g. `c7k-9m2-p4q`), with normalization supporting both plain alphanumeric strings (`c7k9m2p4q`), hyphenated strings, and full invite links.
 - **Room Lifecycle Policy:** Ephemeral guest rooms reset after 3 hours; authenticated host rooms are permanent. Zero user tracking or invasive data collection.
 
 ## 2. Visual Identity & Realistic Glassmorphic Design System
