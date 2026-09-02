@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SynLogo, MeshNetworkIcon, LatencySyncIcon, ScreenCastIcon } from './icons/SynIcons';
-import { X, Shield, Clock, HardDrive, Cpu } from 'lucide-react';
+import { X, Shield, Clock, HardDrive, Cpu, Terminal } from 'lucide-react';
 
 interface DocsModalProps {
   isOpen: boolean;
@@ -25,11 +25,16 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           <div className="flex items-center gap-3">
             <SynLogo size={28} />
             <div>
-              <h2 id="docs-modal-title" className="text-sm font-semibold text-[var(--text-primary)]">
-                System Documentation & Architecture
-              </h2>
-              <p className="text-[11px] text-[var(--text-secondary)]">
-                Technical overview of SynCine protocol and synchronization engine
+              <div className="flex items-center gap-2">
+                <h2 id="docs-modal-title" className="text-sm font-semibold text-[var(--text-primary)]">
+                  System Architecture & Technical Specification
+                </h2>
+                <span className="font-mono text-[10px] text-[var(--text-tertiary)] hidden sm:inline">
+                  [SPEC_V1.0]
+                </span>
+              </div>
+              <p className="font-mono text-[11px] text-[var(--text-secondary)]">
+                WebRTC mesh topology, drift compensation, and ephemeral buffer lifecycle
               </p>
             </div>
           </div>
@@ -42,13 +47,13 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Section Tabs */}
-        <div className="flex px-6 pt-3 border-b border-black/[0.06] dark:border-white/[0.06] gap-2 shrink-0 overflow-x-auto">
+        {/* Section Tabs (Monospace Numbered) */}
+        <div className="flex px-6 pt-3 border-b border-black/[0.06] dark:border-white/[0.06] gap-2 shrink-0 overflow-x-auto font-mono text-xs">
           {[
-            { id: 'architecture', label: 'P2P Mesh Network', icon: MeshNetworkIcon },
-            { id: 'sync', label: 'Drift Sync Engine', icon: LatencySyncIcon },
-            { id: 'lifecycle', label: 'Room Lifecycle & 3h Buffer', icon: Clock },
-            { id: 'privacy', label: 'Zero-Storage Privacy', icon: Shield },
+            { id: 'architecture', num: '[01]', label: 'P2P MESH', icon: MeshNetworkIcon },
+            { id: 'sync', num: '[02]', label: 'DRIFT ENGINE', icon: LatencySyncIcon },
+            { id: 'lifecycle', num: '[03]', label: 'LIFECYCLE', icon: Clock },
+            { id: 'privacy', num: '[04]', label: 'PRIVACY', icon: Shield },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSection === tab.id;
@@ -56,13 +61,14 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveSection(tab.id as any)}
-                className={`pb-3 px-2 text-xs font-medium border-b-2 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`pb-3 px-2 border-b-2 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'border-[var(--accent)] text-[var(--text-primary)]'
+                    ? 'border-[var(--accent)] text-[var(--text-primary)] font-semibold'
                     : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                 }`}
               >
-                <Icon size={14} />
+                <span className="text-[var(--accent)]">{tab.num}</span>
+                <Icon size={13} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -74,11 +80,14 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           {activeSection === 'architecture' && (
             <div className="space-y-4">
               <div>
+                <div className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-wider mb-1">
+                  // TOPOLOGY
+                </div>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                   Full Mesh WebRTC Topology
                 </h3>
                 <p>
-                  SynCine operates on a browser-to-browser WebRTC mesh network. Video and audio streams flow directly between connected participants through encrypted SRTP channels rather than routing through an intermediary media relay.
+                  SynCine operates on a direct browser-to-browser WebRTC mesh network. Video and audio streams flow peer-to-peer over encrypted SRTP channels without routing through centralized media servers.
                 </p>
               </div>
 
@@ -86,7 +95,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                 <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
                   <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold mb-1">
                     <Cpu size={14} />
-                    <span>4-Peer Capacity Limit</span>
+                    <span>4-Peer Capacity Bound</span>
                   </div>
                   <p className="text-[11px]">
                     To maintain optimal uplink bandwidth and prevent CPU throttling on mobile devices, rooms are strictly bounded to a maximum of 4 concurrent peers.
@@ -109,25 +118,31 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           {activeSection === 'sync' && (
             <div className="space-y-4">
               <div>
+                <div className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-wider mb-1">
+                  // SYNCHRONIZATION
+                </div>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                   Sub-350ms Drift Compensation
                 </h3>
                 <p>
-                  Collaborative playback across distributed networks experiences variable latency. SynCine implements a continuous timestamp synchronization engine to maintain synchronized playback.
+                  Collaborative playback across distributed networks experiences variable latency. SynCine implements continuous round-trip latency benchmarking and playback rate compensation.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] space-y-2">
-                <div className="font-semibold text-[var(--text-primary)]">Sync Algorithm Overview</div>
+                <div className="font-mono text-xs font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                  <Terminal size={13} />
+                  <span>SYNC ENGINE RULES</span>
+                </div>
                 <ul className="list-disc pl-4 space-y-1.5 text-[11px]">
                   <li>
-                    <strong>Network Latency Benchmarking:</strong> The host continuously broadcasts playback state packets (current timestamp, playback rate, paused state) over Appwrite Realtime.
+                    <strong>Network Latency Benchmarking:</strong> The host broadcasts state packets (current timestamp, playback rate, paused status) over Appwrite Realtime.
                   </li>
                   <li>
-                    <strong>Jitter Threshold:</strong> If a viewer's local playback deviates by more than 350 milliseconds from the host's compensated reference time, a discrete seek correction is applied.
+                    <strong>Jitter Threshold:</strong> If a viewer's local playback deviates by more than 350 milliseconds from the compensated reference time, a discrete seek correction is executed.
                   </li>
                   <li>
-                    <strong>Micro-Rate Smoothing:</strong> Smaller deviations (&lt;350ms) are corrected transparently by modulating the HTML5 video playback rate between 0.98x and 1.02x to avoid audio clipping.
+                    <strong>Micro-Rate Smoothing:</strong> Deviations under 350ms are corrected smoothly by modulating HTML5 video playback rate between 0.98x and 1.02x to prevent audio pitch jitter.
                   </li>
                 </ul>
               </div>
@@ -137,11 +152,14 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           {activeSection === 'lifecycle' && (
             <div className="space-y-4">
               <div>
+                <div className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-wider mb-1">
+                  // BUFFER POLICY
+                </div>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-                  Ephemeral 3-Hour Buffer & Permanent Rooms
+                  3-Hour Ephemeral Buffer & Permanent Vanity Rooms
                 </h3>
                 <p>
-                  To balance frictionless zero-login access with database maintenance, watchrooms follow two distinct lifecycle models:
+                  To balance frictionless zero-login access with privacy and database maintenance, rooms follow two lifecycle models:
                 </p>
               </div>
 
@@ -151,7 +169,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                     Ephemeral Guest Rooms (Default)
                   </div>
                   <p className="text-[11px]">
-                    Created instantly without credentials. An automatic 3-hour expiration buffer is provisioned upon room creation. Once the 3-hour buffer lapses, signaling and room records are purged automatically.
+                    Created instantly without credentials. An automatic 3-hour expiration buffer is provisioned upon room creation. Once elapsed, signaling and room records are purged automatically.
                   </p>
                 </div>
 
@@ -170,6 +188,9 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
           {activeSection === 'privacy' && (
             <div className="space-y-4">
               <div>
+                <div className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-wider mb-1">
+                  // PRIVACY
+                </div>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                   Zero Cloud Video Storage Privacy
                 </h3>
@@ -181,11 +202,11 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
               <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] space-y-2.5">
                 <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold">
                   <HardDrive size={15} />
-                  <span>Privacy Guarantees</span>
+                  <span>Architecture Guarantees</span>
                 </div>
                 <ul className="list-disc pl-4 space-y-1.5 text-[11px]">
                   <li>
-                    <strong>Local File Mode:</strong> Video files selected from your device are rendered entirely client-side via the HTML5 File API and object URLs. Only timing synchronization metadata is shared.
+                    <strong>Local File Mode:</strong> Video files selected from your device are rendered entirely client-side via the HTML5 File API. Only playback timestamp metadata is synchronized.
                   </li>
                   <li>
                     <strong>Screen Cast Mode:</strong> Display capture is streamed peer-to-peer through encrypted WebRTC data and media channels.
@@ -200,13 +221,13 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 text-[11px] text-[var(--text-tertiary)]">
-          <span>SynCine Architecture Specification v1.0</span>
+        <div className="px-6 py-3 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 font-mono text-[11px] text-[var(--text-tertiary)]">
+          <span>SYNCINE // WEBRTC PROTOCOL SPECIFICATION</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-primary)] font-medium rounded-lg transition cursor-pointer"
           >
-            Close
+            CLOSE
           </button>
         </div>
       </div>

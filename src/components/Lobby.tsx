@@ -9,9 +9,9 @@ import {
   KeyRound,
   LogIn,
   LogOut,
-  BookOpen,
   Sun,
-  Moon
+  Moon,
+  Terminal
 } from 'lucide-react';
 import type { Models } from 'appwrite';
 
@@ -85,32 +85,43 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between font-sans select-none z-10">
-      {/* Symmetrical Top Navigation Bar */}
-      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-3.5 px-6 sm:px-10 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
-        {/* Left: Brand Identity */}
+    <div className="relative min-h-screen w-full flex flex-col justify-between font-sans select-none z-10 architectural-grid">
+      {/* Precision Architectural Header */}
+      <header className="sticky top-0 z-40 w-full flex items-center justify-between py-3.5 px-6 sm:px-12 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+        {/* Left: Brand Identity + Monospace Version Tag */}
         <div className="flex items-center gap-3">
           <SynLogo size={32} className="shrink-0" />
-          <span className="text-[var(--text-primary)] font-bold text-base tracking-tight leading-none">
-            SynCine
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[var(--text-primary)] font-bold text-base tracking-tight leading-none">
+              SynCine
+            </span>
+            <span className="font-mono text-[10px] tracking-wider text-[var(--text-tertiary)] uppercase hidden sm:inline">
+              v1.0.4
+            </span>
+          </div>
         </div>
 
-        {/* Center: System Architecture & Docs Link */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Center: Monospace Navigation Trigger */}
+        <nav className="hidden md:flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenDocs}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono tracking-wide text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
           >
-            <BookOpen size={13} />
-            <span>Architecture & Documentation</span>
+            <Terminal size={13} className="text-[var(--accent)]" />
+            <span className="hover-underline">DOCS // ARCHITECTURE</span>
           </button>
         </nav>
 
-        {/* Right: Controls & Auth */}
+        {/* Right: Telemetry State, Theme Switcher & Auth */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Documentation Mobile Trigger */}
+          {/* Live Telemetry Status Pill */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] text-[10px] font-mono tracking-wider text-[var(--text-secondary)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />
+            <span>SYS: READY</span>
+          </div>
+
+          {/* Docs Mobile Trigger */}
           <button
             type="button"
             onClick={onOpenDocs}
@@ -118,10 +129,10 @@ export const Lobby: React.FC<LobbyProps> = ({
             title="Documentation"
             aria-label="Documentation"
           >
-            <BookOpen size={16} />
+            <Terminal size={15} />
           </button>
 
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle Capsule */}
           <button
             type="button"
             onClick={onToggleTheme}
@@ -129,16 +140,16 @@ export const Lobby: React.FC<LobbyProps> = ({
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle visual theme"
           >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
-          {/* Auth State Button */}
+          {/* Authentication Capsule */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs font-mono text-[var(--text-secondary)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
                 <span className="font-medium hidden sm:inline">{currentUser?.name || currentUser?.email}</span>
-                <span className="text-[10px] font-bold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
+                <span className="text-[10px] uppercase font-bold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
               </div>
               <button
                 type="button"
@@ -147,14 +158,14 @@ export const Lobby: React.FC<LobbyProps> = ({
                 title="Sign out"
                 aria-label="Sign out"
               >
-                <LogOut size={16} />
+                <LogOut size={15} />
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={onOpenAuth}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-semibold border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
             >
               <LogIn size={13} />
               <span>Host Sign In</span>
@@ -163,35 +174,54 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* Main Center Stage */}
       <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center flex-1 justify-center">
-        {/* Editorial Hero */}
+        {/* Editorial Hero Block */}
         <section className="text-center max-w-2xl mb-10 sm:mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] text-[10px] font-mono tracking-widest text-[var(--text-secondary)] uppercase mb-4">
+            <span className="text-[var(--accent)] font-bold">[01]</span>
+            <span>Synchronized Cinema Protocol</span>
+          </div>
+
           <h1 className="text-3xl sm:text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-[1.12] mb-4">
             Shared Cinema, Perfectly Synchronized.
           </h1>
-          <p className="text-[var(--text-secondary)] text-sm sm:text-base leading-relaxed max-w-xl mx-auto font-normal">
-            Real-time peer-to-peer watchrooms with sub-350ms timestamp synchronization and zero server video storage.
+
+          <p className="text-[var(--text-secondary)] text-xs sm:text-sm leading-relaxed max-w-xl mx-auto font-normal mb-5">
+            Real-time peer-to-peer watchrooms with sub-350ms timestamp drift compensation and zero server video storage.
           </p>
+
+          {/* Monospace Architecture Badges */}
+          <div className="flex flex-wrap items-center justify-center gap-3 font-mono text-[11px] text-[var(--text-tertiary)]">
+            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
+              LATENCY // &lt;350MS
+            </span>
+            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
+              TOPOLOGY // 4-PEER MESH
+            </span>
+            <span className="px-2 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.06]">
+              STORAGE // ZERO-CLOUD
+            </span>
+          </div>
         </section>
 
         {/* Action Panel Container */}
-        <div className="w-full max-w-lg p-6 sm:p-8 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl shadow-xl">
-          {/* Tab Switcher */}
-          <div className="grid grid-cols-2 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-6">
+        <div className="w-full max-w-lg p-6 sm:p-8 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl shadow-xl backdrop-blur-xl">
+          {/* Tab Switcher (Watermelon UI Style) */}
+          <div className="grid grid-cols-2 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-xl border border-black/[0.06] dark:border-white/[0.08] mb-6 font-mono text-xs">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('create');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 text-xs font-semibold rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'create'
-                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <span>New Watchroom</span>
+              <span>NEW ROOM</span>
             </button>
             <button
               type="button"
@@ -199,19 +229,19 @@ export const Lobby: React.FC<LobbyProps> = ({
                 setActiveTab('join');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 text-xs font-semibold rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2.5 rounded-lg transition duration-150 flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'join'
-                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] font-semibold shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <span>Join with Code</span>
+              <span>JOIN WITH CODE</span>
             </button>
           </div>
 
           {errorMessage && (
-            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
-              <span>{errorMessage}</span>
+            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs font-mono flex items-center justify-between">
+              <span>ERR: {errorMessage}</span>
               <button
                 type="button"
                 onClick={() => setErrorMessage(null)}
@@ -224,8 +254,8 @@ export const Lobby: React.FC<LobbyProps> = ({
 
           {/* User Display Name */}
           <div className="mb-5">
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-              Your Display Name
+            <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
+              [01] Display Name
             </label>
             <input
               type="text"
@@ -241,8 +271,8 @@ export const Lobby: React.FC<LobbyProps> = ({
           {activeTab === 'create' ? (
             <form onSubmit={handleCreate} className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Watchroom Title
+                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
+                  [02] Watchroom Title
                 </label>
                 <input
                   type="text"
@@ -257,8 +287,8 @@ export const Lobby: React.FC<LobbyProps> = ({
 
               {/* Streaming Pipeline Selection */}
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Streaming Pipeline
+                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
+                  [03] Streaming Pipeline
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div
@@ -269,17 +299,20 @@ export const Lobby: React.FC<LobbyProps> = ({
                         : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div
-                        className={`p-1.5 rounded-lg ${
-                          mediaMode === 'screen'
-                            ? 'bg-[var(--accent)] text-black'
-                            : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                        }`}
-                      >
-                        <ScreenCastIcon size={16} />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`p-1.5 rounded-lg ${
+                            mediaMode === 'screen'
+                              ? 'bg-[var(--accent)] text-black'
+                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          <ScreenCastIcon size={15} />
+                        </div>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">Screen Cast</span>
                       </div>
-                      <span className="text-xs font-semibold text-[var(--text-primary)]">Screen Cast</span>
+                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
                       Hardware H.264 tab or desktop broadcast.
@@ -294,17 +327,20 @@ export const Lobby: React.FC<LobbyProps> = ({
                         : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div
-                        className={`p-1.5 rounded-lg ${
-                          mediaMode === 'local_file'
-                            ? 'bg-[var(--accent)] text-black'
-                            : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                        }`}
-                      >
-                        <CinemaReelIcon size={16} />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`p-1.5 rounded-lg ${
+                            mediaMode === 'local_file'
+                              ? 'bg-[var(--accent)] text-black'
+                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          <CinemaReelIcon size={15} />
+                        </div>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local File Sync</span>
                       </div>
-                      <span className="text-xs font-semibold text-[var(--text-primary)]">Local File Sync</span>
+                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-snug">
                       Local video file sync with zero server upload.
@@ -316,7 +352,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               {/* Permanent Room Option */}
               <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <KeyRound size={15} className={isPermanent ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} />
+                  <KeyRound size={15} className={isPermanent ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'} />
                   <div className="flex flex-col">
                     <span className="text-xs font-semibold text-[var(--text-primary)]">
                       Permanent Watchroom
@@ -346,17 +382,17 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !roomName.trim() || !userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
               >
-                <span>{isLoading ? 'Creating Watchroom...' : 'Start Watchroom'}</span>
-                <ArrowRight size={15} />
+                <span>{isLoading ? 'INITIALIZING STAGE...' : 'START WATCHROOM'}</span>
+                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </form>
           ) : (
             <form onSubmit={handleJoin} className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
-                  Room Code or URL
+                <label className="block font-mono text-[11px] text-[var(--text-secondary)] mb-1.5 uppercase tracking-wider">
+                  [02] Room Code or URL
                 </label>
                 <input
                   type="text"
@@ -372,26 +408,32 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 type="submit"
                 disabled={isLoading || isAuthenticating || !joinRoomId.trim() || !userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
               >
-                <span>{isLoading ? 'Connecting...' : 'Join Watchroom'}</span>
-                <ArrowRight size={15} />
+                <span>{isLoading ? 'CONNECTING...' : 'JOIN WATCHROOM'}</span>
+                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </form>
           )}
         </div>
       </main>
 
-      {/* Clean Minimal Footer */}
-      <footer className="w-full mx-auto py-6 px-6 border-t border-black/[0.06] dark:border-white/[0.06] text-center text-xs text-[var(--text-tertiary)] font-normal flex flex-col sm:flex-row items-center justify-between gap-2 max-w-4xl">
-        <span>SynCine (c) 2026</span>
-        <button
-          type="button"
-          onClick={onOpenDocs}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
-        >
-          Documentation
-        </button>
+      {/* Monospace Editorial Footer */}
+      <footer className="w-full mx-auto py-6 px-6 sm:px-12 border-t border-black/[0.06] dark:border-white/[0.06] text-xs font-mono text-[var(--text-tertiary)] flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div>
+          <span>SYNCINE // P2P WEBRTC CINEMA // (C) 2026</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span>ZERO CLOUD STORAGE</span>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onOpenDocs}
+            className="hover-underline text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+          >
+            [ ARCHITECTURE & SPEC ]
+          </button>
+        </div>
       </footer>
     </div>
   );
