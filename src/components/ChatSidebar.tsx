@@ -129,8 +129,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           </div>
         </div>
         <button
-          onClick={onClose}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1.5 rounded-xl hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+          aria-label="Close Chat"
+          title="Close Chat"
         >
           <X size={18} />
         </button>

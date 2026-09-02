@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   Volume2,
   VolumeX,
-  Sliders
+  Sliders,
+  Video,
+  VideoOff
 } from 'lucide-react';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
@@ -29,8 +31,10 @@ export type DisplayLayout = 'theater' | 'grid' | 'floating';
 export interface Participant {
   id: string;
   name: string;
-  stream: MediaStream;
+  stream?: MediaStream;
   isSelf?: boolean;
+  isMicActive?: boolean;
+  isCameraActive?: boolean;
 }
 
 interface WatchStageProps {
@@ -44,14 +48,19 @@ interface WatchStageProps {
   localFileUrl?: string;
   participants: Participant[];
   isMicActive: boolean;
+  isCameraActive?: boolean;
   isSharingScreen: boolean;
   onToggleMic: () => void;
+  onToggleCamera?: () => void;
   onToggleScreenShare: () => void;
   onSelectLocalFile: (file: File) => void;
   onLeaveRoom: () => void;
   videoRefCallback?: (el: HTMLVideoElement | null) => void;
   childrenChat?: React.ReactNode;
   unreadChatCount?: number;
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
+  onCloseChat?: () => void;
 }
 
 export const WatchStage: React.FC<WatchStageProps> = ({
@@ -63,14 +72,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   mediaStream,
   localFileUrl,
   isMicActive,
+  isCameraActive = false,
   isSharingScreen,
   onToggleMic,
+  onToggleCamera,
   onToggleScreenShare,
   onSelectLocalFile,
   onLeaveRoom,
   videoRefCallback,
   childrenChat,
-  unreadChatCount = 0
+  unreadChatCount = 0,
+  isChatOpen: controlledChatOpen,
+  onToggleChat,
+  onCloseChat
 }) => {
   const [layout, setLayout] = useState<DisplayLayout>('theater');
   const [volumes, setVolumes] = useState<Record<string, number>>({});
@@ -78,8 +92,24 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [mainVideoMuted, setMainVideoMuted] = useState(false);
   const [mainVideoVolume, setMainVideoVolume] = useState(1);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [internalChatOpen, setInternalChatOpen] = useState(false);
+  const isChatOpen = controlledChatOpen !== undefined ? controlledChatOpen : internalChatOpen;
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleChat = () => {
+    if (onToggleChat) {
+      onToggleChat();
+    } else {
+      setInternalChatOpen(!internalChatOpen);
+    }
+  };
+
+  const closeChat = () => {
+    if (onCloseChat) {
+      onCloseChat();
+    }
+    setInternalChatOpen(false);
+  };
 
   const mainStageContainerRef = useRef<HTMLDivElement>(null);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -207,7 +237,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
           {/* Chat Toggle */}
           <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
+            onClick={toggleChat}
             className={`relative p-2 rounded-xl border transition cursor-pointer ${
               isChatOpen
                 ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7] border-black/[0.08] dark:border-white/[0.1]'
@@ -357,98 +387,164 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <div className="flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-2 px-1">
               <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
                 <Sliders size={13} className="text-black/55 dark:text-white/55" />
-                <span>Live Audio Mixer</span>
+                <span>Participants ({participants.length})</span>
               </span>
             </div>
 
-            {participants.map((p) => (
-              <div
-                key={p.id}
-                className="relative aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08]"
-              >
-                <video
-                  ref={(v) => {
-                    if (v) {
-                      v.srcObject = p.stream;
-                      v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                  <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate max-w-[95px]" title={p.name}>
-                    {p.name}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => toggleMutePeer(p.id)}
-                      className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
-                    >
-                      {mutedPeers[p.id] ? (
-                        <VolumeX size={13} className="text-[#FF453A]" />
-                      ) : (
-                        <Volume2 size={13} />
-                      )}
-                    </button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setVolumes((prev) => ({ ...prev, [p.id]: val }));
+            {participants.map((p) => {
+              const hasVideo = Boolean(
+                p.stream &&
+                p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+              );
+
+              return (
+                <div
+                  key={p.id}
+                  className="relative aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08]"
+                >
+                  {hasVideo ? (
+                    <video
+                      ref={(v) => {
+                        if (v && p.stream) {
+                          v.srcObject = p.stream;
+                          if (!p.isSelf) {
+                            v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
+                          }
+                        }
                       }}
-                      className="w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
-                      title="Peer Volume"
+                      autoPlay
+                      playsInline
+                      muted={p.isSelf}
+                      className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
                     />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
+                      <div className="w-12 h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
+                    </div>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate max-w-[105px]" title={p.name}>
+                        {p.name}
+                      </span>
+                      {p.isSelf && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
+                          YOU
+                        </span>
+                      )}
+                    </div>
+
+                    {p.isSelf ? (
+                      <div className="flex items-center gap-1">
+                        {p.isMicActive ? (
+                          <span className="p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
+                            <LiquidMicIcon size={12} />
+                          </span>
+                        ) : (
+                          <span className="p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
+                            <LiquidMicOffIcon size={12} />
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleMutePeer(p.id)}
+                          className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+                        >
+                          {mutedPeers[p.id] ? (
+                            <VolumeX size={13} className="text-[#FF453A]" />
+                          ) : (
+                            <Volume2 size={13} />
+                          )}
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                          }}
+                          className="w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                          title="Peer Volume"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </aside>
         )}
 
         {/* Grid View Layout */}
         {layout === 'grid' && participants.length > 0 && (
           <div className="absolute inset-x-6 bottom-24 grid grid-cols-2 md:grid-cols-4 gap-4 z-30 pointer-events-none">
-            {participants.map((p) => (
-              <div
-                key={p.id}
-                className="pointer-events-auto aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
-              >
-                <video
-                  ref={(v) => {
-                    if (v) {
-                      v.srcObject = p.stream;
-                      v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl px-3 py-2 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                  <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate">{p.name}</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setVolumes((prev) => ({ ...prev, [p.id]: val }));
-                    }}
-                    className="w-16 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
-                  />
+            {participants.map((p) => {
+              const hasVideo = Boolean(
+                p.stream &&
+                p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+              );
+
+              return (
+                <div
+                  key={p.id}
+                  className="pointer-events-auto aspect-video rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
+                >
+                  {hasVideo ? (
+                    <video
+                      ref={(v) => {
+                        if (v && p.stream) {
+                          v.srcObject = p.stream;
+                          if (!p.isSelf) {
+                            v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
+                          }
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      muted={p.isSelf}
+                      className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
+                      <div className="w-12 h-12 rounded-full bg-black/[0.05] dark:bg-white/[0.08] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-sm font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-[10px] text-black/45 dark:text-white/45 font-medium">Camera off</span>
+                    </div>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl px-3 py-2 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                    <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs font-bold truncate">
+                      {p.name}
+                    </span>
+                    {!p.isSelf && (
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                        }}
+                        className="w-16 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -461,6 +557,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 id: p.id,
                 name: p.name,
                 stream: p.stream,
+                isMicActive: p.isMicActive,
+                isSelf: p.isSelf
               }}
               initialX={24 + idx * 280}
               initialY={90}
@@ -470,7 +568,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
         {/* Room Chat Drawer */}
         {childrenChat && isChatOpen && (
-          <div className="h-full shrink-0 z-30">{childrenChat}</div>
+          <div className="h-full shrink-0 z-30">
+            {React.isValidElement(childrenChat)
+              ? React.cloneElement(childrenChat as React.ReactElement<any>, {
+                  onClose: closeChat,
+                  isOpen: isChatOpen
+                })
+              : childrenChat}
+          </div>
         )}
       </main>
 
@@ -490,6 +595,22 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
             <span className="hidden sm:inline">{isMicActive ? 'Mic Active' : 'Mic Muted'}</span>
           </button>
+
+          {/* Studio Camera Toggle */}
+          {onToggleCamera && (
+            <button
+              onClick={onToggleCamera}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
+                isCameraActive
+                  ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
+                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+              }`}
+              title={isCameraActive ? 'Turn Off Camera' : 'Turn On Camera'}
+            >
+              {isCameraActive ? <Video size={16} /> : <VideoOff size={16} />}
+              <span className="hidden sm:inline">{isCameraActive ? 'Camera On' : 'Camera Off'}</span>
+            </button>
+          )}
 
           {/* Screen Share Action (Host) */}
           {mediaMode === 'screen' && isHost && (

@@ -92,6 +92,17 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - `src/lib/media-capture.ts`: Cross-browser display/mic capture with Safari user agent detection to omit audio constraints and prevent `DOMException`.
 - `src/lib/webrtc.ts`: P2P mesh WebRTC engine with H.264 transceiver codec preference, dynamic track replacement, and Appwrite signaling exchange.
 - `src/lib/sync-engine.ts`: Drift-compensated playback synchronizer with network latency benchmarking and 350ms seek jitter threshold.
+
+## 5. Media & WebRTC Mesh Streaming Details
+- **Camera Feed & Multi-party Video:**
+  - `WebRTCEngine` supports both microphone (`attachMicStream`) and camera (`attachCameraStream`, `removeCameraStream`).
+  - Automatic peer discovery via `announceJoin`: When any participant enters the room, an announcement is broadcast over Appwrite Realtime so all active peers proactively initiate peer connections.
+  - Distinct stream tracking ensures screen broadcasts (the movie) are separated from participant webcam video feeds via stream ID matching and signaling metadata.
+  - Local user camera feed ("You") is rendered in the Theater lateral sidebar, Grid view, and Floating draggable tiles with mirror styling (`scale-x-[-1]`), mute safeguards, and camera-off avatar fallbacks.
+  - Bottom dock features a dedicated Camera Toggle button alongside the Microphone Toggle button for real-time webcam activation.
+- **Watchroom Chat Drawer:**
+  - `ChatSidebar` close button ('X') explicitly wired with event propagation guards to toggle and close drawer smoothly.
+
 - `src/components/CustomCursor.tsx`: Custom transparent accent cursor with fluid lerp physics and interactive element scaling.
 - `src/components/DraggableTile.tsx`: Floating draggable participant overlay with pointer capture and independent audio volume controls.
 - `src/components/WatchStage.tsx`: Unified stage supporting Theater (4/5 width), Grid (2x2), and Floating layouts with Picture-in-Picture, Fullscreen, and live multi-peer audio mixer.

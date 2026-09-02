@@ -6,6 +6,7 @@ export interface DraggableParticipant {
   name: string;
   stream?: MediaStream;
   isMicActive?: boolean;
+  isSelf?: boolean;
 }
 
 interface DraggableTileProps {
@@ -36,9 +37,9 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.volume = isMuted ? 0 : volume / 100;
+      videoRef.current.volume = participant.isSelf || isMuted ? 0 : volume / 100;
     }
-  }, [volume, isMuted]);
+  }, [volume, isMuted, participant.isSelf]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('input, button')) return;
@@ -83,14 +84,17 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
           ref={videoRef}
           autoPlay
           playsInline
-          className="w-full h-full object-cover pointer-events-none"
+          muted={participant.isSelf}
+          className={`w-full h-full object-cover pointer-events-none ${participant.isSelf ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.03] dark:bg-white/[0.03] text-[var(--text-tertiary)]">
           <div className="w-12 h-12 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-center text-[var(--text-secondary)] font-bold text-lg mb-1">
             {participant.name.charAt(0).toUpperCase()}
           </div>
-          <span className="text-[11px] text-[var(--text-tertiary)] font-medium">Audio Only</span>
+          <span className="text-[11px] text-[var(--text-tertiary)] font-medium">
+            {participant.isSelf ? 'Camera off' : 'Audio Only'}
+          </span>
         </div>
       )}
 
@@ -110,25 +114,29 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
             </span>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsMuted(!isMuted)}
-            className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
-          >
-            {isMuted ? <VolumeX size={13} className="text-[var(--destructive)]" /> : <Volume2 size={13} />}
-          </button>
+          {!participant.isSelf && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsMuted(!isMuted)}
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                {isMuted ? <VolumeX size={13} className="text-[var(--destructive)]" /> : <Volume2 size={13} />}
+              </button>
 
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={isMuted ? 0 : volume}
-            onChange={(e) => {
-              setVolume(Number(e.target.value));
-              if (isMuted) setIsMuted(false);
-            }}
-            className="w-14 h-1 accent-white/50 cursor-pointer pointer-events-auto"
-          />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  setVolume(Number(e.target.value));
+                  if (isMuted) setIsMuted(false);
+                }}
+                className="w-14 h-1 accent-white/50 cursor-pointer pointer-events-auto"
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
