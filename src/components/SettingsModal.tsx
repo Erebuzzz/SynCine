@@ -225,23 +225,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-enter-smooth select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/60 backdrop-blur-md animate-enter-smooth select-none">
       <div
-        className="w-full max-w-2xl bg-white/95 dark:bg-[#121214]/95 border border-black/[0.08] dark:border-white/[0.1] rounded-3xl shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden max-h-[90vh]"
+        className="w-full max-w-2xl bg-white/95 dark:bg-[#121214]/95 border border-black/[0.08] dark:border-white/[0.1] rounded-2xl sm:rounded-3xl shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden max-h-[94vh] sm:max-h-[90vh]"
         style={{
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
         }}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-primary)]">
-              <Sliders size={18} />
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-primary)]">
+              <Sliders size={16} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[var(--text-primary)]">Watchroom Settings</h2>
-              <p className="text-[11px] text-[var(--text-tertiary)]">
-                Media pipeline, resolution management & live performance diagnostics
+              <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">Watchroom Settings</h2>
+              <p className="text-[10px] sm:text-[11px] text-[var(--text-tertiary)] truncate max-w-[200px] sm:max-w-none">
+                Media pipeline, resolution & diagnostics
               </p>
             </div>
           </div>
@@ -249,7 +249,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
             aria-label="Close settings"
           >
             <X size={18} />
@@ -257,12 +257,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="px-6 pt-4 shrink-0">
-          <div className="grid grid-cols-3 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
+        <div className="px-4 sm:px-6 pt-3 sm:pt-4 shrink-0">
+          <div className="grid grid-cols-3 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-xl sm:rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
             <button
               type="button"
               onClick={() => setActiveTab('audio')}
-              className={`py-2 rounded-xl transition flex items-center justify-center gap-2 font-semibold cursor-pointer ${
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
                 activeTab === 'audio'
                   ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
@@ -275,27 +275,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('video')}
-              className={`py-2 rounded-xl transition flex items-center justify-center gap-2 font-semibold cursor-pointer ${
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
                 activeTab === 'video'
                   ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
               <Video size={14} />
-              <span>Video & Quality</span>
+              <span className="hidden sm:inline">Video & Quality</span>
+              <span className="sm:hidden">Video</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('diagnostics')}
-              className={`py-2 rounded-xl transition flex items-center justify-center gap-2 font-semibold cursor-pointer ${
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
                 activeTab === 'diagnostics'
                   ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
               <Activity size={14} />
-              <span>Diagnostics</span>
+              <span className="hidden sm:inline">Diagnostics</span>
+              <span className="sm:hidden">Stats</span>
               <span
                 className={`w-2 h-2 rounded-full ${
                   telemetry.rtt > 160
@@ -310,7 +312,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 scrollbar-thin">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 flex-1 scrollbar-thin">
           {/* TAB 1: AUDIO SETTINGS */}
           {activeTab === 'audio' && (
             <div className="space-y-5">
@@ -354,7 +356,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2">
                   Speaker / Headphones (Audio Output)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={selectedAudioOutputDeviceId}
                     onChange={(e) => onSelectAudioOutputDevice(e.target.value)}
@@ -375,7 +377,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     onClick={handleTestChime}
                     disabled={isPlayingTestChime}
-                    className="px-4 py-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-primary)] text-xs font-semibold border border-black/[0.08] dark:border-white/[0.08] transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-primary)] text-xs font-semibold border border-black/[0.08] dark:border-white/[0.08] transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                     title="Play acoustic chime test"
                   >
                     <Play size={13} className={isPlayingTestChime ? 'animate-pulse text-[var(--accent)]' : ''} />

@@ -334,9 +334,9 @@ export const NotFound: React.FC<NotFoundProps> = ({
   }, [gameState, jump, startGame]);
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-6 text-center bg-white dark:bg-black select-none z-10 relative">
-      <div className="w-full max-w-lg p-6 sm:p-8 rounded-3xl realistic-glass flex flex-col items-center animate-enter-smooth">
-        <SynLogo size={42} className="mb-3" />
+    <main className="min-h-screen w-full flex flex-col items-center justify-center p-3.5 sm:p-6 text-center bg-white dark:bg-black select-none z-10 relative">
+      <div className="w-full max-w-lg p-5 sm:p-8 rounded-2xl sm:rounded-3xl realistic-glass flex flex-col items-center animate-enter-smooth">
+        <SynLogo size={38} className="mb-2.5 sm:w-11 sm:h-11" />
 
         <span className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)] mb-1">
           404 Not Found

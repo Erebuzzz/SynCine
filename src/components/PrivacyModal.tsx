@@ -15,18 +15,18 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
       role="dialog"
       aria-modal="true"
       aria-labelledby="privacy-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-xl animate-enter-smooth"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-xl animate-enter-smooth"
     >
-      <div className="relative w-full max-w-2xl bg-white dark:bg-[#0C0C0D] border border-black/[0.08] dark:border-white/[0.1] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#0C0C0D] border border-black/[0.08] dark:border-white/[0.1] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
-          <div className="flex items-center gap-3">
-            <SynLogo size={28} />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-5 border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <SynLogo size={26} className="sm:w-7 sm:h-7" />
             <div>
               <h2 id="privacy-modal-title" className="text-sm font-semibold text-[var(--text-primary)]">
                 Privacy Policy
               </h2>
-              <p className="text-xs text-[var(--text-secondary)]">
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)]">
                 Effective Date: September 2026
               </p>
             </div>
@@ -41,7 +41,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6 text-xs text-[var(--text-secondary)] leading-relaxed">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 text-xs text-[var(--text-secondary)] leading-relaxed">
           {/* Section 1 */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold text-sm">
