@@ -117,7 +117,14 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - **Modals & Dialogs (`SettingsModal`, `PrivacyModal`, `TermsModal`, `DocsModal`, `AuthModal`):**
   - Responsive dialog envelopes (`p-2.5 sm:p-4`, `max-h-[92vh]`), touch-friendly tabs, and stacked mobile actions.
 
-## 8. Verification & Validation Status
+## 8. Camera Preview & WebRTC Stream Binding
+- **Green Room Staging (`GreenRoom.tsx`):**
+  - Resolved race condition where `videoPreviewRef.current` was null when `getUserMedia` resolved prior to component DOM mount.
+  - Implemented callback refs `ref={(el) => { ... el.srcObject = previewStream; el.play(); }}` and reactive `useEffect([previewStream, isVideoOn])` to guarantee instantaneous video feed display.
+  - Added track-level toggle handlers (`handleToggleMic`, `handleToggleVideo`) allowing user to mute or unmute their camera without destroying the active media stream or triggering browser permission re-prompts.
+  - Added robust fallback cascade in `captureUserMedia` (`exact` -> `ideal` -> basic `{ video: true, audio: true }` -> audio-only) so external webcams and virtual cameras never fail silently.
+
+## 9. Verification & Validation Status
 - **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.77s.
-- **Main Branch:** Synced and pushed to GitHub repository `origin/main`.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.28s.
+- **Main Branch:** Synced and pushed to GitHub repository `origin/main` (commit `69e565c`).
