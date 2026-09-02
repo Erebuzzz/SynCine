@@ -67,6 +67,77 @@ interface WatchStageProps {
   onOpenSettings?: () => void;
 }
 
+interface StreamVideoPlayerProps {
+  stream?: MediaStream;
+  src?: string;
+  isMuted?: boolean;
+  volume?: number;
+  isMirrored?: boolean;
+  className?: string;
+  controls?: boolean;
+  onMount?: (el: HTMLVideoElement) => void;
+}
+
+/**
+ * High-performance, memoized video player for WebRTC and media streams.
+ * Eliminates frame flickering by isolating stream attachment and volume adjustments
+ * from React component re-render cycles.
+ */
+const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
+  stream,
+  src,
+  isMuted = false,
+  volume = 1,
+  isMirrored = false,
+  className = '',
+  controls = false,
+  onMount
+}) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+        video.play().catch(() => {});
+      }
+    } else if (src) {
+      if (video.src !== src) {
+        video.src = src;
+      }
+    } else {
+      video.srcObject = null;
+    }
+  }, [stream, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = isMuted;
+    video.volume = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+  }, [isMuted, volume]);
+
+  useEffect(() => {
+    if (videoRef.current && onMount) {
+      onMount(videoRef.current);
+    }
+  }, [onMount]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      controls={controls}
+      muted={isMuted}
+      className={`w-full h-full ${isMirrored ? 'scale-x-[-1]' : ''} ${className}`}
+    />
+  );
+});
+
 export const WatchStage: React.FC<WatchStageProps> = ({
   roomName,
   roomId,
@@ -127,11 +198,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     }
   }, [videoRefCallback, localFileUrl, mediaStream]);
 
-  useEffect(() => {
-    if (mainVideoRef.current && mediaStream) {
-      mainVideoRef.current.srcObject = mediaStream;
-    }
-  }, [mediaStream]);
 
   const toggleMutePeer = (peerId: string) => {
     setMutedPeers((prev) => ({ ...prev, [peerId]: !prev[peerId] }));
@@ -286,32 +352,25 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             {/* Left: Screen Share Feed (Dominant 3:1 to 4:1 Ratio) */}
             <div className="flex-1 md:flex-[3] lg:flex-[4] h-full relative flex items-center justify-center bg-black overflow-hidden min-w-0">
               {localFileUrl ? (
-                <video
-                  ref={(el) => {
-                    mainVideoRef.current = el;
-                    if (videoRefCallback) videoRefCallback(el);
-                  }}
+                <StreamVideoPlayer
                   src={localFileUrl}
                   controls
-                  playsInline
-                  className="w-full h-full object-contain max-h-full"
-                />
-              ) : mediaStream ? (
-                <video
-                  ref={(el) => {
+                  className="object-contain max-h-full"
+                  onMount={(el) => {
                     mainVideoRef.current = el;
-                    if (el && mediaStream) {
-                      if (el.srcObject !== mediaStream) {
-                        el.srcObject = mediaStream;
-                      }
-                      el.play().catch(() => {});
-                      el.volume = mainVideoMuted ? 0 : mainVideoVolume;
-                    }
                     if (videoRefCallback) videoRefCallback(el);
                   }}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-contain max-h-full"
+                />
+              ) : mediaStream ? (
+                <StreamVideoPlayer
+                  stream={mediaStream}
+                  isMuted={mainVideoMuted}
+                  volume={mainVideoVolume}
+                  className="object-contain max-h-full"
+                  onMount={(el) => {
+                    mainVideoRef.current = el;
+                    if (videoRefCallback) videoRefCallback(el);
+                  }}
                 />
               ) : null}
 
@@ -387,22 +446,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       className="relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] shrink-0"
                     >
                       {hasVideo ? (
-                        <video
-                          ref={(v) => {
-                            if (v && p.stream) {
-                              if (v.srcObject !== p.stream) {
-                                v.srcObject = p.stream;
-                              }
-                              v.play().catch(() => {});
-                              if (!p.isSelf) {
-                                v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                              }
-                            }
-                          }}
-                          autoPlay
-                          playsInline
-                          muted={p.isSelf}
-                          className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                        <StreamVideoPlayer
+                          stream={p.stream}
+                          isMuted={p.isSelf || mutedPeers[p.id]}
+                          volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                          isMirrored={p.isSelf}
+                          className="object-cover"
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
@@ -513,22 +562,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     className="relative w-full h-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl flex items-center justify-center"
                   >
                     {hasVideo ? (
-                      <video
-                        ref={(v) => {
-                          if (v && p.stream) {
-                            if (v.srcObject !== p.stream) {
-                              v.srcObject = p.stream;
-                            }
-                            v.play().catch(() => {});
-                            if (!p.isSelf) {
-                              v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                            }
-                          }
-                        }}
-                        autoPlay
-                        playsInline
-                        muted={p.isSelf}
-                        className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                      <StreamVideoPlayer
+                        stream={p.stream}
+                        isMuted={p.isSelf || mutedPeers[p.id]}
+                        volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                        isMirrored={p.isSelf}
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">
@@ -636,22 +675,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   className="pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
                 >
                   {hasVideo ? (
-                    <video
-                      ref={(v) => {
-                        if (v && p.stream) {
-                          if (v.srcObject !== p.stream) {
-                            v.srcObject = p.stream;
-                          }
-                          v.play().catch(() => {});
-                          if (!p.isSelf) {
-                            v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                          }
-                        }
-                      }}
-                      autoPlay
-                      playsInline
-                      muted={p.isSelf}
-                      className={`w-full h-full object-cover ${p.isSelf ? 'scale-x-[-1]' : ''}`}
+                    <StreamVideoPlayer
+                      stream={p.stream}
+                      isMuted={p.isSelf || mutedPeers[p.id]}
+                      volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                      isMirrored={p.isSelf}
+                      className="object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.02] dark:bg-white/[0.02] text-black/40 dark:text-white/40">

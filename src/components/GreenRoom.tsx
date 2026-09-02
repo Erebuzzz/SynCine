@@ -73,7 +73,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         setIsVideoOn(stream.getVideoTracks().length > 0);
         setIsMicOn(stream.getAudioTracks().length > 0);
 
-        if (videoPreviewRef.current) {
+        if (videoPreviewRef.current && videoPreviewRef.current.srcObject !== stream) {
           videoPreviewRef.current.srcObject = stream;
           videoPreviewRef.current.play().catch(() => {});
         }
