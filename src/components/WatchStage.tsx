@@ -1,25 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DraggableTile } from './DraggableTile';
 import {
-  Sidebar,
-  LayoutGrid,
-  Move,
-  Mic,
-  MicOff,
+  SynLogo,
+  TheaterLayoutIcon,
+  GridLayoutIcon,
+  FloatingLayoutIcon,
+  ScreenCastIcon,
+  CinemaReelIcon,
+  LiquidMicIcon,
+  LiquidMicOffIcon,
+  MeshNetworkIcon
+} from './icons/SynIcons';
+import {
   Share2,
-  Tv,
-  Film,
   Maximize2,
   Minimize2,
   PictureInPicture2,
   MessageSquare,
   LogOut,
-  Check,
-  Users,
+  CheckCircle2,
   Volume2,
   VolumeX,
-  Clapperboard,
-  Sparkles
+  Sliders
 } from 'lucide-react';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
@@ -83,14 +85,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Bind video element to ref and external synchronizer
   useEffect(() => {
     if (mainVideoRef.current && videoRefCallback) {
       videoRefCallback(mainVideoRef.current);
     }
   }, [videoRefCallback, localFileUrl, mediaStream]);
 
-  // Handle media stream attach
   useEffect(() => {
     if (mainVideoRef.current && mediaStream) {
       mainVideoRef.current.srcObject = mediaStream;
@@ -134,94 +134,88 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   return (
     <div
       ref={mainStageContainerRef}
-      className="relative w-screen h-screen bg-[#050811] overflow-hidden flex flex-col font-sans select-none text-slate-100"
+      className="relative w-screen h-screen bg-[#030611] overflow-hidden flex flex-col font-sans select-none text-slate-100"
     >
-      {/* Top Liquid Glass Header Bar */}
-      <header className="h-16 px-5 liquid-glass-dock flex items-center justify-between z-40 shrink-0 relative">
-        {/* Specular Rim Light */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      {/* Top Floating Glass Navigation Header */}
+      <header className="h-16 px-4 sm:px-6 bg-[rgba(8,12,26,0.85)] backdrop-blur-2xl border-b border-white/[0.12] flex items-center justify-between z-40 shrink-0 relative">
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
 
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30 border border-white/20">
-              <Clapperboard size={18} className="text-white" />
-            </div>
-            <span className="text-white font-extrabold text-base tracking-tight hidden sm:inline">SynCine</span>
-          </div>
-
-          <div className="h-4 w-px bg-white/10 hidden sm:block" />
+        {/* Room Info */}
+        <div className="flex items-center gap-3 min-w-0">
+          <SynLogo size={28} className="shrink-0 drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+          <div className="h-4 w-px bg-white/15 hidden sm:block" />
 
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-slate-200 text-sm font-semibold truncate max-w-[140px] sm:max-w-[220px]" title={roomName}>
+            <span className="text-white text-sm font-bold truncate max-w-[130px] sm:max-w-[200px]" title={roomName}>
               {roomName}
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
               {isHost ? 'Host' : 'Viewer'}
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-black/40 text-slate-400 border border-white/10 flex items-center gap-1 shrink-0">
-              <Users size={11} className="text-indigo-400" />
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-black/40 text-slate-300 border border-white/10 flex items-center gap-1.5 shrink-0">
+              <MeshNetworkIcon size={12} className="text-cyan-400" />
               <span>{totalUsersInRoom}/4</span>
             </span>
           </div>
         </div>
 
-        {/* Layout & Control Switchers */}
-        <div className="flex items-center gap-2">
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <button
             onClick={handleCopyInviteLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition shadow-sm"
-            title="Copy room invite link"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 border border-white/10 transition cursor-pointer"
+            title="Copy watchroom link"
           >
-            {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+            {copiedLink ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Share2 size={14} />}
             <span className="hidden md:inline">{copiedLink ? 'Copied' : 'Invite'}</span>
           </button>
 
-          {/* Layout buttons */}
-          <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/10">
+          {/* Layout Mode Switcher */}
+          <div className="flex gap-1 bg-black/50 p-1 rounded-xl border border-white/10">
             <button
               onClick={() => setLayout('theater')}
-              className={`p-1.5 rounded-lg transition duration-150 ${
+              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'theater'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Theater View"
             >
-              <Sidebar size={15} />
+              <TheaterLayoutIcon size={16} />
             </button>
             <button
               onClick={() => setLayout('grid')}
-              className={`p-1.5 rounded-lg transition duration-150 ${
+              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'grid'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Grid View"
             >
-              <LayoutGrid size={15} />
+              <GridLayoutIcon size={16} />
             </button>
             <button
               onClick={() => setLayout('floating')}
-              className={`p-1.5 rounded-lg transition duration-150 ${
+              className={`p-1.5 rounded-lg transition duration-150 cursor-pointer ${
                 layout === 'floating'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
               title="Floating Viewports"
             >
-              <Move size={15} />
+              <FloatingLayoutIcon size={16} />
             </button>
           </div>
 
           {/* Chat Toggle */}
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`relative p-2 rounded-xl border transition ${
+            className={`relative p-2 rounded-xl border transition cursor-pointer ${
               isChatOpen
-                ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-600/25'
-                : 'bg-white/5 text-slate-300 border-white/10 hover:text-white hover:bg-white/10'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
+                : 'bg-white/[0.06] text-slate-300 border-white/10 hover:text-white hover:bg-white/[0.12]'
             }`}
-            title="Toggle Room Chat"
+            title="Toggle Watchroom Chat"
           >
             <MessageSquare size={16} />
             {unreadChatCount > 0 && !isChatOpen && (
@@ -233,12 +227,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         </div>
       </header>
 
-      {/* Main View Area */}
+      {/* Main Cinema Viewport */}
       <main className="flex-1 relative flex overflow-hidden">
-        {/* Main Stage Video Container */}
+        {/* Stage Area */}
         <div
           className={`transition-all duration-300 flex-1 h-full relative bg-black flex flex-col justify-center items-center ${
-            layout === 'theater' ? 'w-[calc(100%-19rem)]' : 'w-full'
+            layout === 'theater' && participants.length > 0 ? 'w-[calc(100%-19rem)]' : 'w-full'
           }`}
         >
           {localFileUrl ? (
@@ -270,12 +264,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 className="w-full h-full object-contain max-h-full"
               />
 
-              {/* Movie Audio Volume Overlay */}
-              <div className="absolute top-4 right-4 liquid-glass-dock px-3.5 py-2 rounded-2xl flex items-center gap-2 shadow-2xl z-20">
+              {/* Movie Audio Track Slider */}
+              <div className="absolute top-4 right-4 bg-[rgba(10,16,34,0.75)] backdrop-blur-2xl border border-white/15 px-3.5 py-2 rounded-2xl flex items-center gap-2.5 shadow-2xl z-20">
                 <button
                   type="button"
                   onClick={() => setMainVideoMuted(!mainVideoMuted)}
-                  className="text-slate-300 hover:text-white transition"
+                  className="text-slate-300 hover:text-white transition cursor-pointer"
                 >
                   {mainVideoMuted || mainVideoVolume === 0 ? (
                     <VolumeX size={15} className="text-rose-400" />
@@ -294,29 +288,26 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     setMainVideoVolume(val);
                     if (mainVideoRef.current) mainVideoRef.current.volume = val;
                   }}
-                  className="w-20 h-1 accent-indigo-500 cursor-pointer"
-                  title="Stream Volume"
+                  className="w-20 h-1 accent-indigo-400 cursor-pointer"
+                  title="Media Stream Volume"
                 />
               </div>
             </div>
           ) : (
-            /* Atmospheric Ambient Standby Stage */
+            /* Atmospheric Standby Stage */
             <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden">
-              <div className="absolute w-96 h-96 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none animate-liquid-orb-1" />
-              <div className="absolute w-80 h-80 rounded-full bg-pink-600/10 blur-3xl pointer-events-none animate-liquid-orb-2" />
-
-              <div className="relative z-10 w-20 h-20 rounded-3xl liquid-glass-card flex items-center justify-center text-indigo-400 mb-5 shadow-2xl">
-                {mediaMode === 'screen' ? <Tv size={36} /> : <Film size={36} />}
+              <div className="relative z-10 w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-900/50 to-pink-900/40 border border-white/15 backdrop-blur-2xl flex items-center justify-center text-indigo-300 mb-6 shadow-2xl">
+                {mediaMode === 'screen' ? <ScreenCastIcon size={38} /> : <CinemaReelIcon size={38} />}
               </div>
-              <h2 className="relative z-10 text-xl font-extrabold text-white mb-2 tracking-tight">
+              <h2 className="relative z-10 text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
                 {mediaMode === 'screen' ? 'Screen Stream Stage' : 'Local File Synchronization Stage'}
               </h2>
-              <p className="relative z-10 text-slate-400 text-xs sm:text-sm max-w-md mb-6 leading-relaxed">
+              <p className="relative z-10 text-slate-300/80 text-xs sm:text-sm max-w-md mb-8 leading-relaxed font-normal">
                 {mediaMode === 'screen'
                   ? isHost
-                    ? 'You are the host. Click "Start Screen Share" on the bottom dock to begin streaming a tab, window, or desktop to all participants.'
-                    : 'Waiting for the host to start sharing their screen or movie stream.'
-                  : 'Load identical local video files (.mp4, .mkv, .webm) into the player. SynCine will synchronize playback without uploading files to any server.'}
+                    ? 'Click "Start Screen Cast" below to broadcast your video stream with hardware-accelerated H.264 transmission.'
+                    : 'Awaiting host screen broadcast. Grab your popcorn.'
+                  : 'Load the identical video file into your player. SynCine will maintain sub-frame playback synchronization with zero upload.'}
               </p>
 
               {mediaMode === 'local_file' && (
@@ -333,9 +324,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/30 transition flex items-center gap-2 mx-auto"
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/30 transition flex items-center gap-2 mx-auto cursor-pointer"
                   >
-                    <Film size={16} />
+                    <CinemaReelIcon size={18} />
                     <span>Choose Local Video File</span>
                   </button>
                 </div>
@@ -343,18 +334,18 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             </div>
           )}
 
-          {/* Picture in Picture & Fullscreen Floating Buttons */}
+          {/* Picture in Picture & Fullscreen Action Pill */}
           <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20">
             <button
               onClick={togglePictureInPicture}
-              className="p-2.5 liquid-glass-dock hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl transition shadow-xl"
+              className="p-2.5 bg-[rgba(10,16,34,0.75)] hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl border border-white/10 backdrop-blur-2xl transition shadow-xl cursor-pointer"
               title="Picture in Picture"
             >
               <PictureInPicture2 size={16} />
             </button>
             <button
               onClick={toggleFullscreen}
-              className="p-2.5 liquid-glass-dock hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl transition shadow-xl"
+              className="p-2.5 bg-[rgba(10,16,34,0.75)] hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl border border-white/10 backdrop-blur-2xl transition shadow-xl cursor-pointer"
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
             >
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -362,71 +353,65 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         </div>
 
-        {/* Theater View Sidebar */}
-        {layout === 'theater' && (
-          <aside className="w-76 h-full liquid-glass-dock p-4 overflow-y-auto space-y-3.5 shrink-0 z-20 border-l border-white/10">
+        {/* Theater View Lateral Sidebar */}
+        {layout === 'theater' && participants.length > 0 && (
+          <aside className="w-76 h-full bg-[rgba(8,12,26,0.85)] backdrop-blur-2xl border-l border-white/[0.12] p-4 overflow-y-auto space-y-3.5 shrink-0 z-20">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-2 px-1">
-              <span className="flex items-center gap-1.5">
-                <Sparkles size={13} className="text-pink-400" />
-                <span>Participants ({participants.length})</span>
+              <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-slate-400">
+                <Sliders size={13} className="text-pink-400" />
+                <span>Live Audio Mixer</span>
               </span>
             </div>
 
-            {participants.length === 0 ? (
-              <div className="py-12 text-center text-slate-500 text-xs px-2">
-                No other participants yet. Share the invite link to watch together.
-              </div>
-            ) : (
-              participants.map((p) => (
-                <div
-                  key={p.id}
-                  className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900/90 border border-white/10 shadow-xl group"
-                >
-                  <video
-                    ref={(v) => {
-                      if (v) {
-                        v.srcObject = p.stream;
-                        v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
-                      }
-                    }}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-2.5 flex items-center justify-between">
-                    <span className="text-white text-xs font-semibold truncate max-w-[95px]" title={p.name}>
-                      {p.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => toggleMutePeer(p.id)}
-                        className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition"
-                      >
-                        {mutedPeers[p.id] ? (
-                          <VolumeX size={12} className="text-rose-400" />
-                        ) : (
-                          <Volume2 size={12} />
-                        )}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setVolumes((prev) => ({ ...prev, [p.id]: val }));
-                        }}
-                        className="w-14 h-1 accent-indigo-400 cursor-pointer"
-                        title="Participant Audio"
-                      />
-                    </div>
+            {participants.map((p) => (
+              <div
+                key={p.id}
+                className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900/90 border border-white/10 shadow-xl"
+              >
+                <video
+                  ref={(v) => {
+                    if (v) {
+                      v.srcObject = p.stream;
+                      v.volume = mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8;
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-2.5 flex items-center justify-between">
+                  <span className="text-white text-xs font-semibold truncate max-w-[95px]" title={p.name}>
+                    {p.name}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleMutePeer(p.id)}
+                      className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                    >
+                      {mutedPeers[p.id] ? (
+                        <VolumeX size={13} className="text-rose-400" />
+                      ) : (
+                        <Volume2 size={13} />
+                      )}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                      }}
+                      className="w-14 h-1 accent-indigo-400 cursor-pointer"
+                      title="Peer Volume"
+                    />
                   </div>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </aside>
         )}
 
@@ -436,7 +421,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             {participants.map((p) => (
               <div
                 key={p.id}
-                className="pointer-events-auto aspect-video rounded-2xl overflow-hidden liquid-glass-card shadow-2xl relative"
+                className="pointer-events-auto aspect-video rounded-2xl overflow-hidden bg-[rgba(10,16,34,0.75)] backdrop-blur-2xl border border-white/15 shadow-2xl relative"
               >
                 <video
                   ref={(v) => {
@@ -469,7 +454,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         )}
 
-        {/* Floating Overlays */}
+        {/* Floating Draggable Viewports */}
         {layout === 'floating' &&
           participants.map((p) => (
             <DraggableTile
@@ -484,69 +469,68 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             />
           ))}
 
-        {/* Chat Drawer */}
+        {/* Room Chat Drawer */}
         {childrenChat && isChatOpen && (
           <div className="h-full shrink-0 z-30">{childrenChat}</div>
         )}
       </main>
 
-      {/* Bottom Floating Liquid Glass Control Dock */}
-      <footer className="h-18 px-6 liquid-glass-dock flex items-center justify-between z-40 shrink-0 relative">
-        {/* Specular Rim Light */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      {/* Bottom Liquid Glass Control Dock */}
+      <footer className="h-18 px-5 sm:px-8 bg-[rgba(8,12,26,0.85)] backdrop-blur-2xl border-t border-white/[0.12] flex items-center justify-between z-40 shrink-0 relative">
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
 
         <div className="flex items-center gap-2.5">
-          {/* Microphone Toggle */}
+          {/* Studio Microphone Toggle */}
           <button
             onClick={onToggleMic}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer ${
               isMicActive
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
                 : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30'
             }`}
             title={isMicActive ? 'Mute Microphone' : 'Unmute Microphone'}
           >
-            {isMicActive ? <Mic size={16} /> : <MicOff size={16} />}
-            <span className="hidden sm:inline">{isMicActive ? 'Mic On' : 'Mic Muted'}</span>
+            {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
+            <span className="hidden sm:inline">{isMicActive ? 'Mic Active' : 'Mic Muted'}</span>
           </button>
 
-          {/* Screen Share Toggle (Host Only in Screen Mode) */}
+          {/* Screen Share Action (Host) */}
           {mediaMode === 'screen' && isHost && (
             <button
               onClick={onToggleScreenShare}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer ${
                 isSharingScreen
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
-                  : 'bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/30'
+                  : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white shadow-indigo-600/30'
               }`}
             >
-              <Tv size={16} />
+              <ScreenCastIcon size={16} />
               <span className="hidden sm:inline">
-                {isSharingScreen ? 'Stop Sharing' : 'Start Screen Share'}
+                {isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
               </span>
             </button>
           )}
 
-          {/* Local File Change (Local File Mode) */}
+          {/* Select Video File (Local File Mode) */}
           {mediaMode === 'local_file' && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 border border-white/10 transition shadow-sm cursor-pointer"
             >
-              <Film size={16} />
-              <span className="hidden sm:inline">Select Video</span>
+              <CinemaReelIcon size={16} />
+              <span className="hidden sm:inline">Select Video File</span>
             </button>
           )}
         </div>
 
-        {/* Leave Room Button */}
+        {/* Leave Watchroom */}
         <div>
           <button
             onClick={onLeaveRoom}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600/25 text-rose-300 border border-rose-500/30 transition shadow-md"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600/25 text-rose-300 border border-rose-500/30 transition shadow-md cursor-pointer"
           >
             <LogOut size={16} />
-            <span>Leave Party</span>
+            <span>Leave Watchroom</span>
           </button>
         </div>
       </footer>
