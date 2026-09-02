@@ -13,15 +13,15 @@ import {
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
+import { ShaderCanvas } from './components/ShaderCanvas';
 
 export const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [userName, setUserName] = useState<string>('Guest ' + Math.floor(1000 + Math.random() * 9000));
+  const [userName, setUserName] = useState<string>('Cinephile ' + Math.floor(1000 + Math.random() * 9000));
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
 
-  // Initialize Anonymous Auth and parse URL query parameters
   useEffect(() => {
     async function init() {
       try {
@@ -97,6 +97,9 @@ export const App: React.FC = () => {
 
   return (
     <>
+      {/* 60fps WebGL Fluid Gradient Shader Background */}
+      <ShaderCanvas />
+
       {/* Procedural SVG Filters */}
       <LiquidGlassFilters />
 

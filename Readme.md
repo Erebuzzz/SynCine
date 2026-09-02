@@ -146,10 +146,15 @@ SynCine/
 │   └── setup-appwrite.ts             # Appwrite database provisioning script
 ├── src/
 │   ├── components/
-│   │   ├── ChatSidebar.tsx           # Real-time room text chat
+│   │   ├── icons/
+│   │   │   └── SynIcons.tsx          # Handcrafted Greek Sigma & cinema SVG icons
+│   │   ├── ChatSidebar.tsx           # Real-time room text chat drawer
 │   │   ├── DraggableTile.tsx         # Floating draggable participant video
-│   │   ├── Lobby.tsx                 # Room creation, joining & anonymous auth
+│   │   ├── LiquidGlassCard.tsx       # Reusable Apple VisionOS glassmorphic card
+│   │   ├── LiquidGlassFilters.tsx    # Procedural feTurbulence & feDisplacementMap filters
+│   │   ├── Lobby.tsx                 # Watchroom creation, joining & guest auth
 │   │   ├── RoomView.tsx              # Room container & WebRTC coordinator
+│   │   ├── ShaderCanvas.tsx          # 60fps WebGL fluid gradient canvas
 │   │   └── WatchStage.tsx            # Theater, Grid & Floating viewport stage
 │   ├── lib/
 │   │   ├── appwrite.ts               # Appwrite client singleton & types
