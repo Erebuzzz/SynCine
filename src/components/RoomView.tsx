@@ -573,6 +573,27 @@ export const RoomView: React.FC<RoomViewProps> = ({
     }
   }, []);
 
+  const displayedParticipants: Participant[] = useMemo(() => {
+    const list: Participant[] = [];
+    // Self participant tile
+    list.push({
+      id: currentUserId,
+      name: `${effectiveUserName}`,
+      stream: localUserMediaStream || undefined,
+      isSelf: true,
+      isMicActive,
+      isCameraActive
+    });
+    // Remote participants
+    participants.forEach((p) => {
+      list.push({
+        ...p,
+        isSelf: false
+      });
+    });
+    return list;
+  }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, participants]);
+
   if (errorState) {
     return (
       <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center p-6 text-center">
@@ -616,27 +637,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
       />
     );
   }
-
-  const displayedParticipants: Participant[] = useMemo(() => {
-    const list: Participant[] = [];
-    // Self participant tile
-    list.push({
-      id: currentUserId,
-      name: `${effectiveUserName}`,
-      stream: localUserMediaStream || undefined,
-      isSelf: true,
-      isMicActive,
-      isCameraActive
-    });
-    // Remote participants
-    participants.forEach((p) => {
-      list.push({
-        ...p,
-        isSelf: false
-      });
-    });
-    return list;
-  }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, participants]);
 
   const effectiveMediaStream = isHost ? mediaStream : remoteScreenStream;
 
