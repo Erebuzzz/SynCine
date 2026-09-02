@@ -1,5 +1,11 @@
 # SynCine
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.1-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Appwrite](https://img.shields.io/badge/Appwrite-Cloud-FD366E?logo=appwrite&logoColor=white)](https://appwrite.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+
 SynCine is a zero-cost, cross-browser collaborative streaming and synchronized movie-watching web application built on WebRTC and Appwrite Cloud.
 
 It decouples the Control and Signaling Plane from the Media Transport Plane, eliminating expensive media servers and streaming video directly via client-side WebRTC mesh or distributed local file synchronization.
