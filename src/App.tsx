@@ -5,7 +5,8 @@ import {
   databases,
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
-  ID,
+  generateRoomCode,
+  normalizeRoomCode,
   Permission,
   Role,
   RoomDocument,
@@ -90,10 +91,8 @@ export const App: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const roomFromUrl = params.get('room');
         if (roomFromUrl) {
-          const cleanId = roomFromUrl.includes('?room=')
-            ? roomFromUrl.split('?room=')[1]
-            : roomFromUrl;
-          setInitialRoomParam(cleanId.trim());
+          const cleanId = normalizeRoomCode(roomFromUrl);
+          setInitialRoomParam(cleanId);
         }
       } catch (err) {
         console.error('Authentication initialization error:', err);
@@ -122,7 +121,7 @@ export const App: React.FC = () => {
       throw new Error('Unable to initialize user session. Please check your connection.');
     }
 
-    const newRoomId = ID.unique();
+    const newRoomId = generateRoomCode();
     const expiresAt = isPermanent
       ? ''
       : new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
@@ -163,17 +162,29 @@ export const App: React.FC = () => {
       }
     }
 
-    let cleanRoomId = rawInput.trim();
-    if (cleanRoomId.includes('?room=')) {
-      cleanRoomId = cleanRoomId.split('?room=')[1].split('&')[0];
-    }
+    let cleanRoomId = normalizeRoomCode(rawInput);
 
     try {
-      const doc = await databases.getDocument<RoomDocument>(
-        APPWRITE_DATABASE_ID,
-        COLLECTIONS.ROOMS,
-        cleanRoomId
-      );
+      let doc: RoomDocument;
+      try {
+        doc = await databases.getDocument<RoomDocument>(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.ROOMS,
+          cleanRoomId
+        );
+      } catch (initialErr: any) {
+        // Fallback: in case of rawInput string directly
+        if (cleanRoomId !== rawInput.trim()) {
+          doc = await databases.getDocument<RoomDocument>(
+            APPWRITE_DATABASE_ID,
+            COLLECTIONS.ROOMS,
+            rawInput.trim()
+          );
+          cleanRoomId = rawInput.trim();
+        } else {
+          throw initialErr;
+        }
+      }
 
       if (!doc) {
         throw new Error('Watchroom not found. Please verify the Room Code.');

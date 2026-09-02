@@ -131,4 +131,63 @@ export function isUserRegistered(user: Models.User<Models.Preferences> | null): 
   return Boolean(user.email && user.email.length > 0 && !user.name?.startsWith('Guest '));
 }
 
+/**
+ * Generates a memorable 9-character room code.
+ * Uses lowercase letters and numbers, excluding easily confused characters (0/O, 1/l/I).
+ * Starts with a letter to satisfy standard ID conventions.
+ */
+export function generateRoomCode(): string {
+  const letters = 'abcdefghjkmnpqrstuvwxyz';
+  const chars = '23456789abcdefghjkmnpqrstuvwxyz';
+  let code = '';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(9);
+    crypto.getRandomValues(bytes);
+    code += letters[bytes[0] % letters.length];
+    for (let i = 1; i < 9; i++) {
+      code += chars[bytes[i] % chars.length];
+    }
+  } else {
+    code += letters[Math.floor(Math.random() * letters.length)];
+    for (let i = 1; i < 9; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+  }
+  return code;
+}
+
+/**
+ * Formats a 9-character room code as xxx-xxx-xxx for human readability.
+ */
+export function formatRoomCode(code: string): string {
+  if (code.length === 9 && !code.includes('-')) {
+    return `${code.slice(0, 3)}-${code.slice(3, 6)}-${code.slice(6)}`;
+  }
+  return code;
+}
+
+/**
+ * Normalizes user input room codes or links into a clean room ID.
+ * Handles full URLs, query strings, hyphens, and whitespace.
+ */
+export function normalizeRoomCode(input: string): string {
+  let cleaned = input.trim();
+  if (cleaned.includes('?room=')) {
+    cleaned = cleaned.split('?room=')[1].split('&')[0];
+  } else if (cleaned.includes('/')) {
+    // URL without ?room= query param (e.g. pathname)
+    const segments = cleaned.split('/').filter(Boolean);
+    if (segments.length > 0) {
+      cleaned = segments[segments.length - 1];
+    }
+  }
+
+  // If user entered a 9-character code with hyphens or spaces (e.g. "abc-def-ghi" or "abc def ghi")
+  const stripped = cleaned.replace(/[-\s]/g, '').toLowerCase();
+  if (stripped.length === 9) {
+    return stripped;
+  }
+  return cleaned;
+}
+
 export { ID, Query, Permission, Role };
