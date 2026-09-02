@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const projectId = process.env.APPWRITE_PROJECT_ID || '69e76bf4000773ccd6e1';
+const projectId = process.env.APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
 const apiKey = process.env.APPWRITE_API_KEY;
 const dbId = process.env.APPWRITE_DATABASE_ID || 'syncine_db';
 
@@ -74,9 +74,9 @@ async function bootstrap() {
       name: 'Rooms',
       permissions: [
         'read("any")',
-        'create("users")',
-        'update("users")',
-        'delete("users")',
+        'create("any")',
+        'update("any")',
+        'delete("any")',
       ],
       documentSecurity: false,
       enabled: true,
@@ -145,19 +145,24 @@ async function bootstrap() {
     }
   }
 
-  // 3. Signaling Collection (DLS Enabled)
+  // 3. Signaling Collection
   try {
     const res = await apiRequest(`/databases/${dbId}/collections`, 'POST', {
       collectionId: 'signaling',
       name: 'Signaling',
-      permissions: ['create("users")'],
-      documentSecurity: true,
+      permissions: [
+        'read("any")',
+        'create("any")',
+        'update("any")',
+        'delete("any")',
+      ],
+      documentSecurity: false,
       enabled: true,
     });
     if (res.status === 409) {
       console.log('Collection "signaling" already exists.');
     } else {
-      console.log('Collection "signaling" created with Document-Level Security.');
+      console.log('Collection "signaling" created.');
     }
   } catch (err: any) {
     console.error('Error creating signaling collection:', err.message);
@@ -206,7 +211,12 @@ async function bootstrap() {
     const res = await apiRequest(`/databases/${dbId}/collections`, 'POST', {
       collectionId: 'messages',
       name: 'Messages',
-      permissions: ['read("any")', 'create("users")'],
+      permissions: [
+        'read("any")',
+        'create("any")',
+        'update("any")',
+        'delete("any")',
+      ],
       documentSecurity: false,
       enabled: true,
     });
