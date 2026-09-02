@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ensureAnonymousSession,
+  logoutUser,
   databases,
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
@@ -12,26 +13,36 @@ import {
 } from './lib/appwrite';
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
+import { AuthModal } from './components/AuthModal';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
 import { ShaderCanvas } from './components/ShaderCanvas';
+import type { Models } from 'appwrite';
 
 export const App: React.FC = () => {
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<Models.User<Models.Preferences> | null>(null);
   const [userName, setUserName] = useState<string>('Cinephile ' + Math.floor(1000 + Math.random() * 9000));
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     async function init() {
       try {
         const user = await ensureAnonymousSession();
-        setCurrentUserId(user.$id);
+        setCurrentUser(user);
+        if (user.name && !user.name.startsWith('Guest ')) {
+          setUserName(user.name);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const roomFromUrl = params.get('room');
         if (roomFromUrl) {
-          setInitialRoomParam(roomFromUrl);
+          // Sanitize room ID from full URL or bare ID
+          const cleanId = roomFromUrl.includes('?room=')
+            ? roomFromUrl.split('?room=')[1]
+            : roomFromUrl;
+          setInitialRoomParam(cleanId.trim());
         }
       } catch (err) {
         console.error('Authentication initialization error:', err);
@@ -43,8 +54,13 @@ export const App: React.FC = () => {
     init();
   }, []);
 
-  const handleCreateRoom = async (name: string, mediaMode: 'screen' | 'local_file') => {
+  const handleCreateRoom = async (name: string, mediaMode: 'screen' | 'local_file', isPermanent: boolean) => {
+    if (!currentUser) return;
+
     const newRoomId = ID.unique();
+    const expiresAt = isPermanent
+      ? ''
+      : new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
 
     await databases.createDocument<RoomDocument>(
       APPWRITE_DATABASE_ID,
@@ -52,11 +68,13 @@ export const App: React.FC = () => {
       newRoomId,
       {
         name,
-        hostId: currentUserId,
+        hostId: currentUser.$id,
         mediaMode,
         participantCount: 1,
         maxParticipants: MAX_PARTICIPANTS,
-        syncState: ''
+        syncState: '',
+        isPermanent,
+        expiresAt
       },
       [
         Permission.read(Role.any()),
@@ -70,29 +88,62 @@ export const App: React.FC = () => {
     setActiveRoomId(newRoomId);
   };
 
-  const handleJoinRoom = async (roomId: string) => {
+  const handleJoinRoom = async (rawInput: string) => {
+    let cleanRoomId = rawInput.trim();
+    if (cleanRoomId.includes('?room=')) {
+      cleanRoomId = cleanRoomId.split('?room=')[1].split('&')[0];
+    }
+
     const doc = await databases.getDocument<RoomDocument>(
       APPWRITE_DATABASE_ID,
       COLLECTIONS.ROOMS,
-      roomId
+      cleanRoomId
     );
 
     if (!doc) {
-      throw new Error('Room not found. Please verify the Room ID.');
+      throw new Error('Watchroom not found. Please verify the Room Code.');
     }
 
-    if ((doc.participantCount || 1) >= MAX_PARTICIPANTS && doc.hostId !== currentUserId) {
-      throw new Error(`Room is full (Maximum ${MAX_PARTICIPANTS} users allowed).`);
+    // Check expiration for non-permanent rooms
+    if (!doc.isPermanent && doc.expiresAt) {
+      const expirationTime = new Date(doc.expiresAt).getTime();
+      if (Date.now() > expirationTime) {
+        throw new Error('This watchroom has expired (3-hour guest buffer exceeded).');
+      }
     }
 
-    window.history.pushState({}, '', `?room=${roomId}`);
-    setActiveRoomId(roomId);
+    if ((doc.participantCount || 1) >= MAX_PARTICIPANTS && doc.hostId !== currentUser?.$id) {
+      throw new Error(`Watchroom is full (Maximum ${MAX_PARTICIPANTS} participants allowed).`);
+    }
+
+    window.history.pushState({}, '', `?room=${cleanRoomId}`);
+    setActiveRoomId(cleanRoomId);
   };
 
   const handleLeaveRoom = () => {
     window.history.pushState({}, '', window.location.pathname);
     setActiveRoomId(null);
     setInitialRoomParam('');
+  };
+
+  const handleAuthSuccess = (user: Models.User<Models.Preferences>) => {
+    setCurrentUser(user);
+    if (user.name) {
+      setUserName(user.name);
+    }
+  };
+
+  const handleLogout = async () => {
+    setIsAuthenticating(true);
+    try {
+      const guestUser = await logoutUser();
+      setCurrentUser(guestUser);
+      setUserName('Cinephile ' + Math.floor(1000 + Math.random() * 9000));
+    } catch (err) {
+      console.warn('Logout error:', err);
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   return (
@@ -106,20 +157,29 @@ export const App: React.FC = () => {
       {/* Subtle 35mm Cinematic Film Grain Texture */}
       <div className="film-grain-layer" />
 
-      {activeRoomId && currentUserId ? (
+      {/* Optional Host Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
+      {activeRoomId && currentUser ? (
         <RoomView
           roomId={activeRoomId}
-          currentUserId={currentUserId}
+          currentUserId={currentUser.$id}
           currentUserName={userName}
           onLeave={handleLeaveRoom}
         />
       ) : (
         <Lobby
-          currentUserId={currentUserId}
+          currentUser={currentUser}
           userName={userName}
           onUserNameChange={setUserName}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={handleLogout}
           initialRoomId={initialRoomParam}
           isAuthenticating={isAuthenticating}
         />

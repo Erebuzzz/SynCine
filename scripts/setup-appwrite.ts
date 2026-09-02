@@ -100,6 +100,8 @@ async function bootstrap() {
     { type: 'enum', key: 'mediaMode', elements: ['screen', 'local_file'], required: true },
     { type: 'integer', key: 'participantCount', required: false, min: 1, max: 4, default: 1 },
     { type: 'integer', key: 'maxParticipants', required: false, min: 1, max: 4, default: 4 },
+    { type: 'boolean', key: 'isPermanent', required: false, default: false },
+    { type: 'string', key: 'expiresAt', size: 64, required: false },
   ];
 
   for (const attr of roomAttributes) {

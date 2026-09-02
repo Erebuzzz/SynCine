@@ -13,6 +13,7 @@ import { PlaybackSynchronizer, SyncPacket } from '../lib/sync-engine';
 import { captureDisplayMedia, captureUserMedia } from '../lib/media-capture';
 import { WatchStage, Participant } from './WatchStage';
 import { ChatSidebar } from './ChatSidebar';
+import { GreenRoom } from './GreenRoom';
 
 interface RoomViewProps {
   roomId: string;
@@ -36,16 +37,20 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [errorState, setErrorState] = useState<string | null>(null);
 
+  // Google Meet Green Room preview state
+  const [hasEnteredStage, setHasEnteredStage] = useState(false);
+  const [effectiveUserName, setEffectiveUserName] = useState(currentUserName);
+
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
   const localMicStreamRef = useRef<MediaStream | null>(null);
   const isHost = room?.hostId === currentUserId;
 
-  // Initialize WebRTC and Synchronizer
+  // Initial Room Document Fetch & Expiration Validation
   useEffect(() => {
     let isMounted = true;
 
-    async function initRoom() {
+    async function fetchRoom() {
       try {
         const doc = await databases.getDocument<RoomDocument>(
           APPWRITE_DATABASE_ID,
@@ -55,88 +60,113 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
         if (!isMounted) return;
 
+        // Verify 3-hour TTL expiration for non-permanent rooms
+        if (!doc.isPermanent && doc.expiresAt) {
+          const expirationTime = new Date(doc.expiresAt).getTime();
+          if (Date.now() > expirationTime) {
+            setErrorState('This watchroom has expired (3-hour guest buffer exceeded).');
+            return;
+          }
+        }
+
         // Check participant capacity
         const currentCount = doc.participantCount || 1;
         if (currentCount >= MAX_PARTICIPANTS && doc.hostId !== currentUserId) {
-          setErrorState(`Room is at full capacity (Maximum ${MAX_PARTICIPANTS} users).`);
+          setErrorState(`Watchroom is at full capacity (Maximum ${MAX_PARTICIPANTS} participants).`);
           return;
         }
 
         setRoom(doc);
-
-        // If joining as non-host, increment participant count
-        if (doc.hostId !== currentUserId) {
-          await databases.updateDocument(
-            APPWRITE_DATABASE_ID,
-            COLLECTIONS.ROOMS,
-            roomId,
-            { participantCount: Math.min(MAX_PARTICIPANTS, currentCount + 1) }
-          ).catch(console.warn);
-        }
-
-        // Initialize WebRTC Engine
-        const engine = new WebRTCEngine({
-          client: databases.client,
-          databaseId: APPWRITE_DATABASE_ID,
-          roomId,
-          currentUserId,
-          onRemoteTrackAdded: (peerId, stream) => {
-            setParticipants((prev) => {
-              const existingIndex = prev.findIndex((p) => p.id === peerId);
-              if (existingIndex >= 0) {
-                const updated = [...prev];
-                updated[existingIndex] = { ...updated[existingIndex], stream };
-                return updated;
-              }
-              return [...prev, { id: peerId, name: `User ${peerId.slice(-4)}`, stream }];
-            });
-
-            // If remote stream has screen video, display it on stage for viewers
-            if (stream.getVideoTracks().length > 0 && doc.hostId !== currentUserId) {
-              setMediaStream(stream);
-            }
-          },
-          onPeerDisconnected: (peerId) => {
-            setParticipants((prev) => prev.filter((p) => p.id !== peerId));
-          },
-          onPeerConnected: (peerId) => {
-            console.log(`Connected with peer: ${peerId}`);
-          }
-        });
-
-        webrtcRef.current = engine;
-
-        // If not host, initiate WebRTC handshake with host
-        if (doc.hostId !== currentUserId) {
-          await engine.initiateConnection(doc.hostId);
-        }
-
-        // Initialize Playback Synchronizer
-        const sync = new PlaybackSynchronizer(
-          databases,
-          APPWRITE_DATABASE_ID,
-          roomId,
-          doc.hostId === currentUserId
-        );
-        synchronizerRef.current = sync;
-
       } catch (err: any) {
         if (isMounted) {
-          setErrorState(err?.message || 'Failed to load room details.');
+          setErrorState(err?.message || 'Failed to load watchroom details.');
         }
       }
     }
 
-    initRoom();
+    fetchRoom();
 
-    // Subscribe to Room document changes (for syncState and capacity)
+    return () => {
+      isMounted = false;
+    };
+  }, [roomId, currentUserId]);
+
+  // WebRTC and Synchronizer Setup once user enters through the Green Room
+  useEffect(() => {
+    if (!hasEnteredStage || !room) return;
+
+    let isMounted = true;
+
+    async function initStage() {
+      if (!isMounted || !room) return;
+
+      // Increment participant count for non-host
+      if (room.hostId !== currentUserId) {
+        const currentCount = room.participantCount || 1;
+        await databases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.ROOMS,
+          roomId,
+          { participantCount: Math.min(MAX_PARTICIPANTS, currentCount + 1) }
+        ).catch(console.warn);
+      }
+
+      // Initialize WebRTC Engine
+      const engine = new WebRTCEngine({
+        client: databases.client,
+        databaseId: APPWRITE_DATABASE_ID,
+        roomId,
+        currentUserId,
+        onRemoteTrackAdded: (peerId, stream) => {
+          setParticipants((prev) => {
+            const existingIndex = prev.findIndex((p) => p.id === peerId);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = { ...updated[existingIndex], stream };
+              return updated;
+            }
+            return [...prev, { id: peerId, name: `Viewer ${peerId.slice(-4)}`, stream }];
+          });
+
+          // Host screen share stream display
+          if (stream.getVideoTracks().length > 0 && room.hostId !== currentUserId) {
+            setMediaStream(stream);
+          }
+        },
+        onPeerDisconnected: (peerId) => {
+          setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+        },
+        onPeerConnected: (peerId) => {
+          console.log(`P2P mesh peer connected: ${peerId}`);
+        }
+      });
+
+      webrtcRef.current = engine;
+
+      // Handshake with host if viewer
+      if (room.hostId !== currentUserId) {
+        await engine.initiateConnection(room.hostId);
+      }
+
+      // Initialize Playback Synchronizer
+      const sync = new PlaybackSynchronizer(
+        databases,
+        APPWRITE_DATABASE_ID,
+        roomId,
+        room.hostId === currentUserId
+      );
+      synchronizerRef.current = sync;
+    }
+
+    initStage();
+
+    // Subscribe to Realtime room updates
     const roomChannel = `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.ROOMS}.documents.${roomId}`;
     const unsubscribeRoom = realtime.subscribe<RoomDocument>(roomChannel, (event: RealtimeResponseEvent<RoomDocument>) => {
       const updatedDoc = event.payload;
       if (updatedDoc) {
         setRoom(updatedDoc);
 
-        // Apply synchronized playback state in local_file mode
         if (updatedDoc.syncState && synchronizerRef.current) {
           try {
             const packet: SyncPacket = JSON.parse(updatedDoc.syncState);
@@ -152,7 +182,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
       isMounted = false;
       unsubscribeRoom();
 
-      // Decrement participant count if leaving
       if (room && room.hostId !== currentUserId) {
         databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
           .then((d) => {
@@ -164,7 +193,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
           .catch(() => {});
       }
 
-      // Cleanup WebRTC & media
       if (webrtcRef.current) {
         webrtcRef.current.destroy();
         webrtcRef.current = null;
@@ -178,7 +206,32 @@ export const RoomView: React.FC<RoomViewProps> = ({
         localMicStreamRef.current = null;
       }
     };
-  }, [roomId, currentUserId]);
+  }, [hasEnteredStage, roomId, currentUserId]);
+
+  const handleGreenRoomJoin = async (
+    name: string,
+    micEnabled: boolean,
+    videoEnabled: boolean,
+    presentImmediately: boolean
+  ) => {
+    setEffectiveUserName(name);
+    setHasEnteredStage(true);
+
+    if (micEnabled) {
+      try {
+        const stream = await captureUserMedia(videoEnabled);
+        localMicStreamRef.current = stream;
+        webrtcRef.current?.attachMicStream(stream);
+        setIsMicActive(true);
+      } catch (err) {
+        console.warn('Microphone capture failed:', err);
+      }
+    }
+
+    if (presentImmediately && room?.mediaMode === 'screen' && room?.hostId === currentUserId) {
+      handleToggleScreenShare();
+    }
+  };
 
   // Microphone toggle handler
   const handleToggleMic = async () => {
@@ -213,7 +266,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
         setIsSharingScreen(true);
         webrtcRef.current?.attachScreenStream(stream);
 
-        // Listen for user stopping screen share via browser floating bar
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
           videoTrack.onended = () => {
@@ -226,7 +278,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
     }
   };
 
-  // Local file selector handler
   const handleSelectLocalFile = (file: File) => {
     const objectUrl = URL.createObjectURL(file);
     setLocalFileUrl(objectUrl);
@@ -240,16 +291,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   if (errorState) {
     return (
-      <div className="h-screen w-screen bg-[#080C14] flex flex-col items-center justify-center p-6 text-center text-slate-100">
-        <div className="max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-4 font-bold text-xl">
+      <div className="min-h-screen w-full bg-[#030611] flex flex-col items-center justify-center p-6 text-center text-slate-100">
+        <div className="max-w-md bg-[rgba(10,16,34,0.85)] border border-white/15 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-4 font-bold text-xl">
             !
           </div>
-          <h2 className="text-lg font-bold text-white mb-2">Unable to Join Room</h2>
-          <p className="text-slate-400 text-xs leading-relaxed mb-6">{errorState}</p>
+          <h2 className="text-xl font-bold text-white mb-2">Unable to Join Watchroom</h2>
+          <p className="text-slate-300 text-xs leading-relaxed mb-6">{errorState}</p>
           <button
             onClick={onLeave}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg transition"
+            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold rounded-2xl shadow-xl transition cursor-pointer"
           >
             Return to Lobby
           </button>
@@ -260,10 +311,25 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   if (!room) {
     return (
-      <div className="h-screen w-screen bg-[#080C14] flex flex-col items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-screen w-full bg-[#030611] flex flex-col items-center justify-center text-slate-400 text-sm">
         <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-        <span>Connecting to watch party stage...</span>
+        <span>Loading watchroom...</span>
       </div>
+    );
+  }
+
+  // Show Google Meet-style Green Room device check before entering the stage
+  if (!hasEnteredStage) {
+    return (
+      <GreenRoom
+        roomName={room.name}
+        roomId={roomId}
+        initialUserName={effectiveUserName}
+        mediaMode={room.mediaMode}
+        isHost={isHost}
+        onJoin={handleGreenRoomJoin}
+        onCancel={onLeave}
+      />
     );
   }
 
@@ -274,7 +340,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       mediaMode={room.mediaMode}
       isHost={isHost}
       currentUserId={currentUserId}
-      currentUserName={currentUserName}
+      currentUserName={effectiveUserName}
       mediaStream={mediaStream}
       localFileUrl={localFileUrl}
       participants={participants}
@@ -290,7 +356,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         <ChatSidebar
           roomId={roomId}
           currentUserId={currentUserId}
-          currentUserName={currentUserName}
+          currentUserName={effectiveUserName}
           isOpen={true}
           onClose={() => {}}
           onNewMessageReceived={() => setUnreadChatCount((prev) => prev + 1)}

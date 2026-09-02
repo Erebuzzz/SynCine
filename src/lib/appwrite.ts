@@ -36,6 +36,8 @@ export interface RoomDocument extends Models.Document {
   mediaMode: 'screen' | 'local_file';
   participantCount?: number;
   maxParticipants?: number;
+  isPermanent?: boolean;
+  expiresAt?: string;
 }
 
 export interface SignalingDocument extends Models.Document {
@@ -54,8 +56,8 @@ export interface MessageDocument extends Models.Document {
 }
 
 /**
- * Ensures an active anonymous session exists.
- * Reuses existing session if available; creates a new anonymous session otherwise.
+ * Ensures an active session exists.
+ * Returns existing user session if active; otherwise generates an anonymous guest session.
  */
 export async function ensureAnonymousSession(): Promise<Models.User<Models.Preferences>> {
   try {
@@ -65,10 +67,68 @@ export async function ensureAnonymousSession(): Promise<Models.User<Models.Prefe
       await account.createAnonymousSession();
       return await account.get();
     } catch (err) {
-      console.error('Failed to create anonymous session:', err);
+      console.error('Failed to create session:', err);
       throw err;
     }
   }
+}
+
+/**
+ * Optional Appwrite Auth: Sign in with email and password
+ */
+export async function loginWithEmail(email: string, pass: string): Promise<Models.User<Models.Preferences>> {
+  try {
+    // Delete any active anonymous session first to prevent session collision
+    try {
+      await account.deleteSession('current');
+    } catch {
+      // Ignore if no session
+    }
+    await account.createEmailPasswordSession(email, pass);
+    return await account.get();
+  } catch (err) {
+    console.error('Login error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Optional Appwrite Auth: Create new account with email
+ */
+export async function registerWithEmail(email: string, pass: string, name: string): Promise<Models.User<Models.Preferences>> {
+  try {
+    try {
+      await account.deleteSession('current');
+    } catch {
+      // Ignore
+    }
+    await account.create(ID.unique(), email, pass, name);
+    await account.createEmailPasswordSession(email, pass);
+    return await account.get();
+  } catch (err) {
+    console.error('Registration error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Sign out and reset back to anonymous guest session
+ */
+export async function logoutUser(): Promise<Models.User<Models.Preferences>> {
+  try {
+    await account.deleteSession('current');
+  } catch {
+    // Ignore
+  }
+  return await ensureAnonymousSession();
+}
+
+/**
+ * Check if current user is authenticated with email (not an anonymous guest)
+ */
+export function isUserRegistered(user: Models.User<Models.Preferences> | null): boolean {
+  if (!user) return false;
+  return Boolean(user.email && user.email.length > 0 && !user.name?.startsWith('Guest '));
 }
 
 export { ID, Query, Permission, Role };
