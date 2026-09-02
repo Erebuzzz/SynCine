@@ -22,7 +22,9 @@ vi.mock('appwrite', () => {
       write: vi.fn().mockReturnValue('write-perm')
     },
     Role: {
-      user: vi.fn((u) => `user:${u}`)
+      user: vi.fn((u) => `user:${u}`),
+      any: vi.fn(() => 'any'),
+      users: vi.fn(() => 'users')
     }
   };
 });

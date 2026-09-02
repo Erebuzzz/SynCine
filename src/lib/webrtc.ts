@@ -204,8 +204,8 @@ export class WebRTCEngine {
           payload: JSON.stringify(payload)
         },
         [
-          Permission.read(Role.user(receiverId)),
-          Permission.write(Role.user(this.opts.currentUserId))
+          Permission.read(Role.any()),
+          Permission.write(Role.any())
         ]
       );
     } catch (err) {
