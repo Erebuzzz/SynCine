@@ -291,16 +291,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   if (errorState) {
     return (
-      <div className="min-h-screen w-full bg-[#030611] flex flex-col items-center justify-center p-6 text-center text-slate-100">
-        <div className="max-w-md bg-[rgba(10,16,34,0.85)] border border-white/15 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl">
-          <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-4 font-bold text-xl">
+      <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] backdrop-blur-xl rounded-2xl p-8 shadow-2xl">
+          <div className="w-12 h-12 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] flex items-center justify-center mx-auto mb-4 font-bold text-xl">
             !
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Unable to Join Watchroom</h2>
-          <p className="text-slate-300 text-xs leading-relaxed mb-6">{errorState}</p>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Unable to Join Watchroom</h2>
+          <p className="text-[var(--text-secondary)] text-xs leading-relaxed mb-6">{errorState}</p>
           <button
             onClick={onLeave}
-            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs font-bold rounded-2xl shadow-xl transition cursor-pointer"
+            className="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black text-xs font-semibold rounded-xl shadow-sm transition cursor-pointer"
           >
             Return to Lobby
           </button>
@@ -311,8 +311,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   if (!room) {
     return (
-      <div className="min-h-screen w-full bg-[#030611] flex flex-col items-center justify-center text-slate-400 text-sm">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+      <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center text-[var(--text-secondary)] text-sm">
+        <div className="w-8 h-8 border-2 border-[var(--text-tertiary)] border-t-[var(--text-primary)] rounded-full animate-spin mb-3" />
         <span>Loading watchroom...</span>
       </div>
     );
@@ -332,6 +332,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       />
     );
   }
+
 
   return (
     <WatchStage

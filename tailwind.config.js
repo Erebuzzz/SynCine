@@ -4,15 +4,18 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        background: '#0B0F17',
-        surface: '#131B2A',
-        surfaceHover: '#1B263B',
-        accent: '#6366F1',
-        accentLight: '#818CF8'
-      }
+        accent: 'var(--accent)',
+        'accent-hover': 'var(--accent-hover)',
+        destructive: 'var(--destructive)',
+        success: 'var(--success)',
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],

@@ -3,17 +3,42 @@
 @tailwind utilities;
 
 :root {
+  /* Light Mode Tokens (default) */
+  --bg: #FFFFFF;
+  --surface: rgba(0, 0, 0, 0.03);
+  --surface-hover: rgba(0, 0, 0, 0.06);
+  --surface-active: rgba(0, 0, 0, 0.09);
+  --text-primary: #1D1D1F;
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-tertiary: rgba(0, 0, 0, 0.3);
+  --accent: #8B7355;
+  --accent-hover: #7A654A;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --destructive: #FF3B30;
+  --success: #34C759;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #000000;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --surface-active: rgba(255, 255, 255, 0.12);
+  --text-primary: #F5F5F7;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.3);
+  --accent: #C8A97E;
+  --accent-hover: #D4B78E;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --destructive: #FF453A;
+  --success: #30D158;
   color-scheme: dark;
-  --glass-bg: rgba(10, 16, 34, 0.68);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-specular: rgba(255, 255, 255, 0.25);
-  --accent-glow: rgba(99, 102, 241, 0.35);
-  --accent-secondary-glow: rgba(236, 72, 153, 0.3);
 }
 
 html {
   scroll-behavior: smooth;
-  background-color: #030611;
 }
 
 body {
@@ -21,9 +46,9 @@ body {
   padding: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: #030611;
-  color: #F8FAFC;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -37,26 +62,25 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 40;
-  opacity: 0.035;
+  opacity: 0.02;
   filter: url(#film-grain-filter);
 }
 
-/* Custom Luxury Scrollbars */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(8, 12, 26, 0.6);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(236, 72, 153, 0.5));
+  background: var(--text-tertiary);
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.85), rgba(236, 72, 153, 0.85));
+  background: var(--text-secondary);
 }

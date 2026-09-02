@@ -16,6 +16,7 @@ import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
 import { ShaderCanvas } from './components/ShaderCanvas';
+import { Sun, Moon } from 'lucide-react';
 import type { Models } from 'appwrite';
 
 export const App: React.FC = () => {
@@ -25,6 +26,27 @@ export const App: React.FC = () => {
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('syncine-theme');
+      if (stored) return stored === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  // Apply theme class to html element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+      root.classList.remove('light');
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('light');
+    }
+    localStorage.setItem('syncine-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   useEffect(() => {
     async function init() {
@@ -38,7 +60,6 @@ export const App: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const roomFromUrl = params.get('room');
         if (roomFromUrl) {
-          // Sanitize room ID from full URL or bare ID
           const cleanId = roomFromUrl.includes('?room=')
             ? roomFromUrl.split('?room=')[1]
             : roomFromUrl;
@@ -104,7 +125,6 @@ export const App: React.FC = () => {
       throw new Error('Watchroom not found. Please verify the Room Code.');
     }
 
-    // Check expiration for non-permanent rooms
     if (!doc.isPermanent && doc.expiresAt) {
       const expirationTime = new Date(doc.expiresAt).getTime();
       if (Date.now() > expirationTime) {
@@ -148,16 +168,26 @@ export const App: React.FC = () => {
 
   return (
     <>
-      {/* 60fps WebGL Fluid Gradient Shader Background */}
+      {/* Barely perceptible atmospheric canvas */}
       <ShaderCanvas />
 
-      {/* Procedural SVG Filters */}
+      {/* Procedural SVG filters */}
       <LiquidGlassFilters />
 
-      {/* Subtle 35mm Cinematic Film Grain Texture */}
+      {/* Film grain texture at reduced opacity */}
       <div className="film-grain-layer" />
 
-      {/* Optional Host Authentication Modal */}
+      {/* Dark/Light mode toggle -- fixed position */}
+      <button
+        type="button"
+        onClick={() => setIsDark(!isDark)}
+        className="fixed top-4 right-4 z-[60] p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition-all duration-200 cursor-pointer backdrop-blur-xl"
+        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {isDark ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+
+      {/* Auth modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}

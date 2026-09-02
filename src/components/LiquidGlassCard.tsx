@@ -1,35 +1,55 @@
 import React from 'react';
 
-interface LiquidGlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+type CardVariant = 'surface' | 'interactive' | 'dock' | 'modal';
+
+interface LiquidGlassCardProps {
+  variant?: CardVariant;
   className?: string;
-  variant?: 'surface' | 'interactive' | 'dock' | 'modal';
+  children: React.ReactNode;
 }
 
-export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
-  children,
-  className = '',
-  variant = 'surface',
-  ...props
-}) => {
-  const variantStyles = {
-    surface:
-      'bg-[rgba(10,16,34,0.68)] backdrop-blur-2xl border border-white/[0.12] shadow-[0_24px_50px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.2)]',
-    interactive:
-      'bg-[rgba(12,20,40,0.6)] hover:bg-[rgba(18,28,56,0.75)] backdrop-blur-xl border border-white/[0.1] hover:border-indigo-500/50 shadow-[0_12px_30px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all duration-200',
-    dock:
-      'bg-[rgba(8,12,26,0.85)] backdrop-blur-3xl border border-white/[0.14] shadow-[0_20px_40px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.22)]',
-    modal:
-      'bg-[rgba(7,11,24,0.92)] backdrop-blur-3xl border border-white/[0.16] shadow-[0_32px_64px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.25)]'
-  };
+const variantStyles: Record<CardVariant, string> = {
+  surface: [
+    'bg-black/[0.03] dark:bg-white/[0.04]',
+    'backdrop-blur-xl',
+    'border border-black/[0.06] dark:border-white/[0.08]',
+    'shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
+  ].join(' '),
 
+  interactive: [
+    'bg-black/[0.02] dark:bg-white/[0.03]',
+    'hover:bg-black/[0.05] dark:hover:bg-white/[0.07]',
+    'backdrop-blur-xl',
+    'border border-black/[0.06] dark:border-white/[0.06]',
+    'hover:border-black/[0.12] dark:hover:border-white/[0.12]',
+    'shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
+    'transition-all duration-200',
+  ].join(' '),
+
+  dock: [
+    'bg-white/90 dark:bg-black/90',
+    'backdrop-blur-xl',
+    'border-t border-black/[0.06] dark:border-white/[0.08]',
+    'shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.5)]',
+  ].join(' '),
+
+  modal: [
+    'bg-white/95 dark:bg-[rgba(10,10,10,0.95)]',
+    'backdrop-blur-lg',
+    'border border-black/[0.08] dark:border-white/[0.1]',
+    'shadow-2xl',
+  ].join(' '),
+};
+
+export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
+  variant = 'surface',
+  className = '',
+  children,
+}) => {
   return (
-    <div
-      className={`relative rounded-3xl overflow-hidden ${variantStyles[variant]} ${className}`}
-      {...props}
-    >
-      {/* Specular Edge Bevel Glow */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
+    <div className={`relative rounded-2xl overflow-hidden ${variantStyles[variant]} ${className}`}>
+      {/* Subtle top specular edge line */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-black/[0.06] dark:via-white/[0.1] to-transparent pointer-events-none" />
       {children}
     </div>
   );

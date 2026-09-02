@@ -1,15 +1,16 @@
 import React from 'react';
 
-interface IconProps extends React.SVGProps<SVGSVGElement> {
+interface IconProps {
   size?: number;
   className?: string;
 }
 
 /**
- * SynCine Logo: Handcrafted Greek "Σ" (Sigma) and Cinema Infinity Reel.
- * Symbolizes "Syn" (Together in Greek) and synchronized media convergence.
+ * SynCine Norse-inspired S+C merged logo mark.
+ * The Sigma path doubles as both S (Syn) and C (Cine) in a runic convergence stroke,
+ * with a single warm accent play triangle at the center.
  */
-export const SynLogo: React.FC<IconProps> = ({ size = 32, className = '', ...props }) => (
+export const SynLogo: React.FC<IconProps> = ({ size = 40, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -17,56 +18,41 @@ export const SynLogo: React.FC<IconProps> = ({ size = 32, className = '', ...pro
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className={className}
-    {...props}
+    aria-label="SynCine logo"
   >
-    <defs>
-      <linearGradient id="syn-grad-primary" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#818CF8" />
-        <stop offset="50%" stopColor="#6366F1" />
-        <stop offset="100%" stopColor="#EC4899" />
-      </linearGradient>
-      <linearGradient id="syn-grad-accent" x1="12" y1="8" x2="36" y2="40" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#22D3EE" />
-        <stop offset="100%" stopColor="#818CF8" />
-      </linearGradient>
-      <filter id="syn-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="3" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-
-    {/* Outer Cinematic Aperture Ring */}
+    {/* Outer ring -- thin, restrained */}
     <circle
       cx="24"
       cy="24"
-      r="21"
-      stroke="url(#syn-grad-primary)"
-      strokeWidth="2"
-      strokeOpacity="0.4"
-      strokeDasharray="4 4"
+      r="22"
+      stroke="currentColor"
+      strokeWidth="1"
+      strokeOpacity="0.2"
     />
 
-    {/* Dual Converging Fluid Reels (Greek Sigma / Infinity Convergence) */}
+    {/* Norse S+C merged rune stroke -- single warm accent line */}
     <path
       d="M14 13.5H34L22 24L34 34.5H14"
-      stroke="url(#syn-grad-primary)"
-      strokeWidth="3.5"
+      stroke="var(--accent, #C8A97E)"
+      strokeWidth="3"
       strokeLinecap="round"
       strokeLinejoin="round"
-      filter="url(#syn-glow)"
+      fill="none"
     />
 
-    {/* Center Play Convergence Node */}
-    <polygon points="21,20 28,24 21,28" fill="url(#syn-grad-accent)" />
-
-    {/* Left Peer Pulse Satellite */}
-    <circle cx="12" cy="24" r="2.5" fill="#22D3EE" />
-    {/* Right Peer Pulse Satellite */}
-    <circle cx="36" cy="24" r="2.5" fill="#EC4899" />
+    {/* Play triangle -- subtle, filled with current text color */}
+    <polygon
+      points="21,20 28,24 21,28"
+      fill="currentColor"
+      fillOpacity="0.5"
+    />
   </svg>
 );
 
-export const CinemaReelIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+/**
+ * Screen cast / broadcast icon
+ */
+export const ScreenCastIcon: React.FC<IconProps> = ({ size = 24, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -77,40 +63,16 @@ export const CinemaReelIcon: React.FC<IconProps> = ({ size = 20, className = '',
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
-    {...props}
   >
-    <rect x="2" y="2" width="20" height="20" rx="3" />
-    <path d="M7 2v20" />
-    <path d="M17 2v20" />
-    <path d="M2 12h20" />
-    <path d="M2 7h5" />
-    <path d="M2 17h5" />
-    <path d="M17 17h5" />
-    <path d="M17 7h5" />
-  </svg>
-);
-
-export const ScreenCastIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    {...props}
-  >
-    <path d="M2 8V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-    <path d="M2 12a9 9 0 0 1 9 9" />
-    <path d="M2 16a5 5 0 0 1 5 5" />
+    <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
     <line x1="2" y1="20" x2="2.01" y2="20" />
   </svg>
 );
 
-export const MeshNetworkIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+/**
+ * Cinema reel icon
+ */
+export const CinemaReelIcon: React.FC<IconProps> = ({ size = 24, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -121,18 +83,20 @@ export const MeshNetworkIcon: React.FC<IconProps> = ({ size = 20, className = ''
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
-    {...props}
   >
-    <circle cx="12" cy="5" r="2.5" />
-    <circle cx="5" cy="18" r="2.5" />
-    <circle cx="19" cy="18" r="2.5" />
-    <line x1="12" y1="7.5" x2="5" y2="15.5" />
-    <line x1="12" y1="7.5" x2="19" y2="15.5" />
-    <line x1="7.5" y1="18" x2="16.5" y2="18" />
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="12" cy="5" r="1" />
+    <circle cx="19" cy="12" r="1" />
+    <circle cx="12" cy="19" r="1" />
+    <circle cx="5" cy="12" r="1" />
   </svg>
 );
 
-export const LatencySyncIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+/**
+ * P2P mesh network icon
+ */
+export const MeshNetworkIcon: React.FC<IconProps> = ({ size = 24, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -143,16 +107,24 @@ export const LatencySyncIcon: React.FC<IconProps> = ({ size = 20, className = ''
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
-    {...props}
   >
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v5l3 3" />
-    <path d="M18 3l3 3-3 3" />
-    <path d="M6 21l-3-3 3-3" />
+    <circle cx="6" cy="6" r="2" />
+    <circle cx="18" cy="6" r="2" />
+    <circle cx="6" cy="18" r="2" />
+    <circle cx="18" cy="18" r="2" />
+    <line x1="8" y1="6" x2="16" y2="6" />
+    <line x1="8" y1="18" x2="16" y2="18" />
+    <line x1="6" y1="8" x2="6" y2="16" />
+    <line x1="18" y1="8" x2="18" y2="16" />
+    <line x1="7.8" y1="7.8" x2="16.2" y2="16.2" />
+    <line x1="16.2" y1="7.8" x2="7.8" y2="16.2" />
   </svg>
 );
 
-export const LiquidMicIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+/**
+ * Latency sync / drift compensation icon
+ */
+export const LatencySyncIcon: React.FC<IconProps> = ({ size = 24, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -163,92 +135,69 @@ export const LiquidMicIcon: React.FC<IconProps> = ({ size = 20, className = '', 
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
-    {...props}
   >
-    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" y1="19" x2="12" y2="23" />
-    <line x1="8" y1="23" x2="16" y2="23" />
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12,6 12,12 16,14" />
+    <path d="M4.93 4.93l2.83 2.83" />
+    <path d="M16.24 16.24l2.83 2.83" />
   </svg>
 );
 
-export const LiquidMicOffIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    {...props}
-  >
+/**
+ * Theater layout icon
+ */
+export const TheaterLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="1" y="3" width="13" height="14" rx="2" />
+    <rect x="16" y="3" width="3" height="6" rx="1" />
+    <rect x="16" y="11" width="3" height="6" rx="1" />
+  </svg>
+);
+
+/**
+ * Grid layout icon
+ */
+export const GridLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="1" y="1" width="8" height="8" rx="2" />
+    <rect x="11" y="1" width="8" height="8" rx="2" />
+    <rect x="1" y="11" width="8" height="8" rx="2" />
+    <rect x="11" y="11" width="8" height="8" rx="2" />
+  </svg>
+);
+
+/**
+ * Floating layout icon
+ */
+export const FloatingLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="1" y="1" width="18" height="18" rx="2" />
+    <rect x="11" y="11" width="7" height="5" rx="1.5" />
+  </svg>
+);
+
+/**
+ * Microphone icon (active state)
+ */
+export const LiquidMicIcon: React.FC<IconProps> = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10a7 7 0 0 0 14 0" />
+    <line x1="12" y1="19" x2="12" y2="22" />
+    <line x1="8" y1="22" x2="16" y2="22" />
+  </svg>
+);
+
+/**
+ * Microphone muted icon
+ */
+export const LiquidMicOffIcon: React.FC<IconProps> = ({ size = 20, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <line x1="2" y1="2" x2="22" y2="22" />
-    <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2" />
-    <path d="M5 10v2a7 7 0 0 0 12 5" />
-    <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
-    <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
-    <line x1="12" y1="19" x2="12" y2="23" />
-    <line x1="8" y1="23" x2="16" y2="23" />
-  </svg>
-);
-
-export const TheaterLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    {...props}
-  >
-    <rect x="2" y="3" width="14" height="18" rx="2" />
-    <rect x="18" y="3" width="4" height="8" rx="1.5" />
-    <rect x="18" y="13" width="4" height="8" rx="1.5" />
-  </svg>
-);
-
-export const GridLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    {...props}
-  >
-    <rect x="3" y="3" width="8" height="8" rx="2" />
-    <rect x="13" y="3" width="8" height="8" rx="2" />
-    <rect x="3" y="13" width="8" height="8" rx="2" />
-    <rect x="13" y="13" width="8" height="8" rx="2" />
-  </svg>
-);
-
-export const FloatingLayoutIcon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.75"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    {...props}
-  >
-    <rect x="2" y="3" width="20" height="18" rx="2.5" />
-    <rect x="13" y="12" width="7" height="7" rx="1.5" strokeDasharray="2 2" />
-    <circle cx="7" cy="8" r="1.5" fill="currentColor" />
+    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+    <path d="M17 16.95A7 7 0 0 1 5 12" />
+    <line x1="12" y1="19" x2="12" y2="22" />
+    <line x1="8" y1="22" x2="16" y2="22" />
+    <path d="M19 10a7 7 0 0 1-.11 1.23" />
   </svg>
 );
