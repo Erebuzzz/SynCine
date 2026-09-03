@@ -27,14 +27,14 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const audioMeterBarRef = useRef<HTMLDivElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Initialize camera and microphone preview
+  // Initialize camera and microphone preview with resilient fallback
   useEffect(() => {
     let stream: MediaStream | null = null;
     let isCancelled = false;
@@ -57,58 +57,76 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (initialErr) {
-          console.warn('Initial getUserMedia constraints failed, falling back to basic:', initialErr);
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: true
-          });
+          console.warn('Initial getUserMedia constraints failed, trying basic audio/video:', initialErr);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: true
+            });
+          } catch (vidErr) {
+            console.warn('Audio+Video failed, falling back to audio only:', vidErr);
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false
+              });
+            } catch (audErr) {
+              console.warn('Microphone also failed, trying video only:', audErr);
+              stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: true
+              });
+            }
+          }
         }
 
-        if (isCancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+        if (isCancelled || !stream) {
+          stream?.getTracks().forEach((t) => t.stop());
           return;
         }
 
+        const hasVideo = stream.getVideoTracks().length > 0;
+        const hasAudio = stream.getAudioTracks().length > 0;
+
         setPreviewStream(stream);
-        setIsVideoOn(stream.getVideoTracks().length > 0);
-        setIsMicOn(stream.getAudioTracks().length > 0);
+        setIsVideoOn(hasVideo);
+        setIsMicOn(hasAudio);
 
-        if (videoPreviewRef.current && videoPreviewRef.current.srcObject !== stream) {
-          videoPreviewRef.current.srcObject = stream;
-          videoPreviewRef.current.play().catch(() => {});
-        }
+        // Setup audio analysis for the level indicator
+        if (hasAudio) {
+          try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            const audioCtx = new AudioCtx();
+            audioContextRef.current = audioCtx;
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            analyserRef.current = analyser;
 
-        try {
-          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          analyserRef.current = analyser;
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
 
-          const source = audioCtx.createMediaStreamSource(stream);
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const updateAudioMeter = () => {
-            if (!analyserRef.current) {
-              setAudioLevel(0);
-            } else {
-              analyserRef.current.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const updateAudioMeter = () => {
+              if (!analyserRef.current || !audioMeterBarRef.current) {
+                if (audioMeterBarRef.current) audioMeterBarRef.current.style.width = '0%';
+              } else {
+                analyserRef.current.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                  sum += dataArray[i];
+                }
+                const avg = sum / dataArray.length;
+                const level = Math.min(100, Math.round((avg / 128) * 100));
+                audioMeterBarRef.current.style.width = `${level}%`;
               }
-              const avg = sum / dataArray.length;
-              setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
-            }
-            animFrameRef.current = requestAnimationFrame(updateAudioMeter);
-          };
-          updateAudioMeter();
-        } catch {
+              animFrameRef.current = requestAnimationFrame(updateAudioMeter);
+            };
+            updateAudioMeter();
+          } catch {
+          }
         }
       } catch (err) {
-        console.warn('Media preview unavailable:', err);
+        console.warn('Media preview setup error:', err);
         setIsVideoOn(false);
       }
     }
@@ -125,13 +143,32 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     };
   }, []);
 
-  // Ensure video element receives stream as soon as it mounts or changes
+  // Ensure video element receives pure video-only stream with guaranteed DOM muting
   useEffect(() => {
-    if (videoPreviewRef.current && previewStream && isVideoOn) {
-      if (videoPreviewRef.current.srcObject !== previewStream) {
-        videoPreviewRef.current.srcObject = previewStream;
-      }
-      videoPreviewRef.current.play().catch(() => {});
+    const video = videoPreviewRef.current;
+    if (!video) return;
+
+    if (isVideoOn && previewStream && previewStream.getVideoTracks().length > 0) {
+      const videoTrack = previewStream.getVideoTracks()[0];
+      video.defaultMuted = true;
+      video.muted = true;
+
+      // Crucial: video-only stream prevents Chromium Autoplay Policy from blocking playback
+      const videoOnlyStream = new MediaStream([videoTrack]);
+      video.srcObject = videoOnlyStream;
+
+      const attemptPlay = () => {
+        video.play().catch((err) => {
+          console.warn('Preview video play attempt postponed:', err);
+        });
+      };
+
+      video.onloadedmetadata = attemptPlay;
+      attemptPlay();
+
+      videoTrack.onunmute = attemptPlay;
+    } else {
+      video.srcObject = null;
     }
   }, [previewStream, isVideoOn]);
 
@@ -143,30 +180,42 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         t.enabled = nextState;
       });
     }
+    if (!nextState && audioMeterBarRef.current) {
+      audioMeterBarRef.current.style.width = '0%';
+    }
   };
 
   const handleToggleVideo = async () => {
     const nextState = !isVideoOn;
     setIsVideoOn(nextState);
-    if (previewStream) {
-      const videoTracks = previewStream.getVideoTracks();
-      if (videoTracks.length > 0) {
-        videoTracks.forEach((t) => {
-          t.enabled = nextState;
+
+    if (!nextState) {
+      if (previewStream) {
+        previewStream.getVideoTracks().forEach((t) => {
+          t.enabled = false;
         });
-      } else if (nextState) {
-        try {
-          const newStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
-          });
-          const newTrack = newStream.getVideoTracks()[0];
-          if (newTrack) {
-            previewStream.addTrack(newTrack);
-            setPreviewStream(new MediaStream(previewStream.getTracks()));
+      }
+    } else {
+      if (previewStream) {
+        const liveVideoTrack = previewStream.getVideoTracks().find((t) => t.readyState === 'live');
+        if (liveVideoTrack) {
+          liveVideoTrack.enabled = true;
+          setPreviewStream(new MediaStream(previewStream.getTracks()));
+        } else {
+          try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+            });
+            const newTrack = newStream.getVideoTracks()[0];
+            if (newTrack) {
+              previewStream.getVideoTracks().forEach((t) => previewStream.removeTrack(t));
+              previewStream.addTrack(newTrack);
+              setPreviewStream(new MediaStream(previewStream.getTracks()));
+            }
+          } catch (err) {
+            console.warn('Unable to enable camera:', err);
+            setIsVideoOn(false);
           }
-        } catch (err) {
-          console.warn('Unable to enable camera:', err);
-          setIsVideoOn(false);
         }
       }
     }
@@ -211,15 +260,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
           <div className="w-full aspect-video rounded-2xl sm:rounded-3xl relative overflow-hidden bg-black flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1] shadow-2xl">
             {isVideoOn && previewStream?.getVideoTracks().length ? (
               <video
-                ref={(el) => {
-                  videoPreviewRef.current = el;
-                  if (el && previewStream) {
-                    if (el.srcObject !== previewStream) {
-                      el.srcObject = previewStream;
-                    }
-                    el.play().catch(() => {});
-                  }
-                }}
+                ref={videoPreviewRef}
                 autoPlay
                 playsInline
                 muted
@@ -270,8 +311,9 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs text-white/70">
                 <div className="w-12 h-1 bg-white/20 rounded-full overflow-hidden">
                   <div
+                    ref={audioMeterBarRef}
                     className="h-full bg-[var(--accent)] transition-all duration-75 rounded-full"
-                    style={{ width: `${isMicOn ? audioLevel : 0}%` }}
+                    style={{ width: '0%' }}
                   />
                 </div>
                 <span className="text-[11px]">{isMicOn ? 'Mic Ready' : 'Muted'}</span>
