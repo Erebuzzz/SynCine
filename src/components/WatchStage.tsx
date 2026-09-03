@@ -100,10 +100,31 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     if (!video) return;
 
     if (stream) {
+      video.defaultMuted = isMuted;
+      video.muted = isMuted;
       if (video.srcObject !== stream) {
         video.srcObject = stream;
-        video.play().catch(() => {});
       }
+      const attemptPlay = () => {
+        video.play().catch(() => {});
+      };
+      video.onloadedmetadata = attemptPlay;
+      attemptPlay();
+
+      const handleTrackChange = () => {
+        if (video.srcObject !== stream) {
+          video.srcObject = stream;
+        }
+        attemptPlay();
+      };
+
+      stream.addEventListener('addtrack', handleTrackChange);
+      stream.addEventListener('removetrack', handleTrackChange);
+
+      return () => {
+        stream.removeEventListener('addtrack', handleTrackChange);
+        stream.removeEventListener('removetrack', handleTrackChange);
+      };
     } else if (src) {
       if (video.src !== src) {
         video.src = src;
@@ -111,7 +132,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     } else {
       video.srcObject = null;
     }
-  }, [stream, src]);
+  }, [stream, src, isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;

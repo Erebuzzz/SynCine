@@ -70,12 +70,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Mount preview video element
+  // Mount preview video element with video-only stream to guarantee autoplay
   useEffect(() => {
-    if (videoPreviewRef.current && previewStream && previewStream.getVideoTracks().length > 0) {
-      videoPreviewRef.current.srcObject = previewStream;
+    const video = videoPreviewRef.current;
+    if (!video) return;
+
+    if (isOpen && activeTab === 'video' && previewStream && previewStream.getVideoTracks().length > 0) {
+      const videoTrack = previewStream.getVideoTracks()[0];
+      video.defaultMuted = true;
+      video.muted = true;
+      const videoOnly = new MediaStream([videoTrack]);
+      video.srcObject = videoOnly;
+
+      const attemptPlay = () => {
+        video.play().catch(() => {});
+      };
+      video.onloadedmetadata = attemptPlay;
+      attemptPlay();
+      videoTrack.onunmute = attemptPlay;
+    } else {
+      video.srcObject = null;
     }
-  }, [previewStream, activeTab]);
+  }, [isOpen, activeTab, previewStream]);
 
   // Audio level meter for the selected microphone
   useEffect(() => {
@@ -495,15 +511,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="w-full aspect-video rounded-2xl bg-black overflow-hidden relative flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1]">
                   {previewStream && previewStream.getVideoTracks().length > 0 ? (
                     <video
-                      ref={(el) => {
-                        videoPreviewRef.current = el;
-                        if (el && previewStream) {
-                          if (el.srcObject !== previewStream) {
-                            el.srcObject = previewStream;
-                          }
-                          el.play().catch(() => {});
-                        }
-                      }}
+                      ref={videoPreviewRef}
                       autoPlay
                       playsInline
                       muted
