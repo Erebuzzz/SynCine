@@ -214,8 +214,21 @@ export class WebRTCEngine {
   }
 
   public async initiateConnection(peerId: string) {
-    // Calling getOrCreatePeer sets up peer and triggers onnegotiationneeded
-    this.getOrCreatePeer(peerId);
+    const pc = this.getOrCreatePeer(peerId);
+    try {
+      this.makingOffer.set(peerId, true);
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      if (pc.signalingState !== 'stable') return;
+      await pc.setLocalDescription(offer);
+      await this.sendSignal(peerId, 'offer', pc.localDescription || offer);
+    } catch (err) {
+      console.warn(`Failed to initiate connection to peer ${peerId}:`, err);
+    } finally {
+      this.makingOffer.set(peerId, false);
+    }
   }
 
   private async handleOffer(peerId: string, offer: RTCSessionDescriptionInit) {
@@ -311,8 +324,9 @@ export class WebRTCEngine {
         },
         [
           Permission.read(Role.any()),
-          Permission.update(Role.any()),
-          Permission.delete(Role.any())
+          typeof Permission.write === 'function'
+            ? Permission.write(Role.any())
+            : Permission.update(Role.any())
         ]
       );
     } catch (err) {
