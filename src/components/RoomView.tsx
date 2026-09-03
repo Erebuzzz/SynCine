@@ -234,6 +234,30 @@ export const RoomView: React.FC<RoomViewProps> = ({
         databaseId: APPWRITE_DATABASE_ID,
         roomId,
         currentUserId,
+        currentUserName: effectiveUserName,
+        onPeerDiscovered: (peerId, remoteUserName) => {
+          setParticipants((prev) => {
+            const existingIndex = prev.findIndex((p) => p.id === peerId);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = {
+                ...updated[existingIndex],
+                name: remoteUserName || updated[existingIndex].name
+              };
+              return updated;
+            }
+            return [
+              ...prev,
+              {
+                id: peerId,
+                name: remoteUserName,
+                stream: undefined,
+                isMicActive: false,
+                isCameraActive: false
+              }
+            ];
+          });
+        },
         onRemoteTrackAdded: (peerId, stream) => {
           // Check if this stream is the screen broadcast
           if (screenStreamIdRef.current && stream.id === screenStreamIdRef.current) {
@@ -243,19 +267,26 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
+            const hasAudio = stream.getAudioTracks().some((t) => t.enabled);
+            const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
             if (existingIndex >= 0) {
               const updated = [...prev];
-              updated[existingIndex] = { ...updated[existingIndex], stream };
+              updated[existingIndex] = {
+                ...updated[existingIndex],
+                stream,
+                isMicActive: hasAudio,
+                isCameraActive: hasVideo
+              };
               return updated;
             }
             return [
               ...prev,
               {
                 id: peerId,
-                name: `Viewer ${peerId.slice(-4)}`,
+                name: `User ${peerId.slice(-4)}`,
                 stream,
-                isMicActive: stream.getAudioTracks().some((t) => t.enabled),
-                isCameraActive: stream.getVideoTracks().some((t) => t.enabled)
+                isMicActive: hasAudio,
+                isCameraActive: hasVideo
               }
             ];
           });
@@ -290,11 +321,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
       // Announce presence to entire room so existing peers connect
       await engine.announceJoin(effectiveUserName);
-
-      // Handshake with host if viewer
-      if (room.hostId !== currentUserId) {
-        await engine.initiateConnection(room.hostId);
-      }
 
       // Initialize Playback Synchronizer
       const sync = new PlaybackSynchronizer(
@@ -444,12 +470,13 @@ export const RoomView: React.FC<RoomViewProps> = ({
             if (newVideoTrack) stream.addTrack(newVideoTrack);
           } else {
             stream = newStream;
-            localUserMediaRef.current = stream;
-            setLocalUserMediaStream(stream);
+            localUserMediaRef.current = newStream;
+            setLocalUserMediaStream(new MediaStream(newStream.getTracks()));
           }
         }
         if (stream) {
           webrtcRef.current?.attachCameraStream(stream);
+          setLocalUserMediaStream(new MediaStream(stream.getTracks()));
         }
         setIsCameraActive(true);
       } catch (err) {

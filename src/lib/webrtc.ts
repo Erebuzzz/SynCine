@@ -5,9 +5,11 @@ export interface WebRTCEngineOptions {
   databaseId: string;
   roomId: string;
   currentUserId: string;
+  currentUserName?: string;
   onRemoteTrackAdded: (peerId: string, stream: MediaStream) => void;
   onPeerDisconnected: (peerId: string) => void;
   onPeerConnected?: (peerId: string) => void;
+  onPeerDiscovered?: (peerId: string, userName: string) => void;
   onScreenShareChanged?: (peerId: string, streamId: string | undefined, active: boolean) => void;
 }
 
@@ -15,6 +17,9 @@ export class WebRTCEngine {
   private peers: Map<string, RTCPeerConnection> = new Map();
   private remoteStreams: Map<string, MediaStream> = new Map();
   private pendingCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
+  private makingOffer: Map<string, boolean> = new Map();
+  private ignoreOffer: Map<string, boolean> = new Map();
+  private peerNames: Map<string, string> = new Map();
   private db: Databases;
   private unsubscribe?: () => void;
   private localMicStream?: MediaStream;
@@ -55,15 +60,33 @@ export class WebRTCEngine {
           await this.handleAnswer(doc.senderId, payload);
         } else if (doc.type === 'candidate') {
           if (payload && payload.action === 'announce-join') {
-            if (doc.senderId !== this.opts.currentUserId) {
-              await this.initiateConnection(doc.senderId);
-              if (this.localScreenStream) {
-                await this.sendSignal(doc.senderId, 'candidate', {
-                  action: 'screen-cast-started',
-                  streamId: this.localScreenStream.id
-                });
-              }
+            const remoteName = payload.userName || `Viewer ${doc.senderId.slice(-4)}`;
+            this.peerNames.set(doc.senderId, remoteName);
+            this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
+
+            // Respond with announce-ack so the joining peer immediately learns our identity
+            await this.sendSignal(doc.senderId, 'candidate', {
+              action: 'announce-ack',
+              userId: this.opts.currentUserId,
+              userName: this.opts.currentUserName || 'Participant'
+            });
+
+            // Ensure peer connection is initialized
+            this.getOrCreatePeer(doc.senderId);
+
+            if (this.localScreenStream) {
+              await this.sendSignal(doc.senderId, 'candidate', {
+                action: 'screen-cast-started',
+                streamId: this.localScreenStream.id
+              });
             }
+          } else if (payload && payload.action === 'announce-ack') {
+            const remoteName = payload.userName || `User ${doc.senderId.slice(-4)}`;
+            this.peerNames.set(doc.senderId, remoteName);
+            this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
+
+            // Ensure peer connection is initialized
+            this.getOrCreatePeer(doc.senderId);
           } else if (payload && payload.action === 'screen-cast-started') {
             this.opts.onScreenShareChanged?.(doc.senderId, payload.streamId, true);
           } else if (payload && payload.action === 'screen-cast-stopped') {
@@ -86,6 +109,21 @@ export class WebRTCEngine {
 
     pc = new RTCPeerConnection(this.rtcConfiguration);
 
+    // Perfect Negotiation pattern: onnegotiationneeded triggers offer generation
+    pc.onnegotiationneeded = async () => {
+      try {
+        this.makingOffer.set(peerId, true);
+        const offer = await pc.createOffer();
+        if (pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
+        await this.sendSignal(peerId, 'offer', pc.localDescription);
+      } catch (err) {
+        console.warn(`Negotiation error for peer ${peerId}:`, err);
+      } finally {
+        this.makingOffer.set(peerId, false);
+      }
+    };
+
     pc.onicecandidate = async (e) => {
       if (e.candidate) {
         await this.sendSignal(peerId, 'candidate', { candidate: e.candidate.toJSON() });
@@ -99,48 +137,57 @@ export class WebRTCEngine {
         this.remoteStreams.set(peerId, stream);
       }
 
+      if (e.track && !stream.getTracks().some((t) => t.id === e.track.id)) {
+        stream.addTrack(e.track);
+      }
       e.streams[0]?.getTracks().forEach((track) => {
         if (!stream!.getTracks().some((t) => t.id === track.id)) {
           stream!.addTrack(track);
         }
       });
 
-      if (e.track && !stream.getTracks().some((t) => t.id === e.track.id)) {
-        stream.addTrack(e.track);
-      }
-
-      this.opts.onRemoteTrackAdded(peerId, stream);
+      // Crucial: emit a fresh MediaStream wrapper so React detects reference changes
+      const streamWrapper = new MediaStream(stream.getTracks());
+      this.opts.onRemoteTrackAdded(peerId, streamWrapper);
     };
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
         this.opts.onPeerConnected?.(peerId);
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      } else if (
+        pc.connectionState === 'disconnected' ||
+        pc.connectionState === 'failed' ||
+        pc.connectionState === 'closed'
+      ) {
         this.handlePeerLeave(peerId);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+      if (
+        pc.iceConnectionState === 'disconnected' ||
+        pc.iceConnectionState === 'failed' ||
+        pc.iceConnectionState === 'closed'
+      ) {
         this.handlePeerLeave(peerId);
       }
     };
 
-    // Attach active local audio tracks to the peer connection
+    // Attach active local audio tracks
     if (this.localMicStream) {
       this.localMicStream.getAudioTracks().forEach((track) => {
         pc.addTrack(track, this.localMicStream!);
       });
     }
 
-    // Attach active local camera video tracks to the peer connection
+    // Attach active local camera video tracks
     if (this.localCameraStream) {
       this.localCameraStream.getVideoTracks().forEach((track) => {
         pc.addTrack(track, this.localCameraStream!);
       });
     }
 
-    // Attach active local screen tracks to the peer connection
+    // Attach active local screen tracks
     if (this.localScreenStream) {
       this.localScreenStream.getTracks().forEach((track) => {
         pc.addTrack(track, this.localScreenStream!);
@@ -160,46 +207,90 @@ export class WebRTCEngine {
     }
     this.remoteStreams.delete(peerId);
     this.pendingCandidates.delete(peerId);
+    this.makingOffer.delete(peerId);
+    this.ignoreOffer.delete(peerId);
+    this.peerNames.delete(peerId);
     this.opts.onPeerDisconnected(peerId);
   }
 
   public async initiateConnection(peerId: string) {
     const pc = this.getOrCreatePeer(peerId);
-    const offer = await pc.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true
-    });
-    await pc.setLocalDescription(offer);
-    await this.sendSignal(peerId, 'offer', offer);
+    try {
+      this.makingOffer.set(peerId, true);
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      if (pc.signalingState !== 'stable') return;
+      await pc.setLocalDescription(offer);
+      await this.sendSignal(peerId, 'offer', pc.localDescription || offer);
+    } catch (err) {
+      console.warn(`Failed to initiate connection to peer ${peerId}:`, err);
+    } finally {
+      this.makingOffer.set(peerId, false);
+    }
   }
 
   private async handleOffer(peerId: string, offer: RTCSessionDescriptionInit) {
     const pc = this.getOrCreatePeer(peerId);
+    const isPolite = this.opts.currentUserId < peerId;
+    const isMakingOffer = this.makingOffer.get(peerId) || false;
+    const offerCollision = offer.type === 'offer' && (isMakingOffer || pc.signalingState !== 'stable');
+
+    this.ignoreOffer.set(peerId, !isPolite && offerCollision);
+    if (this.ignoreOffer.get(peerId)) {
+      console.warn(`WebRTC glare collision detected with peer ${peerId}. Impolite peer ignoring offer.`);
+      return;
+    }
+
+    if (offerCollision && isPolite) {
+      if (pc.signalingState === 'have-local-offer') {
+        try {
+          console.log(`WebRTC glare collision detected with peer ${peerId}. Polite peer rolling back.`);
+          await pc.setLocalDescription({ type: 'rollback' });
+        } catch (err) {
+          console.warn(`Rollback failed for peer ${peerId}:`, err);
+        }
+      }
+    }
+
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-    // Process queued candidates
+    // Drain queued ICE candidates
     const queued = this.pendingCandidates.get(peerId);
     if (queued && queued.length > 0) {
       for (const candidate of queued) {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.warn('Error applying queued ICE candidate:', e);
+        }
       }
       this.pendingCandidates.delete(peerId);
     }
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await this.sendSignal(peerId, 'answer', answer);
+    if (offer.type === 'offer') {
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await this.sendSignal(peerId, 'answer', pc.localDescription);
+    }
   }
 
   private async handleAnswer(peerId: string, answer: RTCSessionDescriptionInit) {
     const pc = this.peers.get(peerId);
-    if (pc && pc.signalingState !== 'stable') {
+    if (!pc) return;
+
+    if (pc.signalingState === 'have-local-offer') {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
       const queued = this.pendingCandidates.get(peerId);
       if (queued && queued.length > 0) {
         for (const candidate of queued) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.warn('Error applying queued ICE candidate:', e);
+          }
         }
         this.pendingCandidates.delete(peerId);
       }
@@ -209,7 +300,13 @@ export class WebRTCEngine {
   private async handleCandidate(peerId: string, candidate: RTCIceCandidateInit) {
     const pc = this.peers.get(peerId);
     if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        if (!this.ignoreOffer.get(peerId)) {
+          console.warn(`Failed to add ICE candidate for peer ${peerId}:`, err);
+        }
+      }
     } else {
       const list = this.pendingCandidates.get(peerId) || [];
       list.push(candidate);
@@ -232,7 +329,9 @@ export class WebRTCEngine {
         },
         [
           Permission.read(Role.any()),
-          Permission.write(Role.any())
+          typeof Permission.write === 'function'
+            ? Permission.write(Role.any())
+            : Permission.update(Role.any())
         ]
       );
     } catch (err) {
@@ -266,7 +365,7 @@ export class WebRTCEngine {
     this.peers.forEach((pc) => {
       const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
       if (sender) {
-        sender.replaceTrack(track);
+        sender.replaceTrack(track).catch(console.warn);
       } else {
         pc.addTrack(track, stream);
       }
@@ -283,7 +382,7 @@ export class WebRTCEngine {
         (s) => s.track?.kind === 'video' && s.track?.id !== this.localScreenStream?.getVideoTracks()[0]?.id
       );
       if (sender) {
-        sender.replaceTrack(videoTrack);
+        sender.replaceTrack(videoTrack).catch(console.warn);
       } else {
         pc.addTrack(videoTrack, stream);
       }
@@ -382,6 +481,7 @@ export class WebRTCEngine {
 
   public async announceJoin(userName: string) {
     try {
+      this.opts.currentUserName = userName;
       await this.sendSignal('all', 'candidate', {
         action: 'announce-join',
         userId: this.opts.currentUserId,
@@ -402,6 +502,9 @@ export class WebRTCEngine {
     this.peers.clear();
     this.remoteStreams.clear();
     this.pendingCandidates.clear();
+    this.makingOffer.clear();
+    this.ignoreOffer.clear();
+    this.peerNames.clear();
 
     if (this.localMicStream) {
       this.localMicStream.getTracks().forEach((t) => t.stop());
