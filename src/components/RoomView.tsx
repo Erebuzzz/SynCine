@@ -32,6 +32,8 @@ import { WatchStage, Participant } from './WatchStage';
 import { ChatSidebar } from './ChatSidebar';
 import { GreenRoom } from './GreenRoom';
 import { SettingsModal } from './SettingsModal';
+import { FloatingReaction } from './EmojiReactions';
+import { SynEmojiId } from './icons/SynEmojiIcons';
 
 interface RoomViewProps {
   roomId: string;
@@ -90,6 +92,26 @@ export const RoomView: React.FC<RoomViewProps> = ({
   // Google Meet Green Room preview state
   const [hasEnteredStage, setHasEnteredStage] = useState(false);
   const [effectiveUserName, setEffectiveUserName] = useState(currentUserName);
+
+  // Floating reactions state
+  const [activeReactions, setActiveReactions] = useState<FloatingReaction[]>([]);
+  const [isRoomLocked, setIsRoomLocked] = useState(false);
+  const [isCameraMirrored, setIsCameraMirrored] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-camera-mirrored') !== 'false';
+    }
+    return true;
+  });
+
+  const triggerReactionAnimation = useCallback((emojiId: SynEmojiId, senderName?: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const xPercent = 15 + Math.random() * 65;
+    const newReaction: FloatingReaction = { id, emojiId, xPercent, senderName };
+    setActiveReactions((prev) => [...prev, newReaction]);
+    setTimeout(() => {
+      setActiveReactions((prev) => prev.filter((r) => r.id !== id));
+    }, 2700);
+  }, []);
 
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
@@ -258,7 +280,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
             ];
           });
         },
-        onRemoteTrackAdded: (peerId, stream) => {
+        onRemoteTrackAdded: (peerId, stream, peerName) => {
           // Check if this stream is the screen broadcast
           if (screenStreamIdRef.current && stream.id === screenStreamIdRef.current) {
             setRemoteScreenStream(stream);
@@ -269,10 +291,17 @@ export const RoomView: React.FC<RoomViewProps> = ({
             const existingIndex = prev.findIndex((p) => p.id === peerId);
             const hasAudio = stream.getAudioTracks().some((t) => t.enabled);
             const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
+            const displayName =
+              peerName ||
+              (existingIndex >= 0 ? prev[existingIndex].name : undefined) ||
+              engine.getPeerName(peerId) ||
+              `Participant ${peerId.slice(-4)}`;
+
             if (existingIndex >= 0) {
               const updated = [...prev];
               updated[existingIndex] = {
                 ...updated[existingIndex],
+                name: displayName,
                 stream,
                 isMicActive: hasAudio,
                 isCameraActive: hasVideo
@@ -283,7 +312,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
               ...prev,
               {
                 id: peerId,
-                name: `User ${peerId.slice(-4)}`,
+                name: displayName,
                 stream,
                 isMicActive: hasAudio,
                 isCameraActive: hasVideo
@@ -304,6 +333,27 @@ export const RoomView: React.FC<RoomViewProps> = ({
         },
         onPeerConnected: (peerId) => {
           console.log(`P2P mesh peer connected: ${peerId}`);
+        },
+        onHostCommandReceived: (command, targetId) => {
+          if (command === 'mute-all' || (command === 'mute-user' && targetId === currentUserId)) {
+            if (isMicActive) {
+              handleToggleMic();
+            }
+          } else if (command === 'kick-user' && targetId === currentUserId) {
+            alert('You have been removed from the watchroom by the host.');
+            onLeave();
+          } else if (command === 'end-room') {
+            alert('The host has ended this watchroom session.');
+            onLeave();
+          }
+        },
+        onEmojiReactionReceived: (emojiId, senderName) => {
+          triggerReactionAnimation(emojiId as SynEmojiId, senderName);
+        },
+        onCameraMirrorChanged: (peerId, isMirrored) => {
+          setParticipants((prev) =>
+            prev.map((p) => (p.id === peerId ? { ...p, isMirrored } : p))
+          );
         }
       });
 
@@ -334,6 +384,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
     initStage();
 
+    const handleBeforeUnload = () => {
+      webrtcRef.current?.announceLeave();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Subscribe to Realtime room updates
     const roomChannel = `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.ROOMS}.documents.${roomId}`;
     const unsubscribeRoom = realtime.subscribe<RoomDocument>(roomChannel, (event: RealtimeResponseEvent<RoomDocument>) => {
@@ -354,6 +409,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
     return () => {
       isMounted = false;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       unsubscribeRoom();
 
       if (room && room.hostId !== currentUserId) {
@@ -368,6 +424,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       }
 
       if (webrtcRef.current) {
+        webrtcRef.current.announceLeave();
         webrtcRef.current.destroy();
         webrtcRef.current = null;
       }
@@ -600,6 +657,39 @@ export const RoomView: React.FC<RoomViewProps> = ({
     }
   }, []);
 
+  const handleToggleRoomLock = () => {
+    setIsRoomLocked((prev) => !prev);
+  };
+
+  const handleHostMuteAll = () => {
+    webrtcRef.current?.broadcastHostCommand('mute-all');
+  };
+
+  const handleHostMuteParticipant = (peerId: string) => {
+    webrtcRef.current?.broadcastHostCommand('mute-user', peerId);
+  };
+
+  const handleHostKickParticipant = (peerId: string) => {
+    webrtcRef.current?.broadcastHostCommand('kick-user', peerId);
+    setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+  };
+
+  const handleHostEndSession = () => {
+    webrtcRef.current?.broadcastHostCommand('end-room');
+    onLeave();
+  };
+
+  const handleSendEmojiReaction = (emojiId: SynEmojiId) => {
+    triggerReactionAnimation(emojiId, effectiveUserName);
+    webrtcRef.current?.broadcastEmojiReaction(emojiId, effectiveUserName);
+  };
+
+  const handleToggleCameraMirror = (mirrored: boolean) => {
+    setIsCameraMirrored(mirrored);
+    localStorage.setItem('syncine-camera-mirrored', mirrored ? 'true' : 'false');
+    webrtcRef.current?.broadcastCameraMirror(mirrored);
+  };
+
   const displayedParticipants: Participant[] = useMemo(() => {
     const list: Participant[] = [];
     // Self participant tile
@@ -609,7 +699,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
       stream: localUserMediaStream || undefined,
       isSelf: true,
       isMicActive,
-      isCameraActive
+      isCameraActive,
+      isMirrored: isCameraMirrored
     });
     // Remote participants
     participants.forEach((p) => {
@@ -619,7 +710,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       });
     });
     return list;
-  }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, participants]);
+  }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, isCameraMirrored, participants]);
 
   if (errorState) {
     return (
@@ -697,6 +788,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
       }}
       onCloseChat={() => setIsChatOpen(false)}
       onOpenSettings={() => setIsSettingsOpen(true)}
+      isRoomLocked={isRoomLocked}
+      onToggleRoomLock={handleToggleRoomLock}
+      onMuteAllViewers={handleHostMuteAll}
+      onMuteParticipant={handleHostMuteParticipant}
+      onKickParticipant={handleHostKickParticipant}
+      onEndSessionForAll={handleHostEndSession}
+      activeReactions={activeReactions}
+      onSendEmojiReaction={handleSendEmojiReaction}
       childrenChat={
         <ChatSidebar
           roomId={roomId}
@@ -731,6 +830,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
           previewStream={localUserMediaStream}
           telemetry={telemetry}
           latencyHistory={latencyHistory}
+          isCameraMirrored={isCameraMirrored}
+          onToggleCameraMirror={handleToggleCameraMirror}
         />
       }
     />

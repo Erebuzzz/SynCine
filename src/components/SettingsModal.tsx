@@ -38,6 +38,8 @@ export interface SettingsModalProps {
   previewStream?: MediaStream | null;
   telemetry: TelemetryStats;
   latencyHistory: LatencyDataPoint[];
+  isCameraMirrored?: boolean;
+  onToggleCameraMirror?: (mirrored: boolean) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -58,7 +60,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSelectResolution,
   previewStream,
   telemetry,
-  latencyHistory
+  latencyHistory,
+  isCameraMirrored = true,
+  onToggleCameraMirror
 }) => {
   const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'diagnostics'>('audio');
   const [isPlayingTestChime, setIsPlayingTestChime] = useState(false);
@@ -517,10 +521,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Live Mirror Preview */}
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2">
-                  Camera Feed Preview ({RESOLUTION_PRESETS[selectedResolution].width}x
-                  {RESOLUTION_PRESETS[selectedResolution].height})
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                    Camera Feed Preview ({RESOLUTION_PRESETS[selectedResolution].width}x
+                    {RESOLUTION_PRESETS[selectedResolution].height})
+                  </label>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">
+                    {isCameraMirrored ? 'Mirrored' : 'Natural (Unmirrored)'}
+                  </span>
+                </div>
+
                 <div className="w-full aspect-video rounded-2xl bg-black overflow-hidden relative flex items-center justify-center border border-black/[0.08] dark:border-white/[0.1]">
                   {previewStream && previewStream.getVideoTracks().length > 0 ? (
                     <video
@@ -528,7 +538,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       autoPlay
                       playsInline
                       muted
-                      className="w-full h-full object-cover scale-x-[-1]"
+                      className={`w-full h-full object-cover transition-transform duration-300 ${
+                        isCameraMirrored ? 'scale-x-[-1]' : ''
+                      }`}
                     />
                   ) : (
                     <div className="text-xs text-white/50 flex flex-col items-center gap-1.5">
@@ -540,6 +552,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Preset: {selectedResolution} ({RESOLUTION_PRESETS[selectedResolution].width}x{RESOLUTION_PRESETS[selectedResolution].height})
                   </div>
                 </div>
+              </div>
+
+              {/* Flip Camera Horizontally (Mirror Mode) */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+                <div>
+                  <span className="block text-xs font-semibold text-[var(--text-primary)]">
+                    Flip Camera Horizontally (Mirror Mode)
+                  </span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                    Flips your webcam view horizontally for yourself and all watchroom viewers
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onToggleCameraMirror?.(!isCameraMirrored)}
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                    isCameraMirrored ? 'bg-[var(--accent)]' : 'bg-black/20 dark:bg-white/20'
+                  }`}
+                  title="Toggle horizontal mirror"
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-0.5 ${
+                      isCameraMirrored ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           )}
