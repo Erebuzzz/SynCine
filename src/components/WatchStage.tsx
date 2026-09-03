@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DraggableTile } from './DraggableTile';
 import { formatRoomCode } from '../lib/appwrite';
 import {
@@ -27,11 +27,18 @@ import {
   VideoOff,
   Settings,
   ShieldAlert,
-  Smile
+  Smile,
+  Pin,
+  PinOff,
+  Command,
+  HelpCircle,
+  FlipHorizontal
 } from 'lucide-react';
-import { EmojiReactions, FloatingReaction } from './EmojiReactions';
+import { EmojiReactions, type FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
 import { HostControlsModal } from './HostControlsModal';
+import { ShortcutsModal } from './ShortcutsModal';
+import { DrmGuideModal } from './DrmGuideModal';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
 
@@ -57,6 +64,8 @@ interface WatchStageProps {
   participants: Participant[];
   isMicActive: boolean;
   isCameraActive?: boolean;
+  isCameraMirrored?: boolean;
+  onToggleCameraMirror?: (mirrored: boolean) => void;
   isSharingScreen: boolean;
   onToggleMic: () => void;
   onToggleCamera?: () => void;
@@ -118,15 +127,19 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     if (!video) return;
 
     if (stream) {
-      video.defaultMuted = isMuted;
-      video.muted = isMuted;
       if (video.srcObject !== stream) {
         video.srcObject = stream;
       }
+      video.muted = isMuted;
+
       const attemptPlay = () => {
-        video.play().catch(() => {});
+        video.play().catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.warn('Playback error encountered:', err);
+          }
+        });
       };
-      video.onloadedmetadata = attemptPlay;
+
       attemptPlay();
 
       const handleTrackChange = () => {
@@ -187,6 +200,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   localFileUrl,
   isMicActive,
   isCameraActive = false,
+  isCameraMirrored = false,
+  onToggleCameraMirror,
   isSharingScreen,
   onToggleMic,
   onToggleCamera,
@@ -195,7 +210,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   onLeaveRoom,
   videoRefCallback,
   childrenChat,
-  childrenSettings,
   unreadChatCount = 0,
   isChatOpen: controlledChatOpen,
   onToggleChat,
@@ -221,6 +235,28 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEmojiTrayOpen, setIsEmojiTrayOpen] = useState(false);
   const [isHostControlsOpen, setIsHostControlsOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
+
+  // Feed Pinning State
+  const [pinnedFeedId, setPinnedFeedId] = useState<string | null>(null);
+
+  // Full Screen Auto-hiding Controls on Mouse Inactivity
+  const [isControlsVisible, setIsControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const spaceTalkActiveRef = useRef(false);
+
+  const resetControlsTimer = useCallback(() => {
+    setIsControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isFullscreen) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setIsControlsVisible(false);
+      }, 2500);
+    }
+  }, [isFullscreen]);
 
   const toggleChat = () => {
     if (onToggleChat) {
@@ -247,7 +283,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     }
   }, [videoRefCallback, localFileUrl, mediaStream]);
 
-
   const toggleMutePeer = (peerId: string) => {
     setMutedPeers((prev) => ({ ...prev, [peerId]: !prev[peerId] }));
   };
@@ -261,11 +296,193 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      mainStageContainerRef.current?.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      mainStageContainerRef.current
+        ?.requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+          resetControlsTimer();
+        })
+        .catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+          setIsControlsVisible(true);
+        })
+        .catch(() => {});
     }
   };
+
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFsChange = () => {
+      const active = Boolean(document.fullscreenElement);
+      setIsFullscreen(active);
+      if (!active) {
+        setIsControlsVisible(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      } else {
+        resetControlsTimer();
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, [resetControlsTimer]);
+
+  // Mouse move listener to show controls in fullscreen
+  useEffect(() => {
+    const handleMouseMove = () => {
+      if (isFullscreen) {
+        resetControlsTimer();
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [isFullscreen, resetControlsTimer]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const isTyping = (el: EventTarget | null) => {
+      if (!el || !(el instanceof HTMLElement)) return false;
+      return (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el.isContentEditable ||
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA'
+      );
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return;
+
+      // Space: Push-to-Talk (Hold space to speak)
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat && !isMicActive && !spaceTalkActiveRef.current) {
+          spaceTalkActiveRef.current = true;
+          onToggleMic();
+        }
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // M: Toggle Mic
+      if (key === 'm') {
+        e.preventDefault();
+        onToggleMic();
+      }
+      // O: Toggle Camera
+      else if (key === 'o' && onToggleCamera) {
+        e.preventDefault();
+        onToggleCamera();
+      }
+      // R: Reactions
+      else if (key === 'r') {
+        e.preventDefault();
+        setIsEmojiTrayOpen((prev) => !prev);
+      }
+      // S: Settings
+      else if (key === 's' && onOpenSettings) {
+        e.preventDefault();
+        onOpenSettings();
+      }
+      // F: Fullscreen
+      else if (key === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+      // Esc: Exit Fullscreen / Close Modals
+      else if (e.key === 'Escape') {
+        if (isShortcutsModalOpen) {
+          setIsShortcutsModalOpen(false);
+        } else if (isDrmGuideOpen) {
+          setIsDrmGuideOpen(false);
+        } else if (isEmojiTrayOpen) {
+          setIsEmojiTrayOpen(false);
+        } else if (isHostControlsOpen) {
+          setIsHostControlsOpen(false);
+        } else if (isChatOpen) {
+          closeChat();
+        } else if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      // \: Camera Mirror Mode
+      else if (e.key === '\\' && onToggleCameraMirror) {
+        e.preventDefault();
+        onToggleCameraMirror(!isCameraMirrored);
+      }
+      // C: Chat
+      else if (key === 'c') {
+        e.preventDefault();
+        toggleChat();
+      }
+      // P: Pin / Unpin Feed
+      else if (key === 'p') {
+        e.preventDefault();
+        setPinnedFeedId((prev) => (prev ? null : 'screen'));
+      }
+      // H: Host Controls
+      else if (key === 'h' && isHost) {
+        e.preventDefault();
+        setIsHostControlsOpen((prev) => !prev);
+      }
+      // I: Copy Invite Link
+      else if (key === 'i') {
+        e.preventDefault();
+        handleCopyInviteLink();
+      }
+      // ?: Shortcuts Cheatsheet
+      else if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setIsShortcutsModalOpen((prev) => !prev);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return;
+
+      // Space Release: Push-to-Talk Mute
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (spaceTalkActiveRef.current) {
+          spaceTalkActiveRef.current = false;
+          if (isMicActive) {
+            onToggleMic();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [
+    isMicActive,
+    isCameraActive,
+    isCameraMirrored,
+    onToggleMic,
+    onToggleCamera,
+    onToggleCameraMirror,
+    onOpenSettings,
+    isShortcutsModalOpen,
+    isDrmGuideOpen,
+    isEmojiTrayOpen,
+    isHostControlsOpen,
+    isChatOpen,
+    isHost
+  ]);
 
   const togglePictureInPicture = async () => {
     if (!mainVideoRef.current) return;
@@ -283,13 +500,26 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const totalUsersInRoom = participants.length;
   const hasActiveMedia = Boolean(mediaStream || localFileUrl);
 
+  // Determine which participant is pinned
+  const pinnedParticipant = pinnedFeedId && pinnedFeedId !== 'screen'
+    ? participants.find((p) => p.id === pinnedFeedId)
+    : null;
+
   return (
     <div
       ref={mainStageContainerRef}
-      className="relative w-screen h-screen bg-white dark:bg-black overflow-hidden flex flex-col font-sans select-none text-[#1D1D1F] dark:text-[#F5F5F7]"
+      className="relative w-screen h-screen bg-black overflow-hidden flex flex-col font-sans select-none text-[#1D1D1F] dark:text-[#F5F5F7]"
     >
-      {/* Top Floating Glass Navigation Header */}
-      <header className="h-14 sm:h-16 px-3 sm:px-6 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative gap-2">
+      {/* Top Floating Navigation Header */}
+      <header
+        className={`transition-all duration-300 z-40 ${
+          isFullscreen
+            ? `absolute top-0 inset-x-0 h-14 sm:h-16 px-3 sm:px-6 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-2 ${
+                isControlsVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
+              }`
+            : 'h-14 sm:h-16 px-3 sm:px-6 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 relative gap-2'
+        }`}
+      >
         {/* Room Info */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <SynLogo size={24} className="sm:w-7 sm:h-7 shrink-0" />
@@ -317,7 +547,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           <button
             onClick={handleCopyInviteLink}
             className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
-            title="Copy watchroom link"
+            title="Copy watchroom link (I)"
           >
             {copiedLink ? <CheckCircle2 size={14} className="text-[#30D158]" /> : <Share2 size={14} />}
             <span className="hidden md:inline">{copiedLink ? 'Copied' : 'Invite'}</span>
@@ -354,26 +584,38 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7]'
                   : 'text-black/30 dark:text-white/30 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7]'
               }`}
-              title="Floating Viewports"
+              title="Floating View"
             >
               <FloatingLayoutIcon size={15} />
             </button>
           </div>
 
+          {/* Shortcuts Quick Button */}
+          <button
+            type="button"
+            onClick={() => setIsShortcutsModalOpen(true)}
+            className="p-1.5 sm:p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+            title="Keyboard Shortcuts (?)"
+          >
+            <Command size={15} />
+          </button>
+
           {/* Chat Toggle */}
           <button
+            type="button"
             onClick={toggleChat}
-            className={`relative p-1.5 sm:p-2 rounded-xl border transition cursor-pointer ${
+            className={`p-1.5 sm:p-2 rounded-xl border transition cursor-pointer relative ${
               isChatOpen
-                ? 'bg-black/[0.08] dark:bg-white/[0.1] text-[#1D1D1F] dark:text-[#F5F5F7] border-black/[0.08] dark:border-white/[0.1]'
+                ? 'bg-[var(--accent)] text-black border-[var(--accent)]'
                 : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08]'
             }`}
-            title="Toggle Watchroom Chat"
+            title="Room Chat (C)"
+            aria-label="Toggle chat sidebar"
           >
             <MessageSquare size={15} />
             {unreadChatCount > 0 && !isChatOpen && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF453A] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                {unreadChatCount}
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#FF453A] text-white text-[9px] font-bold flex items-center justify-center border-2 border-white dark:border-black">
+                {unreadChatCount > 9 ? '9+' : unreadChatCount}
               </span>
             )}
           </button>
@@ -384,7 +626,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               type="button"
               onClick={onOpenSettings}
               className="p-1.5 sm:p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
-              title="Pipeline Settings & Live Diagnostics"
+              title="Pipeline Settings & Live Diagnostics (S)"
               aria-label="Settings"
             >
               <Settings size={15} />
@@ -394,13 +636,26 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       </header>
 
       {/* Main Cinema Viewport */}
-      <main className="flex-1 relative flex flex-col md:flex-row overflow-hidden">
+      <main className="flex-1 relative flex flex-col md:flex-row overflow-hidden bg-black">
         {hasActiveMedia ? (
-          /* State 1: Active Screen Share or Local File Media (Separated 3:1 / 4:1 Layout) */
+          /* State 1: Active Screen Share or Local File Media */
           <>
-            {/* Left: Screen Share Feed (Dominant 3:1 to 4:1 Ratio) */}
-            <div className="flex-1 md:flex-[3] lg:flex-[4] h-full relative flex items-center justify-center bg-black overflow-hidden min-w-0">
-              {localFileUrl ? (
+            {/* Left: Dominant Cinema Viewport (4:1 Ratio in Fullscreen) */}
+            <div
+              className={`group flex-1 ${
+                isFullscreen ? 'md:flex-[5] lg:flex-[6]' : 'md:flex-[3] lg:flex-[4]'
+              } h-full relative flex items-center justify-center bg-black overflow-hidden min-w-0 [isolation:isolate] [transform:translateZ(0)]`}
+            >
+              {/* If a participant's camera feed is pinned, display them large here */}
+              {pinnedParticipant ? (
+                <StreamVideoPlayer
+                  stream={pinnedParticipant.stream}
+                  isMuted={pinnedParticipant.isSelf || mutedPeers[pinnedParticipant.id]}
+                  volume={pinnedParticipant.isSelf ? 0 : volumes[pinnedParticipant.id] ?? 0.8}
+                  isMirrored={pinnedParticipant.isMirrored ?? pinnedParticipant.isSelf}
+                  className="object-contain max-h-full"
+                />
+              ) : localFileUrl ? (
                 <StreamVideoPlayer
                   src={localFileUrl}
                   controls
@@ -413,7 +668,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               ) : mediaStream ? (
                 <StreamVideoPlayer
                   stream={mediaStream}
-                  isMuted={mainVideoMuted}
+                  isMuted={isSharingScreen ? true : mainVideoMuted}
                   volume={mainVideoVolume}
                   className="object-contain max-h-full"
                   onMount={(el) => {
@@ -423,34 +678,88 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 />
               ) : null}
 
-              {/* Movie Audio Track Slider */}
-              {mediaStream && (
-                <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] px-3.5 py-2 rounded-2xl flex items-center gap-2.5 shadow-sm z-20">
+              {/* Feed Pinning Controls & Protected Content Help */}
+              <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                {pinnedParticipant ? (
                   <button
                     type="button"
-                    onClick={() => setMainVideoMuted(!mainVideoMuted)}
-                    className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition cursor-pointer"
+                    onClick={() => setPinnedFeedId(null)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent)] text-black text-xs font-bold shadow-lg hover:opacity-90 transition cursor-pointer"
+                    title="Unpin feed to return to shared cinema stream (P)"
                   >
-                    {mainVideoMuted || mainVideoVolume === 0 ? (
-                      <VolumeX size={15} className="text-[#FF453A]" />
-                    ) : (
-                      <Volume2 size={15} />
-                    )}
+                    <PinOff size={14} />
+                    <span>Pinned: {pinnedParticipant.name} (Click to Unpin)</span>
                   </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={mainVideoMuted ? 0 : mainVideoVolume}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setMainVideoVolume(val);
-                      if (mainVideoRef.current) mainVideoRef.current.volume = val;
-                    }}
-                    className="w-20 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
-                    title="Media Stream Volume"
-                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPinnedFeedId((prev) => (prev === 'screen' ? null : 'screen'))}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md border text-xs font-semibold transition cursor-pointer ${
+                      pinnedFeedId === 'screen'
+                        ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-lg'
+                        : 'bg-black/60 text-white/90 border-white/15 opacity-0 group-hover:opacity-100 hover:bg-black/80'
+                    }`}
+                    title={pinnedFeedId === 'screen' ? 'Unpin Screen Feed (P)' : 'Pin Screen Feed (P)'}
+                  >
+                    {pinnedFeedId === 'screen' ? <PinOff size={14} /> : <Pin size={14} />}
+                    <span>{pinnedFeedId === 'screen' ? 'Pinned' : 'Pin Feed'}</span>
+                  </button>
+                )}
+
+                {/* Hotstar / Netflix DRM black screen helper */}
+                {isSharingScreen && !pinnedParticipant && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDrmGuideOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/25 text-amber-300 border border-amber-500/35 text-xs font-medium backdrop-blur-md hover:bg-amber-500/35 transition cursor-pointer"
+                    title="Having black screen on Hotstar or Netflix? Click for 10-second fix"
+                  >
+                    <HelpCircle size={13} />
+                    <span className="hidden sm:inline">Black Screen on Hotstar/Netflix?</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Movie Audio Track Slider - Automatically muted on presenter screen to eliminate double audio echo */}
+              {mediaStream && !pinnedParticipant && (
+                <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.06] px-3.5 py-2 rounded-2xl flex items-center gap-2.5 shadow-sm z-20">
+                  {isSharingScreen ? (
+                    <div
+                      className="flex items-center gap-1.5 text-xs text-[var(--accent)] font-medium"
+                      title="Audio is muted locally for you to prevent double sound and acoustic mic echo. Viewers hear your stream clearly."
+                    >
+                      <VolumeX size={15} />
+                      <span className="hidden sm:inline text-[11px]">Audio muted locally (echo prevention)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setMainVideoMuted(!mainVideoMuted)}
+                        className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] transition cursor-pointer"
+                      >
+                        {mainVideoMuted || mainVideoVolume === 0 ? (
+                          <VolumeX size={15} className="text-[#FF453A]" />
+                        ) : (
+                          <Volume2 size={15} />
+                        )}
+                      </button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={mainVideoMuted ? 0 : mainVideoVolume}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMainVideoVolume(val);
+                          if (mainVideoRef.current) mainVideoRef.current.volume = val;
+                        }}
+                        className="w-20 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                        title="Media Stream Volume"
+                      />
+                    </>
+                  )}
                 </div>
               )}
 
@@ -466,16 +775,20 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 <button
                   onClick={toggleFullscreen}
                   className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  title={isFullscreen ? 'Exit Fullscreen (F / Esc)' : 'Fullscreen (F)'}
                 >
                   {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Right: Participant Cameras (Clean Separated Column) */}
+            {/* Right: Participant Cameras (Compact 4:1 layout in fullscreen, anti-aliased to prevent corner dead pixels) */}
             {layout === 'theater' && participants.length > 0 && (
-              <aside className="w-full md:w-76 lg:w-80 xl:w-96 h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 shrink-0 z-20">
+              <aside
+                className={`w-full ${
+                  isFullscreen ? 'md:w-52 lg:w-60' : 'md:w-76 lg:w-80 xl:w-96'
+                } h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 shrink-0 z-20`}
+              >
                 <div className="hidden md:flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1 px-1">
                   <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
                     <Sliders size={13} className="text-black/55 dark:text-white/55" />
@@ -492,8 +805,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   return (
                     <div
                       key={p.id}
-                      className="relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] shrink-0"
+                      className="group relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shrink-0 shadow-sm"
                     >
+                      {/* Video Layer */}
                       {hasVideo ? (
                         <StreamVideoPlayer
                           stream={p.stream}
@@ -511,42 +825,52 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                         </div>
                       )}
 
-                      <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl p-2 sm:p-2.5 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
-                        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                          <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate max-w-[80px] sm:max-w-[105px]" title={p.name}>
-                            {p.name}
-                          </span>
-                          {p.isSelf && (
-                            <span className="text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] text-black/60 dark:text-white/60 font-semibold shrink-0">
-                              YOU
-                            </span>
-                          )}
-                        </div>
+                      {/* Pin Feed Button on Hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
+                        }}
+                        className={`absolute top-2 right-2 z-20 p-1.5 rounded-lg backdrop-blur-md border transition cursor-pointer ${
+                          pinnedFeedId === p.id
+                            ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
+                            : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+                        }`}
+                        title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
+                      >
+                        {pinnedFeedId === p.id ? <PinOff size={13} /> : <Pin size={13} />}
+                      </button>
 
+                      {/* Floating Bottom-Left Pill: Name & YOU (No border-t intersection = 0 dead pixels) */}
+                      <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
+                        <span className="text-[11px] font-bold truncate max-w-[80px] sm:max-w-[100px]" title={p.name}>
+                          {p.name}
+                        </span>
+                        {p.isSelf && (
+                          <span className="text-[8px] sm:text-[9px] px-1 py-0.2 rounded bg-white/20 text-white font-bold shrink-0">
+                            YOU
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Floating Bottom-Right Pill: Mic Status & Peer Volume */}
+                      <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-sm">
                         {p.isSelf ? (
-                          <div className="flex items-center gap-1">
-                            {p.isMicActive ? (
-                              <span className="p-0.5 sm:p-1 rounded-md bg-[#30D158]/15 text-[#30D158]">
-                                <LiquidMicIcon size={12} />
-                              </span>
-                            ) : (
-                              <span className="p-0.5 sm:p-1 rounded-md bg-[#FF453A]/15 text-[#FF453A]">
-                                <LiquidMicOffIcon size={12} />
-                              </span>
-                            )}
-                          </div>
+                          p.isMicActive ? (
+                            <span className="text-[#30D158]"><LiquidMicIcon size={12} /></span>
+                          ) : (
+                            <span className="text-[#FF453A]"><LiquidMicOffIcon size={12} /></span>
+                          )
                         ) : (
-                          <div className="flex items-center gap-1 sm:gap-1.5">
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => toggleMutePeer(p.id)}
-                              className="text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] p-1 rounded-lg hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+                              className="text-white/75 hover:text-white p-0.5 transition cursor-pointer"
+                              title={mutedPeers[p.id] ? 'Unmute participant' : 'Mute participant'}
                             >
-                              {mutedPeers[p.id] ? (
-                                <VolumeX size={13} className="text-[#FF453A]" />
-                              ) : (
-                                <Volume2 size={13} />
-                              )}
+                              {mutedPeers[p.id] ? <VolumeX size={12} className="text-[#FF453A]" /> : <Volume2 size={12} />}
                             </button>
                             <input
                               type="range"
@@ -558,7 +882,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                                 const val = parseFloat(e.target.value);
                                 setVolumes((prev) => ({ ...prev, [p.id]: val }));
                               }}
-                              className="hidden md:block w-14 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                              className="hidden md:block w-12 h-1 accent-[var(--accent)] cursor-pointer"
                               title="Peer Volume"
                             />
                           </div>
@@ -589,17 +913,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               </div>
             </div>
 
-            {/* Symmetrical Stage Coverage */}
+            {/* Symmetrical Stage Coverage or Spotlight Pinned View */}
             <div
               className={`w-full h-full max-h-[84vh] mx-auto grid gap-3 sm:gap-6 items-center justify-center ${
-                participants.length <= 1
+                pinnedParticipant || participants.length <= 1
                   ? 'grid-cols-1 max-w-5xl'
                   : participants.length === 2
                   ? 'grid-cols-1 md:grid-cols-2 max-w-6xl'
                   : 'grid-cols-2 max-w-6xl'
               }`}
             >
-              {participants.map((p) => {
+              {(pinnedParticipant ? [pinnedParticipant] : participants).map((p) => {
                 const hasVideo = Boolean(
                   p.stream &&
                   p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
@@ -608,7 +932,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 return (
                   <div
                     key={p.id}
-                    className="relative w-full h-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.1] shadow-2xl flex items-center justify-center"
+                    className="group relative w-full h-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shadow-2xl flex items-center justify-center"
                   >
                     {hasVideo ? (
                       <StreamVideoPlayer
@@ -627,55 +951,72 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       </div>
                     )}
 
-                    {/* Bottom Info Pill */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4 flex items-center justify-between z-10">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-white text-xs sm:text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px]">
-                          {p.name} {p.isSelf && '(You)'}
-                        </span>
-                        {p.isMicActive ? (
-                          <span className="p-1 rounded-md bg-[#30D158]/20 text-[#30D158]">
-                            <LiquidMicIcon size={12} />
-                          </span>
-                        ) : (
-                          <span className="p-1 rounded-md bg-[#FF453A]/20 text-[#FF453A]">
-                            <LiquidMicOffIcon size={12} />
-                          </span>
-                        )}
-                      </div>
+                    {/* Pin button on standby tile */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
+                      }}
+                      className={`absolute top-3 right-3 z-20 p-2 rounded-xl backdrop-blur-md border transition cursor-pointer ${
+                        pinnedFeedId === p.id
+                          ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
+                          : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+                      }`}
+                      title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
+                    >
+                      {pinnedFeedId === p.id ? <PinOff size={15} /> : <Pin size={15} />}
+                    </button>
 
-                      {!p.isSelf && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleMutePeer(p.id)}
-                            className="text-white/80 hover:text-white p-1 rounded transition cursor-pointer"
-                          >
-                            {mutedPeers[p.id] ? <VolumeX size={14} className="text-[#FF453A]" /> : <Volume2 size={14} />}
-                          </button>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              setVolumes((prev) => ({ ...prev, [p.id]: val }));
-                            }}
-                            className="hidden sm:block w-16 h-1 accent-white cursor-pointer"
-                          />
-                        </div>
+                    {/* Bottom Floating Pill Overlays */}
+                    <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
+                      <span className="text-xs sm:text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px]">
+                        {p.name} {p.isSelf && '(You)'}
+                      </span>
+                      {p.isMicActive ? (
+                        <span className="p-1 rounded-md bg-[#30D158]/20 text-[#30D158]">
+                          <LiquidMicIcon size={12} />
+                        </span>
+                      ) : (
+                        <span className="p-1 rounded-md bg-[#FF453A]/20 text-[#FF453A]">
+                          <LiquidMicOffIcon size={12} />
+                        </span>
                       )}
                     </div>
+
+                    {!p.isSelf && (
+                      <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => toggleMutePeer(p.id)}
+                          className="text-white/75 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                          title={mutedPeers[p.id] ? 'Unmute participant' : 'Mute participant'}
+                        >
+                          {mutedPeers[p.id] ? <VolumeX size={15} className="text-[#FF453A]" /> : <Volume2 size={15} />}
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={mutedPeers[p.id] ? 0 : volumes[p.id] ?? 0.8}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setVolumes((prev) => ({ ...prev, [p.id]: val }));
+                          }}
+                          className="w-16 sm:w-24 h-1 accent-[var(--accent)] cursor-pointer"
+                          title="Peer Volume"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Local File Picker Button when in local_file mode */}
-            {mediaMode === 'local_file' && isHost && (
-              <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none z-20">
+            {/* Standby Local File Selector for Host */}
+            {isHost && mediaMode === 'local_file' && (
+              <div className="absolute bottom-20 sm:bottom-24 inset-x-0 flex justify-center pointer-events-none z-20">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -701,7 +1042,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <button
                 onClick={toggleFullscreen}
                 className="p-2.5 bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-black/55 dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] rounded-xl border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl transition cursor-pointer"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                title={isFullscreen ? 'Exit Fullscreen (F / Esc)' : 'Fullscreen (F)'}
               >
                 {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
@@ -721,7 +1062,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] relative"
+                  className="group pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] relative shadow-md"
                 >
                   {hasVideo ? (
                     <StreamVideoPlayer
@@ -740,11 +1081,31 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     </div>
                   )}
 
-                  <div className="absolute inset-x-0 bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl px-2.5 py-1.5 sm:px-3 sm:py-2 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06]">
+                  {/* Pin button on grid tile */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
+                    }}
+                    className={`absolute top-2 right-2 z-20 p-1.5 rounded-lg backdrop-blur-md border transition cursor-pointer ${
+                      pinnedFeedId === p.id
+                        ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
+                        : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+                    }`}
+                    title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
+                  >
+                    {pinnedFeedId === p.id ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+
+                  <div className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
                     <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate">
                       {p.name}
                     </span>
-                    {!p.isSelf && (
+                  </div>
+
+                  {!p.isSelf && (
+                    <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-sm">
                       <input
                         type="range"
                         min="0"
@@ -755,17 +1116,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                           const val = parseFloat(e.target.value);
                           setVolumes((prev) => ({ ...prev, [p.id]: val }));
                         }}
-                        className="hidden sm:block w-14 md:w-16 h-1 accent-black/30 dark:accent-white/30 cursor-pointer"
+                        className="w-12 h-1 accent-[var(--accent)] cursor-pointer"
                       />
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Floating Draggable Viewports (Only rendered when active shared media is broadcasting) */}
+        {/* Floating Draggable Viewports */}
         {hasActiveMedia &&
           layout === 'floating' &&
           participants.map((p, idx) => (
@@ -797,36 +1158,66 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         )}
       </main>
 
-      {/* Bottom Liquid Glass Control Dock */}
-      <footer className="h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between z-40 shrink-0 relative gap-2">
+      {/* Bottom Liquid Glass Control Dock (Auto-hiding and Icon-only in Fullscreen to eliminate distractions) */}
+      <footer
+        className={`transition-all duration-300 z-40 ${
+          isFullscreen
+            ? `absolute bottom-0 inset-x-0 h-16 sm:h-18 px-3 sm:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-2 ${
+                isControlsVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'
+              }`
+            : 'h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 relative gap-2'
+        }`}
+      >
         <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1">
           {/* Studio Microphone Toggle */}
           <button
             onClick={onToggleMic}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isMicActive
                 ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
                 : 'bg-[#FF453A]/15 text-[#FF453A] border border-[#FF453A]/20 hover:bg-[#FF453A]/25'
             }`}
-            title={isMicActive ? 'Mute Microphone' : 'Unmute Microphone'}
+            title={isMicActive ? 'Mute Microphone (M / Hold Space to talk)' : 'Unmute Microphone (M / Hold Space to talk)'}
           >
             {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
-            <span className="hidden sm:inline">{isMicActive ? 'Mic Active' : 'Mic Muted'}</span>
+            {!isFullscreen && <span className="hidden sm:inline">{isMicActive ? 'Mic Active' : 'Mic Muted'}</span>}
           </button>
 
           {/* Studio Camera Toggle */}
           {onToggleCamera && (
             <button
               onClick={onToggleCamera}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isCameraActive
                   ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
                   : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
               }`}
-              title={isCameraActive ? 'Turn Off Camera' : 'Turn On Camera'}
+              title={isCameraActive ? 'Turn Off Camera (O)' : 'Turn On Camera (O)'}
             >
               {isCameraActive ? <Video size={16} /> : <VideoOff size={16} />}
-              <span className="hidden sm:inline">{isCameraActive ? 'Camera On' : 'Camera Off'}</span>
+              {!isFullscreen && <span className="hidden sm:inline">{isCameraActive ? 'Camera On' : 'Camera Off'}</span>}
+            </button>
+          )}
+
+          {/* Mirror Camera Mode Toggle */}
+          {onToggleCameraMirror && (
+            <button
+              onClick={() => onToggleCameraMirror(!isCameraMirrored)}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                isCameraMirrored
+                  ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25 hover:bg-[var(--accent)]/20'
+                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+              }`}
+              title={isCameraMirrored ? 'Disable Mirror Mode (\\)' : 'Enable Mirror Mode (\\)'}
+            >
+              <FlipHorizontal size={16} />
+              {!isFullscreen && <span className="hidden sm:inline">Mirror {isCameraMirrored ? 'On' : 'Off'}</span>}
             </button>
           )}
 
@@ -834,16 +1225,21 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {mediaMode === 'screen' && isHost && (
             <button
               onClick={onToggleScreenShare}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isSharingScreen
                   ? 'bg-[#8B7355]/15 dark:bg-[#C8A97E]/15 text-[#8B7355] dark:text-[#C8A97E] border border-[#8B7355]/20 dark:border-[#C8A97E]/20 hover:bg-[#8B7355]/25 dark:hover:bg-[#C8A97E]/25'
                   : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
               }`}
+              title={isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
             >
               <ScreenCastIcon size={16} />
-              <span className="hidden sm:inline">
-                {isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
-              </span>
+              {!isFullscreen && (
+                <span className="hidden sm:inline">
+                  {isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
+                </span>
+              )}
             </button>
           )}
 
@@ -851,87 +1247,104 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {mediaMode === 'local_file' && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]"
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]`}
+              title="Select Video File"
             >
               <CinemaReelIcon size={16} />
-              <span className="hidden sm:inline">Select Video File</span>
+              {!isFullscreen && <span className="hidden sm:inline">Select Video File</span>}
             </button>
           )}
 
-          {/* Watchroom Settings */}
+          {/* Settings Trigger */}
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] transition cursor-pointer shrink-0 min-h-[40px]"
-              title="Pipeline Settings & Live Diagnostics"
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]`}
+              title="Pipeline Settings & Diagnostics (S)"
             >
               <Settings size={16} />
-              <span className="hidden md:inline">Settings</span>
+              {!isFullscreen && <span className="hidden sm:inline">Settings</span>}
             </button>
           )}
 
-          {/* Custom SVG Emoji Reactions Tray Trigger */}
+          {/* Emoji Reactions Trigger */}
           {onSendEmojiReaction && (
-            <button
-              type="button"
-              onClick={() => setIsEmojiTrayOpen((prev) => !prev)}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
-                isEmojiTrayOpen
-                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30 shadow-sm'
-                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
-              }`}
-              title="Reactions (10 Custom Cinema Presets)"
-            >
-              <Smile size={16} />
-              <span className="hidden md:inline">React</span>
-            </button>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEmojiTrayOpen((prev) => !prev)}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                  isEmojiTrayOpen
+                    ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
+                    : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
+                }`}
+                title="Cinema Emoji Reactions (R)"
+              >
+                <Smile size={16} />
+                {!isFullscreen && <span className="hidden sm:inline">React</span>}
+              </button>
+
+              <EmojiReactions
+                isOpen={isEmojiTrayOpen}
+                onClose={() => setIsEmojiTrayOpen(false)}
+                onSendReaction={onSendEmojiReaction}
+                activeReactions={activeReactions || []}
+              />
+            </div>
           )}
 
-          {/* Host Controls Trigger (Host Only) */}
+          {/* Host Controls Trigger (Only visible to host) */}
           {isHost && (
-            <button
-              type="button"
-              onClick={() => setIsHostControlsOpen(true)}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-[var(--accent)]/15 hover:bg-[var(--accent)]/25 text-[var(--accent)] border border-[var(--accent)]/25 transition cursor-pointer shrink-0 min-h-[40px]"
-              title="Host Controls"
-            >
-              <ShieldAlert size={16} />
-              <span className="hidden md:inline">Host Controls</span>
-            </button>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsHostControlsOpen((prev) => !prev)}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                  isHostControlsOpen
+                    ? 'bg-[#C8A97E] text-black border border-[#C8A97E]'
+                    : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
+                }`}
+                title="Room Host Controls (H)"
+              >
+                <ShieldAlert size={16} />
+                {!isFullscreen && <span className="hidden sm:inline">Host Controls</span>}
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Leave Watchroom */}
-        <div className="shrink-0">
+        {/* Right Dock Controls: Leave Room */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onLeaveRoom}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/15 hover:bg-[#FF453A]/25 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer min-h-[40px]"
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+            } text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]`}
+            title="Leave Watchroom"
           >
-            <LogOut size={15} />
-            <span className="hidden sm:inline">Leave</span>
+            <LogOut size={16} />
+            {!isFullscreen && <span className="hidden sm:inline">Leave</span>}
           </button>
         </div>
       </footer>
 
-      {/* Floating Emoji Reactions Layer & Tray */}
-      <EmojiReactions
-        isOpen={isEmojiTrayOpen}
-        onClose={() => setIsEmojiTrayOpen(false)}
-        onSendReaction={(id) => {
-          onSendEmojiReaction?.(id);
-        }}
-        activeReactions={activeReactions || []}
-      />
-
-      {/* Host Controls Modal (Host Only) */}
+      {/* Host Controls Modal */}
       {isHost && (
         <HostControlsModal
           isOpen={isHostControlsOpen}
           onClose={() => setIsHostControlsOpen(false)}
           roomId={roomId}
           roomName={roomName}
-          isRoomLocked={isRoomLocked || false}
+          isRoomLocked={Boolean(isRoomLocked)}
           onToggleRoomLock={onToggleRoomLock || (() => {})}
           participants={participants}
           onMuteAll={onMuteAllViewers || (() => {})}
@@ -941,7 +1354,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         />
       )}
 
-      {childrenSettings}
+      {/* Keyboard Shortcuts Modal */}
+      <ShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
+
+      {/* Hotstar / Netflix DRM Guide Modal */}
+      <DrmGuideModal
+        isOpen={isDrmGuideOpen}
+        onClose={() => setIsDrmGuideOpen(false)}
+      />
     </div>
   );
 };

@@ -9,7 +9,15 @@ import {
   Cpu,
   Wifi,
   Sliders,
-  ShieldCheck
+  ShieldCheck,
+  Command,
+  MonitorPlay,
+  FlipHorizontal,
+  Pin,
+  MessageSquare,
+  Smile,
+  Shield,
+  Copy
 } from 'lucide-react';
 import {
   VideoResolution,
@@ -18,6 +26,7 @@ import {
   playAudioOutputTestChime
 } from '../lib/media-capture';
 import { TelemetryStats, LatencyDataPoint } from '../lib/diagnostics';
+import { DrmGuideModal } from './DrmGuideModal';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -77,9 +86,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isCameraMirrored = false,
   onToggleCameraMirror
 }) => {
-  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'diagnostics'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'shortcuts' | 'diagnostics'>('audio');
   const [isPlayingTestChime, setIsPlayingTestChime] = useState(false);
   const [audioInputLevel, setAudioInputLevel] = useState(0);
+  const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
@@ -304,7 +314,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Switcher */}
         <div className="px-4 sm:px-6 pt-3 sm:pt-4 shrink-0">
-          <div className="grid grid-cols-3 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-xl sm:rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
+          <div className="grid grid-cols-4 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-xl sm:rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
             <button
               type="button"
               onClick={() => setActiveTab('audio')}
@@ -328,8 +338,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Video size={14} />
-              <span className="hidden sm:inline">Video & Quality</span>
+              <span className="hidden sm:inline">Video</span>
               <span className="sm:hidden">Video</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('shortcuts')}
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
+                activeTab === 'shortcuts'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              <Command size={14} />
+              <span className="hidden sm:inline">Shortcuts</span>
+              <span className="sm:hidden">Keys</span>
             </button>
 
             <button
@@ -595,7 +619,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: DIAGNOSTICS & TELEMETRY */}
+          {/* TAB 3: KEYBOARD SHORTCUTS & DRM GUIDE */}
+          {activeTab === 'shortcuts' && (
+            <div className="space-y-4">
+              {/* Hotstar & Netflix DRM Helper Card */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start justify-between gap-3 text-xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500 shrink-0 mt-0.5">
+                    <MonitorPlay size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-[var(--text-primary)]">
+                      Screen Sharing Hotstar, Netflix, or Prime?
+                    </h4>
+                    <p className="text-black/60 dark:text-white/60 mt-0.5 leading-relaxed">
+                      If video shows a black screen with audio playing, disable Hardware Acceleration in your browser settings.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDrmGuideOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-black font-bold text-[11px] shrink-0 hover:opacity-90 transition cursor-pointer"
+                >
+                  View 10s Guide
+                </button>
+              </div>
+
+              {/* Shortcuts Table */}
+              <div className="space-y-2">
+                <h4 className="text-xs uppercase font-bold tracking-wider text-black/45 dark:text-white/45 px-1">
+                  Active Keyboard Shortcuts
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { key: 'M', label: 'Mute / Unmute Microphone', icon: <Mic size={13} /> },
+                    { key: 'Space', label: 'Push-to-Talk (Hold to speak)', icon: <Mic size={13} /> },
+                    { key: 'O', label: 'Camera On / Off', icon: <Video size={13} /> },
+                    { key: '\\', label: 'Camera Mirror Mode', icon: <FlipHorizontal size={13} /> },
+                    { key: 'F', label: 'Toggle Full Screen Mode', icon: <Command size={13} /> },
+                    { key: 'Esc', label: 'Exit Full Screen / Close Menus', icon: <Command size={13} /> },
+                    { key: 'P', label: 'Pin / Unpin Active Feed', icon: <Pin size={13} /> },
+                    { key: 'S', label: 'Open Settings & Diagnostics', icon: <Sliders size={13} /> },
+                    { key: 'R', label: 'Open Emoji Reactions Tray', icon: <Smile size={13} /> },
+                    { key: 'C', label: 'Toggle Room Chat Sidebar', icon: <MessageSquare size={13} /> },
+                    { key: 'H', label: 'Host Controls (Host Only)', icon: <Shield size={13} /> },
+                    { key: 'I', label: 'Copy Watchroom Invite Link', icon: <Copy size={13} /> },
+                    { key: '?', label: 'Open Shortcuts Cheatsheet', icon: <Command size={13} /> }
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/[0.05] text-xs"
+                    >
+                      <div className="flex items-center gap-2 text-black/80 dark:text-white/80">
+                        <span className="text-black/45 dark:text-white/45">{item.icon}</span>
+                        <span className="truncate max-w-[180px]">{item.label}</span>
+                      </div>
+                      <kbd className="px-2 py-0.5 rounded-lg bg-black/[0.06] dark:bg-white/[0.1] border border-black/10 dark:border-white/10 font-mono text-[11px] font-bold text-[var(--accent)] shrink-0">
+                        {item.key}
+                      </kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-[11px] text-black/45 dark:text-white/45 text-center pt-1">
+                Shortcuts are automatically paused while typing in text inputs or the chat box.
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: DIAGNOSTICS & TELEMETRY */}
           {activeTab === 'diagnostics' && (
             <div className="space-y-6">
               {/* Smart Diagnosis Advisor Banner */}
@@ -746,6 +841,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      <DrmGuideModal
+        isOpen={isDrmGuideOpen}
+        onClose={() => setIsDrmGuideOpen(false)}
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SynLogo, MeshNetworkIcon, LatencySyncIcon, ScreenCastIcon } from './icons/SynIcons';
-import { X, Shield, Clock, HardDrive, Cpu } from 'lucide-react';
+import { X, Shield, Clock, HardDrive, Cpu, Command, MonitorPlay } from 'lucide-react';
 
 interface DocsModalProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface DocsModalProps {
 }
 
 export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
-  const [activeSection, setActiveSection] = useState<'architecture' | 'sync' | 'lifecycle' | 'privacy'>('architecture');
+  const [activeSection, setActiveSection] = useState<'architecture' | 'sync' | 'lifecycle' | 'privacy' | 'shortcuts'>('architecture');
 
   if (!isOpen) return null;
 
@@ -49,6 +49,7 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
             { id: 'sync', label: 'Drift Sync Engine', icon: LatencySyncIcon },
             { id: 'lifecycle', label: 'Room Lifecycle', icon: Clock },
             { id: 'privacy', label: 'Zero-Storage Privacy', icon: Shield },
+            { id: 'shortcuts', label: 'Shortcuts & DRM', icon: Command },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSection === tab.id;
@@ -196,6 +197,62 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                     <strong>Ephemeral Signaling:</strong> WebRTC SDP offers, answers, and ICE candidate records are protected with Document-Level Security (DLS) and purged automatically.
                   </li>
                 </ul>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'shortcuts' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  Keyboard Shortcuts Reference
+                </h3>
+                <p>
+                  SynCine includes desktop-class hotkeys to control your audio, video, reactions, and fullscreen stage without breaking playback immersion.
+                </p>
+              </div>
+
+              {/* Shortcuts Table */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { key: 'M', label: 'Mute / Unmute Microphone' },
+                  { key: 'Space', label: 'Push-to-Talk (Hold to speak, release to mute)' },
+                  { key: 'O', label: 'Camera On / Off' },
+                  { key: '\\', label: 'Camera Mirror Mode On / Off' },
+                  { key: 'F', label: 'Toggle Full Screen Mode' },
+                  { key: 'Esc', label: 'Exit Full Screen Mode / Close Modals' },
+                  { key: 'P', label: 'Pin / Unpin Focused Video Feed' },
+                  { key: 'S', label: 'Open Settings & Live Diagnostics' },
+                  { key: 'R', label: 'Open Cinema Emoji Reactions Tray' },
+                  { key: 'C', label: 'Toggle Room Chat Drawer' },
+                  { key: 'H', label: 'Open Host Controls Panel (Host Only)' },
+                  { key: 'I', label: 'Copy Watchroom Shareable Invite Link' },
+                  { key: '?', label: 'Open Shortcuts Cheatsheet Modal' }
+                ].map((s) => (
+                  <div
+                    key={s.key}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]"
+                  >
+                    <span className="text-xs text-[var(--text-primary)] truncate max-w-[190px]">{s.label}</span>
+                    <kbd className="px-2 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/[0.1] border border-black/10 dark:border-white/10 font-mono text-[11px] font-bold text-[var(--accent)] shrink-0">
+                      {s.key}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+
+              {/* Hotstar, Netflix & DRM Black Screen Guide */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-amber-500 font-bold">
+                  <MonitorPlay size={16} />
+                  <span>Fixing Black Screen on Hotstar, Netflix, or Prime Video</span>
+                </div>
+                <p className="text-black/70 dark:text-white/70 leading-relaxed text-[11px]">
+                  Protected streaming platforms enforce HDCP hardware encryption via Widevine DRM. When capturing through your browser, GPU hardware acceleration blacks out video frames to prevent recording.
+                </p>
+                <div className="font-semibold text-black/80 dark:text-white/80 text-[11px]">
+                  Solution: Open Chrome Settings (chrome://settings/system) &gt; turn OFF "Use hardware acceleration when available" &gt; click Relaunch. Hotstar and Netflix tabs will now share with full video and audio.
+                </div>
               </div>
             </div>
           )}
