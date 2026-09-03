@@ -32,13 +32,21 @@ import {
   PinOff,
   Command,
   HelpCircle,
-  FlipHorizontal
+  FlipHorizontal,
+  Subtitles,
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import { EmojiReactions, type FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
 import { HostControlsModal } from './HostControlsModal';
 import { ShortcutsModal } from './ShortcutsModal';
 import { DrmGuideModal } from './DrmGuideModal';
+import { YouTubeSyncPlayer } from './YouTubeSyncPlayer';
+import { AmbilightGlow } from './AmbilightGlow';
+import { SubtitleOverlay } from './SubtitleOverlay';
+import { parseSubtitleContent, SubtitleCue } from '../lib/subtitle-parser';
+import { CinemaAudioProcessor, DialogueBoostLevel } from '../lib/audio-processing';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
 
@@ -55,7 +63,10 @@ export interface Participant {
 interface WatchStageProps {
   roomName: string;
   roomId: string;
-  mediaMode: 'screen' | 'local_file';
+  mediaMode: 'screen' | 'local_file' | 'youtube';
+  youtubeVideoId?: string;
+  youtubeSyncState?: { currentTime: number; isPlaying: boolean; timestamp: number } | null;
+  onYouTubeSyncAction?: (state: { currentTime: number; isPlaying: boolean }) => void;
   isHost: boolean;
   currentUserId: string;
   currentUserName: string;
@@ -194,6 +205,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   roomName,
   roomId,
   mediaMode,
+  youtubeVideoId,
+  youtubeSyncState,
+  onYouTubeSyncAction,
   isHost,
   participants,
   mediaStream,
@@ -238,6 +252,41 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [isHostControlsOpen, setIsHostControlsOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
+
+  // Picture-in-Picture State
+  const [isPiPActive, setIsPiPActive] = useState(false);
+
+  // Ambilight State (defaults to true)
+  const [isAmbilightEnabled, setIsAmbilightEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-ambilight') !== 'false';
+    }
+    return true;
+  });
+
+  // External Subtitles State
+  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [subtitleOffset, setSubtitleOffset] = useState<number>(0);
+  const [isSubtitlesVisible, setIsSubtitlesVisible] = useState(true);
+  const [subtitleFontSize, setSubtitleFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const [isSubtitleMenuOpen, setIsSubtitleMenuOpen] = useState(false);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const subtitleFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Audio Processing State (Dialogue Boost & Night Mode)
+  const [dialogueBoost, setDialogueBoost] = useState<DialogueBoostLevel>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('syncine-dialogue-boost') as DialogueBoostLevel) || 'off';
+    }
+    return 'off';
+  });
+  const [nightMode, setNightMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-night-mode') === 'true';
+    }
+    return false;
+  });
+  const audioProcessorRef = useRef<CinemaAudioProcessor | null>(null);
 
   // Feed Pinning State
   const [pinnedFeedId, setPinnedFeedId] = useState<string | null>(null);
@@ -293,6 +342,82 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  // Picture-in-Picture Toggle
+  const togglePictureInPicture = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setIsPiPActive(false);
+      } else if (mainVideoRef.current && document.pictureInPictureEnabled) {
+        await mainVideoRef.current.requestPictureInPicture();
+        setIsPiPActive(true);
+      }
+    } catch (err) {
+      console.warn('Picture-in-picture error:', err);
+    }
+  };
+
+  // Video tracking for subtitles, PiP events, and Cinema Web Audio
+  useEffect(() => {
+    const video = mainVideoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      setVideoCurrentTime(video.currentTime);
+    };
+    const handleEnterPiP = () => setIsPiPActive(true);
+    const handleLeavePiP = () => setIsPiPActive(false);
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('enterpictureinpicture', handleEnterPiP);
+    video.addEventListener('leavepictureinpicture', handleLeavePiP);
+
+    // Attach audio processing for speech clarity & night compression
+    if (!audioProcessorRef.current) {
+      audioProcessorRef.current = new CinemaAudioProcessor();
+    }
+    audioProcessorRef.current.attachMediaElement(video, { dialogueBoost, nightMode });
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('enterpictureinpicture', handleEnterPiP);
+      video.removeEventListener('leavepictureinpicture', handleLeavePiP);
+    };
+  }, [localFileUrl, mediaStream]);
+
+  // Apply audio boost and night mode settings updates dynamically
+  useEffect(() => {
+    audioProcessorRef.current?.applyConfig({ dialogueBoost, nightMode });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('syncine-dialogue-boost', dialogueBoost);
+      localStorage.setItem('syncine-night-mode', nightMode.toString());
+    }
+  }, [dialogueBoost, nightMode]);
+
+  // Persist ambilight state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('syncine-ambilight', isAmbilightEnabled ? 'true' : 'false');
+    }
+  }, [isAmbilightEnabled]);
+
+  // Subtitle file import handler
+  const handleSubtitleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const parsed = parseSubtitleContent(content);
+        setSubtitleCues(parsed);
+        setIsSubtitlesVisible(true);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const toggleFullscreen = () => {
@@ -431,10 +556,25 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         e.preventDefault();
         toggleChat();
       }
+      // Shift+P: Picture-in-Picture
+      if (e.shiftKey && (key === 'p')) {
+        e.preventDefault();
+        togglePictureInPicture();
+      }
       // P: Pin / Unpin Feed
       else if (key === 'p') {
         e.preventDefault();
         setPinnedFeedId((prev) => (prev ? null : 'screen'));
+      }
+      // V: Toggle Subtitles Visibility
+      else if (key === 'v') {
+        e.preventDefault();
+        setIsSubtitlesVisible((prev) => !prev);
+      }
+      // A: Toggle Dynamic Ambilight
+      else if (key === 'a') {
+        e.preventDefault();
+        setIsAmbilightEnabled((prev) => !prev);
       }
       // H: Host Controls
       else if (key === 'h' && isHost) {
@@ -490,21 +630,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     isHost
   ]);
 
-  const togglePictureInPicture = async () => {
-    if (!mainVideoRef.current) return;
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (document.pictureInPictureEnabled) {
-        await mainVideoRef.current.requestPictureInPicture();
-      }
-    } catch (err) {
-      console.warn('Picture-in-Picture failed:', err);
-    }
-  };
-
   const totalUsersInRoom = participants.length;
-  const hasActiveMedia = Boolean(mediaStream || localFileUrl);
+  const hasActiveMedia = Boolean(mediaStream || localFileUrl || (mediaMode === 'youtube' && youtubeVideoId));
 
   // Determine which participant is pinned
   const pinnedParticipant = pinnedFeedId && pinnedFeedId !== 'screen'
@@ -652,6 +779,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isFullscreen ? 'md:flex-[5] lg:flex-[6]' : 'md:flex-[3] lg:flex-[4]'
               } h-full relative flex items-center justify-center bg-black overflow-hidden min-w-0 [isolation:isolate] [transform:translateZ(0)]`}
             >
+              {/* Dynamic Cinema Ambilight Glow */}
+              <AmbilightGlow
+                videoElement={mainVideoRef.current}
+                isEnabled={isAmbilightEnabled && !pinnedParticipant}
+              />
+
               {/* If a participant's camera feed is pinned, display them large here */}
               {pinnedParticipant ? (
                 <StreamVideoPlayer
@@ -661,6 +794,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   isMirrored={pinnedParticipant.isMirrored ?? pinnedParticipant.isSelf}
                   className="object-contain max-h-full"
                 />
+              ) : mediaMode === 'youtube' && youtubeVideoId ? (
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <YouTubeSyncPlayer
+                    videoId={youtubeVideoId}
+                    isHost={isHost}
+                    syncState={youtubeSyncState || null}
+                    onSyncAction={onYouTubeSyncAction}
+                  />
+                </div>
               ) : localFileUrl ? (
                 <StreamVideoPlayer
                   src={localFileUrl}
@@ -683,6 +825,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   }}
                 />
               ) : null}
+
+              {/* Subtitle Overlay */}
+              <SubtitleOverlay
+                cues={subtitleCues}
+                currentTime={videoCurrentTime}
+                offsetSeconds={subtitleOffset}
+                fontSize={subtitleFontSize}
+                isVisible={isSubtitlesVisible}
+              />
 
               {/* Feed Pinning Controls & Protected Content Help */}
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
@@ -1249,6 +1400,169 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             </button>
           )}
 
+          {/* Picture-in-Picture (PiP) Multitasking */}
+          <button
+            type="button"
+            onClick={togglePictureInPicture}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              isPiPActive
+                ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
+                : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
+            }`}
+            title="Picture-in-Picture Floating Window (Shift+P)"
+          >
+            <PictureInPicture2 size={16} />
+            {!isFullscreen && <span className="hidden sm:inline">{isPiPActive ? 'PiP Active' : 'PiP'}</span>}
+          </button>
+
+          {/* Subtitles & Captions Menu */}
+          <div className="relative shrink-0">
+            <input
+              ref={subtitleFileInputRef}
+              type="file"
+              accept=".srt,.vtt,text/vtt"
+              onChange={handleSubtitleFileSelect}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => setIsSubtitleMenuOpen((prev) => !prev)}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                isSubtitleMenuOpen || (subtitleCues.length > 0 && isSubtitlesVisible)
+                  ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
+                  : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
+              }`}
+              title="External Subtitles & Captions (V)"
+            >
+              <Subtitles size={16} />
+              {!isFullscreen && (
+                <span className="hidden sm:inline">
+                  {subtitleCues.length > 0 ? (isSubtitlesVisible ? 'CC On' : 'CC Off') : 'Subtitles'}
+                </span>
+              )}
+            </button>
+
+            {/* Subtitle Settings Popover */}
+            {isSubtitleMenuOpen && (
+              <div className="absolute bottom-full mb-2 left-0 w-64 p-3 rounded-2xl bg-white/95 dark:bg-[#151518]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 shadow-2xl z-50 animate-enter-smooth text-xs select-none">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/10 dark:border-white/10 font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
+                  <span className="flex items-center gap-1.5">
+                    <Subtitles size={14} className="text-[var(--accent)]" />
+                    <span>Subtitles & Timing</span>
+                  </span>
+                  {subtitleCues.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSubtitlesVisible(!isSubtitlesVisible)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                        isSubtitlesVisible ? 'bg-[#30D158]/20 text-[#30D158]' : 'bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50'
+                      }`}
+                    >
+                      {isSubtitlesVisible ? 'Enabled' : 'Hidden'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Upload Button */}
+                <button
+                  type="button"
+                  onClick={() => subtitleFileInputRef.current?.click()}
+                  className="w-full py-2 px-3 mb-2 rounded-xl bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-black/[0.06] dark:border-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] font-semibold flex items-center justify-center gap-2 cursor-pointer transition"
+                >
+                  <FileText size={14} />
+                  <span>{subtitleCues.length > 0 ? 'Replace Subtitles (.srt/.vtt)' : 'Load Subtitles (.srt/.vtt)'}</span>
+                </button>
+
+                {subtitleCues.length > 0 && (
+                  <>
+                    <div className="text-[10px] text-black/50 dark:text-white/50 mb-2">
+                      Loaded {subtitleCues.length} caption cues
+                    </div>
+
+                    {/* Sync Offset Calibration */}
+                    <div className="space-y-1.5 mb-2">
+                      <div className="flex justify-between text-[11px] text-black/60 dark:text-white/60">
+                        <span>Sync Offset</span>
+                        <span className="font-mono font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
+                          {subtitleOffset > 0 ? `+${subtitleOffset.toFixed(1)}s` : `${subtitleOffset.toFixed(1)}s`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSubtitleOffset((prev) => Math.max(-10, prev - 0.5))}
+                          className="px-2 py-1 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-xs font-mono font-bold hover:bg-black/[0.1] dark:hover:bg-white/[0.12] cursor-pointer"
+                          title="Nudge -0.5s"
+                        >
+                          -0.5s
+                        </button>
+                        <input
+                          type="range"
+                          min="-5"
+                          max="5"
+                          step="0.1"
+                          value={subtitleOffset}
+                          onChange={(e) => setSubtitleOffset(parseFloat(e.target.value))}
+                          className="flex-1 h-1.5 accent-[var(--accent)] cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSubtitleOffset((prev) => Math.min(10, prev + 0.5))}
+                          className="px-2 py-1 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-xs font-mono font-bold hover:bg-black/[0.1] dark:hover:bg-white/[0.12] cursor-pointer"
+                          title="Nudge +0.5s"
+                        >
+                          +0.5s
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Size Selector */}
+                    <div className="flex items-center justify-between pt-1 border-t border-black/10 dark:border-white/10">
+                      <span className="text-[11px] text-black/60 dark:text-white/60">Font Size</span>
+                      <div className="flex gap-1">
+                        {(['sm', 'md', 'lg'] as const).map((sz) => (
+                          <button
+                            key={sz}
+                            type="button"
+                            onClick={() => setSubtitleFontSize(sz)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] uppercase font-bold cursor-pointer transition ${
+                              subtitleFontSize === sz
+                                ? 'bg-[var(--accent)] text-black'
+                                : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/50 dark:text-white/50'
+                            }`}
+                          >
+                            {sz}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dynamic Ambilight Quick Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsAmbilightEnabled((prev) => !prev)}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              isAmbilightEnabled
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25'
+                : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+            }`}
+            title="Dynamic Cinema Ambilight Glow (A)"
+          >
+            <Sparkles size={16} className={isAmbilightEnabled ? 'text-amber-400' : ''} />
+            {!isFullscreen && <span className="hidden sm:inline">Glow</span>}
+          </button>
+
           {/* Select Video File (Local File Mode) */}
           {mediaMode === 'local_file' && (
             <button
@@ -1373,7 +1687,16 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       />
 
       {/* Watchroom Settings Modal */}
-      {childrenSettings}
+      {React.isValidElement(childrenSettings)
+        ? React.cloneElement(childrenSettings as React.ReactElement<any>, {
+            isAmbilightEnabled,
+            onToggleAmbilight: setIsAmbilightEnabled,
+            dialogueBoost,
+            onSelectDialogueBoost: setDialogueBoost,
+            nightMode,
+            onToggleNightMode: setNightMode
+          })
+        : childrenSettings}
     </div>
   );
 };

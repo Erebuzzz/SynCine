@@ -25,7 +25,7 @@ import {
 export interface PermanentRoomItem {
   id: string;
   name: string;
-  mediaMode: 'screen' | 'local_file';
+  mediaMode: 'screen' | 'local_file' | 'youtube';
   createdAt?: string;
 }
 

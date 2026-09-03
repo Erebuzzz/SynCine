@@ -7,6 +7,8 @@ import {
   COLLECTIONS,
   generateRoomCode,
   normalizeRoomCode,
+  formatRoomCode,
+  extractYouTubeId,
   Permission,
   Role,
   RoomDocument,
@@ -222,7 +224,12 @@ export const App: React.FC = () => {
     applyISTReflectionCSS(getISTCycleState(), nextTheme);
   };
 
-  const handleCreateRoom = async (name: string, mediaMode: 'screen' | 'local_file', isPermanent: boolean) => {
+  const handleCreateRoom = async (
+    name: string,
+    mediaMode: 'screen' | 'local_file' | 'youtube',
+    isPermanent: boolean,
+    youtubeUrl?: string
+  ) => {
     let user = currentUser;
     if (!user) {
       user = await ensureAnonymousSession();
@@ -237,20 +244,29 @@ export const App: React.FC = () => {
       ? ''
       : new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
 
+    const ytId = youtubeUrl ? extractYouTubeId(youtubeUrl) : undefined;
+
+    const payload: any = {
+      name,
+      hostId: user.$id,
+      mediaMode,
+      participantCount: 1,
+      maxParticipants: MAX_PARTICIPANTS,
+      syncState: '',
+      isPermanent,
+      expiresAt
+    };
+
+    if (ytId) {
+      payload.youtubeVideoId = ytId;
+      payload.youtubeUrl = youtubeUrl;
+    }
+
     await databases.createDocument<RoomDocument>(
       APPWRITE_DATABASE_ID,
       COLLECTIONS.ROOMS,
       newRoomId,
-      {
-        name,
-        hostId: user.$id,
-        mediaMode,
-        participantCount: 1,
-        maxParticipants: MAX_PARTICIPANTS,
-        syncState: '',
-        isPermanent,
-        expiresAt
-      },
+      payload,
       [
         Permission.read(Role.any()),
         Permission.update(Role.any()),
@@ -267,7 +283,7 @@ export const App: React.FC = () => {
       });
     }
 
-    window.history.pushState({}, '', `?room=${newRoomId}`);
+    window.history.pushState({}, '', `/${formatRoomCode(newRoomId)}`);
     setActiveRoomId(newRoomId);
   };
 

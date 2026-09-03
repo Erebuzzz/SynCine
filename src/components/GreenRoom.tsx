@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SynLogo, LiquidMicIcon, LiquidMicOffIcon, ScreenCastIcon } from './icons/SynIcons';
-import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X } from 'lucide-react';
+import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X, Lock, Bell, AlertCircle } from 'lucide-react';
+import { ID } from 'appwrite';
 import {
   formatRoomCode,
   databases,
@@ -14,7 +15,8 @@ interface GreenRoomProps {
   roomName: string;
   roomId: string;
   initialUserName: string;
-  mediaMode: 'screen' | 'local_file';
+  currentUserId: string;
+  mediaMode: 'screen' | 'local_file' | 'youtube';
   isHost: boolean;
   onJoin: (userName: string, micEnabled: boolean, videoEnabled: boolean, presentImmediately: boolean) => void;
   onCancel: () => void;
@@ -24,6 +26,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   roomName,
   roomId,
   initialUserName,
+  currentUserId,
   mediaMode,
   isHost,
   onJoin,
@@ -35,6 +38,10 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [liveOccupancy, setLiveOccupancy] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [hostId, setHostId] = useState<string>('');
+  const [hasKnocked, setHasKnocked] = useState(false);
+  const [knockStatus, setKnockStatus] = useState<'idle' | 'waiting' | 'declined'>('idle');
   const [isMirrored] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('syncine-camera-mirrored') === 'true';
@@ -42,14 +49,21 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     return false;
   });
 
-  // Query live room occupancy and subscribe to realtime participant count
+  // Query live room occupancy, lock status, and subscribe to realtime updates
   useEffect(() => {
     let isMounted = true;
 
     databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
       .then((doc) => {
-        if (isMounted && typeof doc.participantCount === 'number') {
+        if (!isMounted) return;
+        if (typeof doc.participantCount === 'number') {
           setLiveOccupancy(doc.participantCount);
+        }
+        if (doc.isLocked) {
+          setIsLocked(true);
+        }
+        if (doc.hostId) {
+          setHostId(doc.hostId);
         }
       })
       .catch(() => {});
@@ -57,8 +71,12 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     const unsubscribe = realtime.subscribe(
       `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.ROOMS}.documents.${roomId}`,
       (event: any) => {
-        if (isMounted && event?.payload?.participantCount !== undefined) {
+        if (!isMounted) return;
+        if (event?.payload?.participantCount !== undefined) {
           setLiveOccupancy(event.payload.participantCount);
+        }
+        if (event?.payload?.isLocked !== undefined) {
+          setIsLocked(event.payload.isLocked);
         }
       }
     );
@@ -68,6 +86,51 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       unsubscribe();
     };
   }, [roomId]);
+
+  // Subscribe to signaling channel for admission notification after knocking
+  useEffect(() => {
+    if (!currentUserId || !hasKnocked) return;
+
+    const unsubscribe = realtime.subscribe(
+      `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.SIGNALING}.documents`,
+      (event: any) => {
+        const payload = event?.payload;
+        if (payload?.roomId === roomId && payload?.receiverId === currentUserId) {
+          if (payload.type === 'knock-admitted') {
+            handleJoinClick(false);
+          } else if (payload.type === 'knock-declined') {
+            setKnockStatus('declined');
+            setHasKnocked(false);
+          }
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUserId, hasKnocked, roomId]);
+
+  const handleKnock = async () => {
+    if (!userName.trim() || !hostId) return;
+    setHasKnocked(true);
+    setKnockStatus('waiting');
+
+    try {
+      await databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        COLLECTIONS.SIGNALING,
+        ID.unique(),
+        {
+          roomId,
+          senderId: currentUserId,
+          receiverId: hostId,
+          type: 'knock',
+          payload: JSON.stringify({ guestName: userName.trim() || 'Guest', guestId: currentUserId })
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to send knock request:', err);
+    }
+  };
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const audioMeterBarRef = useRef<HTMLDivElement | null>(null);
@@ -432,26 +495,54 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
 
             {/* Actions */}
             <div className="space-y-3 pt-1">
-              <button
-                type="button"
-                onClick={() => handleJoinClick(false)}
-                disabled={!userName.trim()}
-                className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
-              >
-                <span>Enter Watchroom</span>
-                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-              </button>
+              {isLocked && !isHost ? (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2.5">
+                    <Lock size={16} className="shrink-0 text-amber-400" />
+                    <span>This watchroom is currently locked. Knock to ask the host for entry.</span>
+                  </div>
 
-              {mediaMode === 'screen' && isHost && (
-                <button
-                  type="button"
-                  onClick={() => handleJoinClick(true)}
-                  disabled={!userName.trim()}
-                  className="w-full py-3 bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium rounded-xl border border-black/[0.06] dark:border-white/[0.08] transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <ScreenCastIcon size={15} />
-                  <span>Present Screen Immediately</span>
-                </button>
+                  {knockStatus === 'declined' && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>The host is unable to admit guests right now.</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleKnock}
+                    disabled={hasKnocked || !userName.trim()}
+                    className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
+                  >
+                    <Bell size={15} className={hasKnocked ? 'animate-bounce text-black' : ''} />
+                    <span>{hasKnocked ? 'Doorbell Sent · Waiting for Host...' : 'Knock on Door'}</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleJoinClick(false)}
+                    disabled={!userName.trim()}
+                    className="w-full py-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black font-semibold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-sm group hover:scale-[1.01]"
+                  >
+                    <span>Enter Watchroom</span>
+                    <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+
+                  {mediaMode === 'screen' && isHost && (
+                    <button
+                      type="button"
+                      onClick={() => handleJoinClick(true)}
+                      disabled={!userName.trim()}
+                      className="w-full py-3 bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium rounded-xl border border-black/[0.06] dark:border-white/[0.08] transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <ScreenCastIcon size={15} />
+                      <span>Present Screen Immediately</span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
 

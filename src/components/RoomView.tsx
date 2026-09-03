@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ID } from 'appwrite';
+import { Bell } from 'lucide-react';
 import {
   databases,
   realtime,
@@ -6,7 +8,8 @@ import {
   COLLECTIONS,
   RoomDocument,
   MAX_PARTICIPANTS,
-  RealtimeResponseEvent
+  RealtimeResponseEvent,
+  extractYouTubeId
 } from '../lib/appwrite';
 import { WebRTCEngine } from '../lib/webrtc';
 import { PlaybackSynchronizer, SyncPacket } from '../lib/sync-engine';
@@ -97,6 +100,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
   // Floating reactions state
   const [activeReactions, setActiveReactions] = useState<FloatingReaction[]>([]);
   const [isRoomLocked, setIsRoomLocked] = useState(false);
+  const [activeKnocks, setActiveKnocks] = useState<{ senderId: string; guestName: string }[]>([]);
+  const [youtubeSyncState, setYoutubeSyncState] = useState<{ currentTime: number; isPlaying: boolean; timestamp: number } | null>(null);
   const [isCameraMirrored, setIsCameraMirrored] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('syncine-camera-mirrored') === 'true';
@@ -113,6 +118,79 @@ export const RoomView: React.FC<RoomViewProps> = ({
       setActiveReactions((prev) => prev.filter((r) => r.id !== id));
     }, 2700);
   }, []);
+
+  const playDoorbellChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.7);
+    } catch {}
+  }, []);
+
+  const handleAdmitGuest = async (senderId: string) => {
+    setActiveKnocks((prev) => prev.filter((k) => k.senderId !== senderId));
+    try {
+      await databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        COLLECTIONS.SIGNALING,
+        ID.unique(),
+        {
+          roomId,
+          senderId: currentUserId,
+          receiverId: senderId,
+          type: 'knock-admitted',
+          payload: '{}'
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to admit guest:', err);
+    }
+  };
+
+  const handleDeclineGuest = async (senderId: string) => {
+    setActiveKnocks((prev) => prev.filter((k) => k.senderId !== senderId));
+    try {
+      await databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        COLLECTIONS.SIGNALING,
+        ID.unique(),
+        {
+          roomId,
+          senderId: currentUserId,
+          receiverId: senderId,
+          type: 'knock-declined',
+          payload: '{}'
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to decline guest:', err);
+    }
+  };
+
+  const handleYouTubeSyncAction = useCallback((state: { currentTime: number; isPlaying: boolean }) => {
+    if (!room || room.hostId !== currentUserId) return;
+    const packet: SyncPacket = {
+      action: state.isPlaying ? 'play' : 'pause',
+      currentTime: state.currentTime,
+      originTimestamp: Date.now()
+    };
+    databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+      syncState: JSON.stringify(packet)
+    }).catch((err) => {
+      console.warn('Failed to sync YouTube state:', err);
+    });
+  }, [room, currentUserId, roomId]);
 
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
@@ -402,10 +480,19 @@ export const RoomView: React.FC<RoomViewProps> = ({
       if (updatedDoc) {
         setRoom(updatedDoc);
 
-        if (updatedDoc.syncState && synchronizerRef.current) {
+        if (updatedDoc.syncState) {
           try {
             const packet: SyncPacket = JSON.parse(updatedDoc.syncState);
-            synchronizerRef.current.applyRemoteUpdate(packet);
+            if (synchronizerRef.current) {
+              synchronizerRef.current.applyRemoteUpdate(packet);
+            }
+            if (packet.originTimestamp) {
+              setYoutubeSyncState({
+                currentTime: packet.currentTime,
+                isPlaying: packet.action === 'play',
+                timestamp: packet.originTimestamp
+              });
+            }
           } catch (err) {
             console.warn('Failed to parse syncState packet:', err);
           }
@@ -413,10 +500,27 @@ export const RoomView: React.FC<RoomViewProps> = ({
       }
     });
 
+    // Subscribe to Signaling channel for doorbell knocks (Host admission)
+    const signalingChannel = `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.SIGNALING}.documents`;
+    const unsubscribeSignaling = realtime.subscribe(signalingChannel, (event: any) => {
+      const payload = event?.payload;
+      if (payload?.roomId === roomId && payload?.receiverId === currentUserId && payload?.type === 'knock') {
+        try {
+          const data = JSON.parse(payload.payload);
+          playDoorbellChime();
+          setActiveKnocks((prev) => {
+            if (prev.some((k) => k.senderId === payload.senderId)) return prev;
+            return [...prev, { senderId: payload.senderId, guestName: data.guestName || 'Guest' }];
+          });
+        } catch {}
+      }
+    });
+
     return () => {
       isMounted = false;
       window.removeEventListener('beforeunload', handleBeforeUnload);
       unsubscribeRoom();
+      unsubscribeSignaling();
 
       if (room && room.hostId !== currentUserId) {
         databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
@@ -754,6 +858,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         roomName={room.name}
         roomId={roomId}
         initialUserName={effectiveUserName}
+        currentUserId={currentUserId}
         mediaMode={room.mediaMode}
         isHost={isHost}
         onJoin={handleGreenRoomJoin}
@@ -766,6 +871,39 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   return (
     <>
+      {/* Knocking Guest Toast Banner (Host only) */}
+      {isHost && activeKnocks.length > 0 && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none select-none">
+          {activeKnocks.map((k) => (
+            <div
+              key={k.senderId}
+              className="pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-black/90 dark:bg-[#151518]/95 backdrop-blur-2xl border border-[var(--accent)]/50 shadow-2xl text-xs text-white animate-enter-smooth"
+            >
+              <Bell size={16} className="text-[var(--accent)] animate-bounce shrink-0" />
+              <span>
+                <strong className="text-[var(--accent)]">{k.guestName}</strong> is knocking to enter the room
+              </span>
+              <div className="flex items-center gap-1.5 ml-2">
+                <button
+                  type="button"
+                  onClick={() => handleAdmitGuest(k.senderId)}
+                  className="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black font-bold rounded-lg transition cursor-pointer"
+                >
+                  Admit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeclineGuest(k.senderId)}
+                  className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-lg transition cursor-pointer"
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {networkStatus !== 'connected' && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-amber-500/90 text-black font-bold text-xs shadow-2xl backdrop-blur-md animate-enter-smooth select-none">
           <div className="w-2 h-2 rounded-full bg-black animate-ping" />
@@ -779,12 +917,15 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
       <WatchStage
         roomName={room.name}
-      roomId={roomId}
-      mediaMode={room.mediaMode}
-      isHost={isHost}
-      currentUserId={currentUserId}
-      currentUserName={effectiveUserName}
-      mediaStream={effectiveMediaStream}
+        roomId={roomId}
+        mediaMode={room.mediaMode}
+        youtubeVideoId={room.youtubeVideoId || (room.youtubeUrl ? (extractYouTubeId(room.youtubeUrl) ?? undefined) : undefined)}
+        youtubeSyncState={youtubeSyncState}
+        onYouTubeSyncAction={handleYouTubeSyncAction}
+        isHost={isHost}
+        currentUserId={currentUserId}
+        currentUserName={effectiveUserName}
+        mediaStream={effectiveMediaStream}
       localFileUrl={localFileUrl}
       participants={displayedParticipants}
       isMicActive={isMicActive}

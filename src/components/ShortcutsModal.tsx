@@ -1,5 +1,5 @@
 import React from 'react';
-import { Command, X, Mic, Video, Smile, Settings, Maximize, FlipHorizontal, MessageSquare, Pin, Shield, Copy } from 'lucide-react';
+import { Command, X, Mic, Video, Smile, Settings, Maximize, FlipHorizontal, MessageSquare, Pin, Shield, Copy, PictureInPicture2, Subtitles, Sparkles } from 'lucide-react';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -21,6 +21,9 @@ const SHORTCUTS: ShortcutItem[] = [
 
   { key: 'F', description: 'Toggle Full Screen Mode', category: 'stage', icon: <Maximize size={14} /> },
   { key: 'Esc', description: 'Exit Full Screen / Close Active Modals', category: 'stage', icon: <Command size={14} /> },
+  { key: 'Shift+P', description: 'Picture-in-Picture Floating Window', category: 'stage', icon: <PictureInPicture2 size={14} /> },
+  { key: 'V', description: 'Toggle Subtitles Overlay On / Off', category: 'stage', icon: <Subtitles size={14} /> },
+  { key: 'A', description: 'Toggle Dynamic Ambilight Glow On / Off', category: 'stage', icon: <Sparkles size={14} /> },
   { key: 'P', description: 'Pin / Unpin Focused Video Feed', category: 'stage', icon: <Pin size={14} /> },
   { key: 'S', description: 'Open Settings Menu & Diagnostics', category: 'stage', icon: <Settings size={14} /> },
 

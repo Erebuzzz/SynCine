@@ -33,19 +33,41 @@ export interface RoomDocument extends Models.Document {
   name: string;
   hostId: string;
   syncState?: string;
-  mediaMode: 'screen' | 'local_file';
+  mediaMode: 'screen' | 'local_file' | 'youtube';
   participantCount?: number;
   maxParticipants?: number;
   isPermanent?: boolean;
   expiresAt?: string;
+  isLocked?: boolean;
+  youtubeVideoId?: string;
+  youtubeUrl?: string;
 }
 
 export interface SignalingDocument extends Models.Document {
   roomId: string;
   senderId: string;
   receiverId: string;
-  type: 'offer' | 'answer' | 'candidate';
+  type: 'offer' | 'answer' | 'candidate' | 'knock' | 'knock-admitted' | 'knock-declined';
   payload: string;
+}
+
+/**
+ * Parses a YouTube URL or video ID into an 11-character video ID.
+ * Supports standard watch, shortened youtu.be, embed, live, and direct ID.
+ */
+export function extractYouTubeId(input: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const watchMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch && watchMatch[1]) return watchMatch[1];
+  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch && shortMatch[1]) return shortMatch[1];
+  const embedMatch = trimmed.match(/youtube\.com\/(?:embed|live|shorts|v)\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch && embedMatch[1]) return embedMatch[1];
+  return null;
 }
 
 export interface MessageDocument extends Models.Document {

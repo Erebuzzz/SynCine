@@ -113,21 +113,70 @@ sequenceDiagram
 
 ---
 
+## Locked Room Doorbell & Knocking Protocol
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Guest as Guest (Green Room)
+    participant Appwrite as Appwrite Realtime / DB
+    participant Host as Host (Active Stage)
+
+    Note over Guest,Host: Room is Locked by Host (isLocked = true)
+    Guest->>Appwrite: Create Knock Signal (type: knock, receiverId: hostId)
+    Appwrite-->>Host: Realtime Push Knock Notification
+    Host->>Host: Synthesize Web Audio Doorbell Chime
+    Host->>Host: Display Top Floating Admit / Decline Banner
+    alt Host Clicks Admit
+        Host->>Appwrite: Create Signal (type: knock-admitted, receiverId: guestId)
+        Appwrite-->>Guest: Realtime Push knock-admitted
+        Guest->>Guest: Automatically Transition from Green Room into Watchroom
+    else Host Clicks Decline
+        Host->>Appwrite: Create Signal (type: knock-declined, receiverId: guestId)
+        Appwrite-->>Guest: Realtime Push knock-declined
+        Guest->>Guest: Display Notice: Host is unable to admit guests right now
+    end
+```
+
+---
+
 ## Core Capabilities
 
-### 1. Dual Playback Modes
-- **Screen / Tab Sharing:** The host captures a tab or application window with `getDisplayMedia`. Audio and video tracks are negotiated via H.264 over direct WebRTC peer connections.
+### 1. Tri-Mode Cinema Streaming
+- **Screen / Tab Sharing:** The host captures a tab or application window with `getDisplayMedia`. Audio and video tracks are negotiated via H.264 over direct WebRTC peer connections. Presenter audio is muted locally to prevent acoustic feedback loops and double audio echo.
 - **Local File Sync:** Zero upload bandwidth mode where participants drop identical local video files into their browsers (`URL.createObjectURL(file)`). Playback state (play, pause, seek) synchronizes with round-trip latency compensation.
+- **YouTube Cinema Sync:** Zero bandwidth streaming directly from YouTube CDN in 4K and 1080p. The host controls playback and seeking while all guests remain synchronized with drift compensation.
 
-### 2. Participant Limits & Security
+### 2. Cinema Audio & Visual Enhancements
+- **Dynamic Cinema Ambilight:** GPU-accelerated canvas ambient lighting that samples real-time edge colors at 32x18 resolution and diffuses a soft reactive backlight glow behind the cinema player.
+- **Speech Clarity EQ (Dialogue Booster):** Web Audio peaking equalizer filter calibrated at 2.5 kHz (+3.5 dB or +6.0 dB) to elevate human speech frequencies over intense background scores.
+- **Night Mode Dynamics Compression:** Dynamics compressor node that automatically tames sudden explosive sound effects while gently lifting whisper dialogues for late-night listening.
+- **External Subtitles Engine:** High-speed SubRip (`.srt`) and WebVTT (`.vtt`) parser with binary search cue matching, font sizing, and fine-grained +/-10s offset calibration.
+- **Picture-in-Picture (PiP):** Floating multitasking video window with instant toggle hotkey (`Shift+P`).
+
+### 3. Participant Limits & Security
 - **Strict Capacity:** Limited to a maximum of 4 participants per room to guarantee low P2P mesh CPU and bandwidth overhead.
+- **Host Room Locking & Doorbell:** Hosts can lock the room. Guests in the Green Room knock to request admission, triggering a synthesized doorbell chime on the host's screen.
 - **Document-Level Security (DLS):** Ephemeral WebRTC signaling documents (`signaling`) are restricted so only the intended recipient can read the SDP payloads.
 - **Automated Ephemeral Cleanup:** An Appwrite serverless function executes on a 5-minute cron schedule (`*/5 * * * *`) to purge signaling documents older than 10 minutes.
 
-### 3. Cross-Browser Optimization
-- **Safari Audio Guard:** Detects WebKit/Safari user agents and omits audio constraints on `getDisplayMedia` to prevent fatal `DOMException` errors.
-- **H.264 Codec Priority:** WebRTC transceivers set codec preferences prioritizing `video/h264` for macOS and iOS hardware decoding.
-- **Pointer-Safe Floating Viewport:** Drag participant video tiles freely across the stage with pointer capture (`setPointerCapture`) and `touchAction: none` to isolate dragging from page scroll or zoom.
+### 4. Keyboard Shortcuts
+- `M`: Mute / Unmute Microphone
+- `Space`: Push-to-Talk (Hold to speak, release to mute)
+- `O`: Camera On / Off
+- `\`: Camera Mirror Mode On / Off
+- `F`: Toggle Full Screen
+- `Esc`: Exit Full Screen / Close Active Modals
+- `Shift+P`: Picture-in-Picture Floating Window
+- `V`: Toggle Subtitles Visibility
+- `A`: Toggle Dynamic Ambilight Glow
+- `P`: Pin / Unpin Focused Video Feed
+- `S`: Settings Menu & Pipeline Diagnostics
+- `R`: Cinema Emoji Reactions Tray
+- `C`: Toggle Room Chat Sidebar
+- `H`: Host Controls Panel (Host Only)
+- `I`: Copy Clean Watchroom Invite Link (`/e89-ag8-zm5`)
+- `?`: Open Keyboard Shortcuts Cheatsheet
 
 ---
 

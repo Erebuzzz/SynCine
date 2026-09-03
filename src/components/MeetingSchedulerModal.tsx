@@ -34,7 +34,7 @@ export interface ScheduledMeeting {
   date: string; // YYYY-MM-DD
   time: string; // HH:mm
   durationMinutes: number;
-  mediaMode: 'screen' | 'local_file';
+  mediaMode: 'screen' | 'local_file' | 'youtube';
   description?: string;
   createdAt: string;
 }

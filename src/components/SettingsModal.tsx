@@ -17,7 +17,11 @@ import {
   MessageSquare,
   Smile,
   Shield,
-  Copy
+  Copy,
+  Sparkles,
+  Moon,
+  Volume2,
+  Subtitles
 } from 'lucide-react';
 import {
   VideoResolution,
@@ -26,6 +30,7 @@ import {
   playAudioOutputTestChime
 } from '../lib/media-capture';
 import { TelemetryStats, LatencyDataPoint } from '../lib/diagnostics';
+import { DialogueBoostLevel } from '../lib/audio-processing';
 import { DrmGuideModal } from './DrmGuideModal';
 
 export interface SettingsModalProps {
@@ -49,6 +54,12 @@ export interface SettingsModalProps {
   latencyHistory?: LatencyDataPoint[];
   isCameraMirrored?: boolean;
   onToggleCameraMirror?: (mirrored: boolean) => void;
+  isAmbilightEnabled?: boolean;
+  onToggleAmbilight?: (enabled: boolean) => void;
+  dialogueBoost?: DialogueBoostLevel;
+  onSelectDialogueBoost?: (level: DialogueBoostLevel) => void;
+  nightMode?: boolean;
+  onToggleNightMode?: (enabled: boolean) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -84,9 +95,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   },
   latencyHistory = [],
   isCameraMirrored = false,
-  onToggleCameraMirror
+  onToggleCameraMirror,
+  isAmbilightEnabled: propAmbilight,
+  onToggleAmbilight,
+  dialogueBoost: propDialogueBoost,
+  onSelectDialogueBoost,
+  nightMode: propNightMode,
+  onToggleNightMode
 }) => {
-  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'shortcuts' | 'diagnostics'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'cinema' | 'shortcuts' | 'diagnostics'>('audio');
+  const [localAmbilight, setLocalAmbilight] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-ambilight') !== 'false';
+    }
+    return true;
+  });
+  const [localDialogueBoost, setLocalDialogueBoost] = useState<DialogueBoostLevel>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('syncine-dialogue-boost') as DialogueBoostLevel) || 'off';
+    }
+    return 'off';
+  });
+  const [localNightMode, setLocalNightMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-night-mode') === 'true';
+    }
+    return false;
+  });
+
+  const effectiveAmbilight = propAmbilight !== undefined ? propAmbilight : localAmbilight;
+  const effectiveDialogueBoost = propDialogueBoost !== undefined ? propDialogueBoost : localDialogueBoost;
+  const effectiveNightMode = propNightMode !== undefined ? propNightMode : localNightMode;
+
+  const handleToggleAmbilight = (val: boolean) => {
+    setLocalAmbilight(val);
+    if (onToggleAmbilight) onToggleAmbilight(val);
+    if (typeof window !== 'undefined') localStorage.setItem('syncine-ambilight', val ? 'true' : 'false');
+  };
+
+  const handleSelectDialogueBoost = (level: DialogueBoostLevel) => {
+    setLocalDialogueBoost(level);
+    if (onSelectDialogueBoost) onSelectDialogueBoost(level);
+    if (typeof window !== 'undefined') localStorage.setItem('syncine-dialogue-boost', level);
+  };
+
+  const handleToggleNightMode = (val: boolean) => {
+    setLocalNightMode(val);
+    if (onToggleNightMode) onToggleNightMode(val);
+    if (typeof window !== 'undefined') localStorage.setItem('syncine-night-mode', val ? 'true' : 'false');
+  };
+
   const [isPlayingTestChime, setIsPlayingTestChime] = useState(false);
   const [audioInputLevel, setAudioInputLevel] = useState(0);
   const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
@@ -314,32 +372,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Switcher */}
         <div className="px-4 sm:px-6 pt-3 sm:pt-4 shrink-0">
-          <div className="grid grid-cols-4 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-xl sm:rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
+          <div className="grid grid-cols-5 p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-xl sm:rounded-2xl border border-black/[0.06] dark:border-white/[0.08] text-xs">
             <button
               type="button"
               onClick={() => setActiveTab('audio')}
-              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1 sm:gap-1.5 font-semibold cursor-pointer ${
                 activeTab === 'audio'
                   ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <Mic size={14} />
-              <span>Audio</span>
+              <Mic size={13} />
+              <span className="hidden sm:inline">Audio</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('video')}
-              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 sm:gap-2 font-semibold cursor-pointer ${
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1 sm:gap-1.5 font-semibold cursor-pointer ${
                 activeTab === 'video'
                   ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <Video size={14} />
+              <Video size={13} />
               <span className="hidden sm:inline">Video</span>
-              <span className="sm:hidden">Video</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('cinema')}
+              className={`py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1 sm:gap-1.5 font-semibold cursor-pointer ${
+                activeTab === 'cinema'
+                  ? 'bg-white dark:bg-white/[0.12] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              <Sparkles size={13} className={activeTab === 'cinema' ? 'text-amber-400' : ''} />
+              <span className="hidden sm:inline">Cinema</span>
             </button>
 
             <button
@@ -619,7 +689,122 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: KEYBOARD SHORTCUTS & DRM GUIDE */}
+          {/* TAB 3: CINEMA & AUDIO ENHANCEMENTS */}
+          {activeTab === 'cinema' && (
+            <div className="space-y-5 animate-enter-smooth">
+              {/* Dynamic Cinema Ambilight Glow */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+                <div className="pr-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles size={16} className="text-amber-400" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Dynamic Cinema Ambilight Glow
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+                    Samples edge frames in real time and diffuses a soft ambient glow behind the cinema player to reduce eye fatigue and heighten immersion.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleAmbilight(!effectiveAmbilight)}
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                    effectiveAmbilight ? 'bg-[var(--accent)]' : 'bg-black/20 dark:bg-white/20'
+                  }`}
+                  title="Toggle Cinema Ambilight"
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-0.5 ${
+                      effectiveAmbilight ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Speech Clarity (Dialogue Booster) */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Volume2 size={16} className="text-[var(--accent)]" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Speech Clarity EQ (Dialogue Booster)
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">Peaking EQ (2.5 kHz)</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-tertiary)] mb-3 leading-relaxed">
+                  Applies a Web Audio equalizer curve targeted at speech consonant frequencies so actor voices remain crystal clear even over booming movie soundtracks.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { id: 'off', label: 'Off', desc: 'Natural sound mix' },
+                      { id: 'medium', label: 'Medium', desc: '+3.5 dB speech lift' },
+                      { id: 'high', label: 'High', desc: '+6.0 dB vocal isolation' }
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleSelectDialogueBoost(opt.id)}
+                      className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                        effectiveDialogueBoost === opt.id
+                          ? 'bg-black/[0.06] dark:bg-white/[0.1] border-[var(--accent)] text-[var(--text-primary)] shadow-sm'
+                          : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] text-[var(--text-secondary)] hover:border-black/[0.12] dark:hover:border-white/[0.12]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold">{opt.label}</span>
+                        {effectiveDialogueBoost === opt.id && <Check size={13} className="text-[var(--accent)]" />}
+                      </div>
+                      <span className="text-[10px] text-[var(--text-tertiary)] leading-tight block">
+                        {opt.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Night Mode Dynamics Compression */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+                <div className="pr-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Moon size={16} className="text-indigo-400" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Night Mode (Dynamic Range Compression)
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+                    Studio dynamics compressor that automatically cushions sudden loud explosions and action sequences while softly raising whisper volumes for late-night viewing.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleNightMode(!effectiveNightMode)}
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                    effectiveNightMode ? 'bg-[var(--accent)]' : 'bg-black/20 dark:bg-white/20'
+                  }`}
+                  title="Toggle Night Mode Compression"
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-0.5 ${
+                      effectiveNightMode ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Picture-in-Picture & Subtitles Quick Tip */}
+              <div className="p-3.5 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center gap-3">
+                <Subtitles size={18} className="text-[var(--accent)] shrink-0" />
+                <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                  External subtitles (.srt and .vtt) can be loaded directly from the cinema dock. Press <strong className="font-mono text-[var(--text-primary)]">V</strong> to toggle captions and <strong className="font-mono text-[var(--text-primary)]">Shift+P</strong> for Picture-in-Picture.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: KEYBOARD SHORTCUTS & DRM GUIDE */}
           {activeTab === 'shortcuts' && (
             <div className="space-y-4">
               {/* Hotstar & Netflix DRM Helper Card */}
@@ -660,6 +845,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     { key: '\\', label: 'Camera Mirror Mode', icon: <FlipHorizontal size={13} /> },
                     { key: 'F', label: 'Toggle Full Screen Mode', icon: <Command size={13} /> },
                     { key: 'Esc', label: 'Exit Full Screen / Close Menus', icon: <Command size={13} /> },
+                    { key: 'Shift+P', label: 'Picture-in-Picture Floating Player', icon: <MonitorPlay size={13} /> },
+                    { key: 'V', label: 'Toggle Subtitles Overlay', icon: <Subtitles size={13} /> },
+                    { key: 'A', label: 'Toggle Cinema Ambilight Glow', icon: <Sparkles size={13} /> },
                     { key: 'P', label: 'Pin / Unpin Active Feed', icon: <Pin size={13} /> },
                     { key: 'S', label: 'Open Settings & Diagnostics', icon: <Sliders size={13} /> },
                     { key: 'R', label: 'Open Emoji Reactions Tray', icon: <Smile size={13} /> },

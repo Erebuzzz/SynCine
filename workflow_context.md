@@ -135,7 +135,32 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - **Root Cause 2 (Inline Callback Ref Playback Interruptions):** Inline `<video ref={(v) => { ... }}>` callbacks caused React to invoke `ref(null)` followed by `ref(videoElement)` on every render, triggering repeated `.play()` calls that interrupted the active media decoder pipeline. Fixed by creating a dedicated, memoized `StreamVideoPlayer` component that isolates `srcObject` binding and volume adjustments from parent render cycles.
   - **Root Cause 3 (Hardware Overlay Clipping):** Added CSS isolation rules (`transform: translateZ(0); backface-visibility: hidden; will-change: transform;`) in `index.css` to ensure video elements get their own dedicated hardware compositing plane.
 
-## 10. Verification & Validation Status
-- **Vitest Suites:** 4/4 test files passed (13/13 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, and performance diagnostics.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 4.55s.
-- **Main Branch:** Synced and pushed to GitHub repository `origin/main`.
+## 10. Cinema Innovations & Audio/Visual Suite
+- **Recommendation 1: Embedded YouTube Cinema Sync (`YouTubeSyncPlayer.tsx`):**
+  - Direct zero-bandwidth streaming from YouTube CDN in 4K/1080p.
+  - Hosts control playback, pause, and seek with drift compensation across all guests.
+  - Guest scrubbers are locked with a tooltip explaining host playback authority.
+- **Recommendation 2: External Subtitle Loader (`subtitle-parser.ts`, `SubtitleOverlay.tsx`):**
+  - High-performance parser for SubRip (.srt) and WebVTT (.vtt) format captions.
+  - High-contrast cinema overlay with dark text-shadow protection, size scaling, and word wrapping.
+  - Subtitle offset calibration slider ([-10.0s ... +10.0s] with +0.5s / -0.5s nudge buttons) and quick 'V' hotkey toggle.
+- **Recommendation 3: Dynamic Cinema Ambilight Glow (`AmbilightGlow.tsx`):**
+  - GPU-accelerated canvas ambient lighting sampling 32x18 edge frames every 120ms with CSS `filter: blur(64px)`.
+  - Diffuses a soft reactive backlight glow behind the cinema player with zero CPU memory overhead.
+  - Quick toggle in dock and keyboard shortcut 'A'.
+- **Recommendation 4: Speech Clarity EQ & Night Mode Dynamics Compression (`audio-processing.ts`):**
+  - Peaking biquad filter at 2.5 kHz (+3.5 dB / +6.0 dB) isolating speech consonant frequencies over heavy movie soundtracks.
+  - Dynamics compressor node taming sudden explosive sound effects while gently raising whisper dialogues.
+  - Persisted to localStorage and accessible via the Cinema tab in SettingsModal.
+- **Recommendation 5: Picture-in-Picture Multitasking:**
+  - One-click native PiP integration via `togglePictureInPicture()`, `enterpictureinpicture` / `leavepictureinpicture` event tracking, dock button, and `Shift+P` keyboard shortcut.
+- **Recommendation 7: Knocking & Doorbell Protocol for Locked Rooms:**
+  - When a host locks the room (`isLocked: true`), guests in the Green Room see a "Knock on Door" button with live doorbell state.
+  - Emits signaling document `type: 'knock'`.
+  - Host receives real-time signal, synthesizes pleasant Web Audio doorbell chime (587 Hz to 880 Hz sine wave), and displays floating banner with Admit and Decline options.
+  - Admitted guests automatically enter the watchroom stage without manual reloading.
+
+## 11. Verification & Validation Status
+- **Vitest Suites:** 7/7 test files passed (27/27 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, performance diagnostics, subtitle parsing, YouTube video ID extraction, and cinema audio processing.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.38s.
+- **Main Branch:** Synced and ready to push to GitHub repository `origin/main`.
