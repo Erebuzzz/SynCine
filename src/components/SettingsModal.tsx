@@ -75,22 +75,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const video = videoPreviewRef.current;
     if (!video) return;
 
+    let videoTrack: MediaStreamTrack | null = null;
+    let attemptPlay: (() => void) | null = null;
+
     if (isOpen && activeTab === 'video' && previewStream && previewStream.getVideoTracks().length > 0) {
-      const videoTrack = previewStream.getVideoTracks()[0];
+      videoTrack = previewStream.getVideoTracks()[0];
       video.defaultMuted = true;
       video.muted = true;
       const videoOnly = new MediaStream([videoTrack]);
       video.srcObject = videoOnly;
 
-      const attemptPlay = () => {
+      attemptPlay = () => {
         video.play().catch(() => {});
       };
       video.onloadedmetadata = attemptPlay;
       attemptPlay();
-      videoTrack.onunmute = attemptPlay;
+
+      videoTrack.addEventListener('unmute', attemptPlay);
     } else {
       video.srcObject = null;
     }
+
+    return () => {
+      if (video) {
+        video.onloadedmetadata = null;
+      }
+      if (videoTrack && attemptPlay) {
+        videoTrack.removeEventListener('unmute', attemptPlay);
+      }
+    };
   }, [isOpen, activeTab, previewStream]);
 
   // Audio level meter for the selected microphone

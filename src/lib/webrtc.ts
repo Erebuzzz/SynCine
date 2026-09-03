@@ -244,8 +244,14 @@ export class WebRTCEngine {
     }
 
     if (offerCollision && isPolite) {
-      console.log(`WebRTC glare collision detected with peer ${peerId}. Polite peer rolling back.`);
-      await pc.setLocalDescription({ type: 'rollback' });
+      if (pc.signalingState === 'have-local-offer') {
+        try {
+          console.log(`WebRTC glare collision detected with peer ${peerId}. Polite peer rolling back.`);
+          await pc.setLocalDescription({ type: 'rollback' });
+        } catch (err) {
+          console.warn(`Rollback failed for peer ${peerId}:`, err);
+        }
+      }
     }
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -273,7 +279,6 @@ export class WebRTCEngine {
   private async handleAnswer(peerId: string, answer: RTCSessionDescriptionInit) {
     const pc = this.peers.get(peerId);
     if (!pc) return;
-    if (this.ignoreOffer.get(peerId)) return;
 
     if (pc.signalingState === 'have-local-offer') {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));

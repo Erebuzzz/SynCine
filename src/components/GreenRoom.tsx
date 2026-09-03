@@ -148,8 +148,11 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     const video = videoPreviewRef.current;
     if (!video) return;
 
+    let videoTrack: MediaStreamTrack | null = null;
+    let attemptPlay: (() => void) | null = null;
+
     if (isVideoOn && previewStream && previewStream.getVideoTracks().length > 0) {
-      const videoTrack = previewStream.getVideoTracks()[0];
+      videoTrack = previewStream.getVideoTracks()[0];
       video.defaultMuted = true;
       video.muted = true;
 
@@ -157,7 +160,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       const videoOnlyStream = new MediaStream([videoTrack]);
       video.srcObject = videoOnlyStream;
 
-      const attemptPlay = () => {
+      attemptPlay = () => {
         video.play().catch((err) => {
           console.warn('Preview video play attempt postponed:', err);
         });
@@ -166,10 +169,19 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       video.onloadedmetadata = attemptPlay;
       attemptPlay();
 
-      videoTrack.onunmute = attemptPlay;
+      videoTrack.addEventListener('unmute', attemptPlay);
     } else {
       video.srcObject = null;
     }
+
+    return () => {
+      if (video) {
+        video.onloadedmetadata = null;
+      }
+      if (videoTrack && attemptPlay) {
+        videoTrack.removeEventListener('unmute', attemptPlay);
+      }
+    };
   }, [previewStream, isVideoOn]);
 
   const handleToggleMic = () => {
