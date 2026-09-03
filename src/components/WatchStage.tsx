@@ -25,8 +25,13 @@ import {
   Sliders,
   Video,
   VideoOff,
-  Settings
+  Settings,
+  ShieldAlert,
+  Smile
 } from 'lucide-react';
+import { EmojiReactions, FloatingReaction } from './EmojiReactions';
+import { SynEmojiId } from './icons/SynEmojiIcons';
+import { HostControlsModal } from './HostControlsModal';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
 
@@ -37,6 +42,7 @@ export interface Participant {
   isSelf?: boolean;
   isMicActive?: boolean;
   isCameraActive?: boolean;
+  isMirrored?: boolean;
 }
 
 interface WatchStageProps {
@@ -65,6 +71,18 @@ interface WatchStageProps {
   onToggleChat?: () => void;
   onCloseChat?: () => void;
   onOpenSettings?: () => void;
+
+  // Host Controls
+  isRoomLocked?: boolean;
+  onToggleRoomLock?: () => void;
+  onMuteAllViewers?: () => void;
+  onMuteParticipant?: (peerId: string) => void;
+  onKickParticipant?: (peerId: string) => void;
+  onEndSessionForAll?: () => void;
+
+  // Emoji Reactions
+  activeReactions?: FloatingReaction[];
+  onSendEmojiReaction?: (emojiId: SynEmojiId) => void;
 }
 
 interface StreamVideoPlayerProps {
@@ -182,7 +200,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   isChatOpen: controlledChatOpen,
   onToggleChat,
   onCloseChat,
-  onOpenSettings
+  onOpenSettings,
+  isRoomLocked,
+  onToggleRoomLock,
+  onMuteAllViewers,
+  onMuteParticipant,
+  onKickParticipant,
+  onEndSessionForAll,
+  activeReactions,
+  onSendEmojiReaction
 }) => {
   const [layout, setLayout] = useState<DisplayLayout>('theater');
   const [volumes, setVolumes] = useState<Record<string, number>>({});
@@ -193,6 +219,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [internalChatOpen, setInternalChatOpen] = useState(false);
   const isChatOpen = controlledChatOpen !== undefined ? controlledChatOpen : internalChatOpen;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEmojiTrayOpen, setIsEmojiTrayOpen] = useState(false);
+  const [isHostControlsOpen, setIsHostControlsOpen] = useState(false);
 
   const toggleChat = () => {
     if (onToggleChat) {
@@ -471,7 +499,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                           stream={p.stream}
                           isMuted={p.isSelf || mutedPeers[p.id]}
                           volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
-                          isMirrored={p.isSelf}
+                          isMirrored={p.isMirrored ?? p.isSelf}
                           className="object-cover"
                         />
                       ) : (
@@ -587,7 +615,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                         stream={p.stream}
                         isMuted={p.isSelf || mutedPeers[p.id]}
                         volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
-                        isMirrored={p.isSelf}
+                        isMirrored={p.isMirrored ?? p.isSelf}
                         className="object-cover"
                       />
                     ) : (
@@ -700,7 +728,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       stream={p.stream}
                       isMuted={p.isSelf || mutedPeers[p.id]}
                       volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
-                      isMirrored={p.isSelf}
+                      isMirrored={p.isMirrored ?? p.isSelf}
                       className="object-cover"
                     />
                   ) : (
@@ -737,8 +765,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         )}
 
-        {/* Floating Draggable Viewports (Docked along right edge to never obstruct shared screen) */}
-        {layout === 'floating' &&
+        {/* Floating Draggable Viewports (Only rendered when active shared media is broadcasting) */}
+        {hasActiveMedia &&
+          layout === 'floating' &&
           participants.map((p, idx) => (
             <DraggableTile
               key={p.id}
@@ -747,7 +776,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 name: p.name,
                 stream: p.stream,
                 isMicActive: p.isMicActive,
-                isSelf: p.isSelf
+                isSelf: p.isSelf,
+                isMirrored: p.isMirrored
               }}
               initialX={typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 280) : 24}
               initialY={80 + idx * 170}
@@ -840,6 +870,36 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <span className="hidden md:inline">Settings</span>
             </button>
           )}
+
+          {/* Custom SVG Emoji Reactions Tray Trigger */}
+          {onSendEmojiReaction && (
+            <button
+              type="button"
+              onClick={() => setIsEmojiTrayOpen((prev) => !prev)}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                isEmojiTrayOpen
+                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30 shadow-sm'
+                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+              }`}
+              title="Reactions (10 Custom Cinema Presets)"
+            >
+              <Smile size={16} />
+              <span className="hidden md:inline">React</span>
+            </button>
+          )}
+
+          {/* Host Controls Trigger (Host Only) */}
+          {isHost && (
+            <button
+              type="button"
+              onClick={() => setIsHostControlsOpen(true)}
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold bg-[var(--accent)]/15 hover:bg-[var(--accent)]/25 text-[var(--accent)] border border-[var(--accent)]/25 transition cursor-pointer shrink-0 min-h-[40px]"
+              title="Host Controls"
+            >
+              <ShieldAlert size={16} />
+              <span className="hidden md:inline">Host Controls</span>
+            </button>
+          )}
         </div>
 
         {/* Leave Watchroom */}
@@ -853,6 +913,33 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </button>
         </div>
       </footer>
+
+      {/* Floating Emoji Reactions Layer & Tray */}
+      <EmojiReactions
+        isOpen={isEmojiTrayOpen}
+        onClose={() => setIsEmojiTrayOpen(false)}
+        onSendReaction={(id) => {
+          onSendEmojiReaction?.(id);
+        }}
+        activeReactions={activeReactions || []}
+      />
+
+      {/* Host Controls Modal (Host Only) */}
+      {isHost && (
+        <HostControlsModal
+          isOpen={isHostControlsOpen}
+          onClose={() => setIsHostControlsOpen(false)}
+          roomId={roomId}
+          roomName={roomName}
+          isRoomLocked={isRoomLocked || false}
+          onToggleRoomLock={onToggleRoomLock || (() => {})}
+          participants={participants}
+          onMuteAll={onMuteAllViewers || (() => {})}
+          onMuteParticipant={onMuteParticipant || (() => {})}
+          onKickParticipant={onKickParticipant || (() => {})}
+          onEndSessionForAll={onEndSessionForAll || (() => {})}
+        />
+      )}
 
       {childrenSettings}
     </div>

@@ -6,11 +6,14 @@ export interface WebRTCEngineOptions {
   roomId: string;
   currentUserId: string;
   currentUserName?: string;
-  onRemoteTrackAdded: (peerId: string, stream: MediaStream) => void;
+  onRemoteTrackAdded: (peerId: string, stream: MediaStream, peerName?: string) => void;
   onPeerDisconnected: (peerId: string) => void;
   onPeerConnected?: (peerId: string) => void;
   onPeerDiscovered?: (peerId: string, userName: string) => void;
   onScreenShareChanged?: (peerId: string, streamId: string | undefined, active: boolean) => void;
+  onHostCommandReceived?: (command: string, targetId?: string) => void;
+  onEmojiReactionReceived?: (emojiId: string, senderName?: string) => void;
+  onCameraMirrorChanged?: (peerId: string, isMirrored: boolean) => void;
 }
 
 export class WebRTCEngine {
@@ -62,6 +65,16 @@ export class WebRTCEngine {
           if (payload && payload.action === 'announce-join') {
             const remoteName = payload.userName || `Viewer ${doc.senderId.slice(-4)}`;
             this.peerNames.set(doc.senderId, remoteName);
+
+            // Rejoin handling: if an old connection exists for this sender, purge it cleanly
+            if (this.peers.has(doc.senderId)) {
+              const oldPc = this.peers.get(doc.senderId);
+              oldPc?.close();
+              this.peers.delete(doc.senderId);
+              this.remoteStreams.delete(doc.senderId);
+              this.pendingCandidates.delete(doc.senderId);
+            }
+
             this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
 
             // Respond with announce-ack so the joining peer immediately learns our identity
@@ -87,6 +100,15 @@ export class WebRTCEngine {
 
             // Ensure peer connection is initialized
             this.getOrCreatePeer(doc.senderId);
+          } else if (payload && payload.action === 'announce-leave') {
+            // Cleanly remove departing peer
+            this.handlePeerLeave(doc.senderId);
+          } else if (payload && payload.action === 'host-command') {
+            this.opts.onHostCommandReceived?.(payload.command, payload.targetId);
+          } else if (payload && payload.action === 'emoji-reaction') {
+            this.opts.onEmojiReactionReceived?.(payload.emojiId, payload.senderName);
+          } else if (payload && payload.action === 'camera-mirror-changed') {
+            this.opts.onCameraMirrorChanged?.(doc.senderId, payload.isMirrored);
           } else if (payload && payload.action === 'screen-cast-started') {
             this.opts.onScreenShareChanged?.(doc.senderId, payload.streamId, true);
           } else if (payload && payload.action === 'screen-cast-stopped') {
@@ -105,7 +127,21 @@ export class WebRTCEngine {
 
   private getOrCreatePeer(peerId: string): RTCPeerConnection {
     let pc = this.peers.get(peerId);
-    if (pc) return pc;
+    if (pc) {
+      if (
+        pc.signalingState === 'closed' ||
+        pc.connectionState === 'closed' ||
+        pc.connectionState === 'failed'
+      ) {
+        pc.close();
+        this.peers.delete(peerId);
+        this.remoteStreams.delete(peerId);
+        this.pendingCandidates.delete(peerId);
+        pc = undefined;
+      } else {
+        return pc;
+      }
+    }
 
     pc = new RTCPeerConnection(this.rtcConfiguration);
 
@@ -146,9 +182,10 @@ export class WebRTCEngine {
         }
       });
 
-      // Crucial: emit a fresh MediaStream wrapper so React detects reference changes
+      // Crucial: emit a fresh MediaStream wrapper and pass peerName so display names are never lost
       const streamWrapper = new MediaStream(stream.getTracks());
-      this.opts.onRemoteTrackAdded(peerId, streamWrapper);
+      const peerName = this.peerNames.get(peerId);
+      this.opts.onRemoteTrackAdded(peerId, streamWrapper, peerName);
     };
 
     pc.onconnectionstatechange = () => {
@@ -316,6 +353,12 @@ export class WebRTCEngine {
 
   private async sendSignal(receiverId: string, type: 'offer' | 'answer' | 'candidate', payload: any) {
     try {
+      const permissions = [
+        Permission.read(Role.any()),
+        typeof Permission.write === 'function'
+          ? Permission.write(Role.any())
+          : Permission.update(Role.any())
+      ];
       await this.db.createDocument(
         this.opts.databaseId,
         'signaling',
@@ -327,12 +370,7 @@ export class WebRTCEngine {
           type,
           payload: JSON.stringify(payload)
         },
-        [
-          Permission.read(Role.any()),
-          typeof Permission.write === 'function'
-            ? Permission.write(Role.any())
-            : Permission.update(Role.any())
-        ]
+        permissions
       );
     } catch (err) {
       console.error(`Failed to send signaling message (${type}) to ${receiverId}:`, err);
@@ -445,6 +483,10 @@ export class WebRTCEngine {
     return this.peers;
   }
 
+  public getPeerName(peerId: string): string | undefined {
+    return this.peerNames.get(peerId);
+  }
+
   public async updateVideoEncodings(maxBitrate: number): Promise<void> {
     for (const pc of this.peers.values()) {
       const senders = pc.getSenders();
@@ -492,7 +534,55 @@ export class WebRTCEngine {
     }
   }
 
+  public async announceLeave(): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'announce-leave',
+        userId: this.opts.currentUserId
+      });
+    } catch (err) {
+      console.warn('Failed to announce leave:', err);
+    }
+  }
+
+  public async broadcastHostCommand(command: string, targetId?: string): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'host-command',
+        command,
+        targetId
+      });
+    } catch (err) {
+      console.warn('Failed to broadcast host command:', err);
+    }
+  }
+
+  public async broadcastEmojiReaction(emojiId: string, senderName: string): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'emoji-reaction',
+        emojiId,
+        senderName
+      });
+    } catch (err) {
+      console.warn('Failed to broadcast emoji reaction:', err);
+    }
+  }
+
+  public async broadcastCameraMirror(isMirrored: boolean): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'camera-mirror-changed',
+        isMirrored
+      });
+    } catch (err) {
+      console.warn('Failed to broadcast camera mirror state:', err);
+    }
+  }
+
   public destroy() {
+    this.announceLeave().catch(() => {});
+
     if (this.unsubscribe) {
       this.unsubscribe();
       this.unsubscribe = undefined;

@@ -7,6 +7,7 @@ export interface DraggableParticipant {
   stream?: MediaStream;
   isMicActive?: boolean;
   isSelf?: boolean;
+  isMirrored?: boolean;
 }
 
 interface DraggableTileProps {
@@ -90,7 +91,7 @@ export const DraggableTile: React.FC<DraggableTileProps> = ({
           autoPlay
           playsInline
           muted={participant.isSelf}
-          className={`w-full h-full object-cover pointer-events-none ${participant.isSelf ? 'scale-x-[-1]' : ''}`}
+          className={`w-full h-full object-cover pointer-events-none ${(participant.isMirrored ?? participant.isSelf) ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center bg-black/[0.03] dark:bg-white/[0.03] text-[var(--text-tertiary)]">
