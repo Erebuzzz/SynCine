@@ -27,6 +27,12 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isMirrored] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-camera-mirrored') === 'true';
+    }
+    return false;
+  });
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const audioMeterBarRef = useRef<HTMLDivElement | null>(null);
@@ -276,7 +282,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover scale-x-[-1]"
+                className={`w-full h-full object-cover transition-transform duration-300 ${isMirrored ? 'scale-x-[-1]' : ''}`}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center bg-black text-[var(--text-secondary)] p-6">

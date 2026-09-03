@@ -98,9 +98,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isRoomLocked, setIsRoomLocked] = useState(false);
   const [isCameraMirrored, setIsCameraMirrored] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('syncine-camera-mirrored') !== 'false';
+      return localStorage.getItem('syncine-camera-mirrored') === 'true';
     }
-    return true;
+    return false;
   });
 
   const triggerReactionAnimation = useCallback((emojiId: SynEmojiId, senderName?: string) => {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SynLogo,
   ScreenCastIcon,
@@ -13,20 +13,39 @@ import {
   Moon,
   BookOpen,
   Shield,
-  FileText
+  FileText,
+  User,
+  Settings,
+  Calendar,
+  Link2,
+  ChevronDown,
+  Lock,
+  Share2,
+  Copy,
+  Check,
+  ExternalLink,
+  Tv,
+  Film
 } from 'lucide-react';
 import type { Models } from 'appwrite';
+import { formatRoomCode } from '../lib/appwrite';
+import { getLocalPermanentRooms, PermanentRoomItem } from './PermanentLinksModal';
 
 interface LobbyProps {
   currentUser: Models.User<Models.Preferences> | null;
   userName: string;
   onUserNameChange: (name: string) => void;
+  avatarUrl?: string;
   onCreateRoom: (name: string, mode: 'screen' | 'local_file', isPermanent: boolean) => Promise<void>;
   onJoinRoom: (roomId: string) => Promise<void>;
   onOpenAuth: () => void;
   onOpenDocs: () => void;
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
+  onOpenProfile: () => void;
+  onOpenPermanentLinks: () => void;
+  onOpenScheduler: () => void;
+  onOpenSettings: () => void;
   onLogout: () => Promise<void>;
   isDark: boolean;
   onToggleTheme: () => void;
@@ -38,12 +57,17 @@ export const Lobby: React.FC<LobbyProps> = ({
   currentUser,
   userName,
   onUserNameChange,
+  avatarUrl = '',
   onCreateRoom,
   onJoinRoom,
   onOpenAuth,
   onOpenDocs,
   onOpenPrivacy,
   onOpenTerms,
+  onOpenProfile,
+  onOpenPermanentLinks,
+  onOpenScheduler,
+  onOpenSettings,
   onLogout,
   isDark,
   onToggleTheme,
@@ -58,9 +82,40 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Profile Dropdown Popover state
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Permanent Rooms on Home
+  const [permanentRooms, setPermanentRooms] = useState<PermanentRoomItem[]>([]);
+  const [copiedHomeRoomId, setCopiedHomeRoomId] = useState<string | null>(null);
+
   // Card mouse-tracking interactive sheen
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [cardSheen, setCardSheen] = useState({ x: 50, y: 50, active: false });
+
+  const isAuthenticated = Boolean(currentUser?.email && currentUser.email.length > 0);
+  const effectiveDisplayName = currentUser?.name || userName || 'Guest';
+
+  // Load permanent rooms
+  useEffect(() => {
+    setPermanentRooms(getLocalPermanentRooms());
+  }, [isProfileMenuOpen, activeTab]);
+
+  // Click outside listener for profile menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
 
   const handleMouseMoveCard = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -74,11 +129,14 @@ export const Lobby: React.FC<LobbyProps> = ({
     setCardSheen((prev) => ({ ...prev, active: false }));
   };
 
-  const isAuthenticated = Boolean(currentUser?.email && currentUser.email.length > 0);
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomName.trim() || !userName.trim()) return;
+
+    if (isPermanent && !isAuthenticated) {
+      onOpenAuth();
+      return;
+    }
 
     setIsLoading(true);
     setErrorMessage(null);
@@ -106,6 +164,30 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   };
 
+  const handleCopyHomeRoom = (id: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const fullUrl = `${origin}/?room=${id}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedHomeRoomId(id);
+    setTimeout(() => setCopiedHomeRoomId(null), 2000);
+  };
+
+  const handleShareHomeRoom = async (room: PermanentRoomItem) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const fullUrl = `${origin}/?room=${room.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `SynCine Watchroom: ${room.name}`,
+          text: `Join my permanent cinema watchroom on SynCine!`,
+          url: fullUrl
+        });
+        return;
+      } catch {}
+    }
+    handleCopyHomeRoom(room.id);
+  };
+
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between select-none z-10">
       {/* Symmetrical Top Header */}
@@ -130,7 +212,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           </button>
         </nav>
 
-        {/* Right: Controls & Auth */}
+        {/* Right: Controls & Interactive Profile Button */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Docs Mobile Trigger */}
           <button
@@ -154,35 +236,171 @@ export const Lobby: React.FC<LobbyProps> = ({
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* Authentication State */}
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-xs text-[var(--text-secondary)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                <span className="font-medium hidden sm:inline">{currentUser?.name || currentUser?.email}</span>
-                <span className="text-[10px] uppercase font-semibold bg-black/[0.08] dark:bg-white/[0.1] px-1.5 py-0.5 rounded text-[var(--text-primary)]">Host</span>
-              </div>
-              <button
-                type="button"
-                onClick={onLogout}
-                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
-                title="Sign out"
-                aria-label="Sign out"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
+          {/* Functional Profile Name Button & Dropdown Menu */}
+          <div className="relative" ref={profileMenuRef}>
             <button
               type="button"
-              onClick={onOpenAuth}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] border border-black/[0.06] dark:border-white/[0.08] text-xs transition cursor-pointer group"
+              title="Profile & Options"
             >
-              <LogIn size={14} />
-              <span className="hidden min-[400px]:inline">Host Sign In</span>
-              <span className="min-[400px]:hidden">Sign In</span>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={effectiveDisplayName}
+                  className="w-5 h-5 rounded-full object-cover border border-[var(--accent)]/50"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] font-bold text-[10px] flex items-center justify-center border border-[var(--accent)]/40">
+                  {effectiveDisplayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="font-semibold text-[var(--text-primary)] max-w-[120px] truncate hidden min-[360px]:inline">
+                {effectiveDisplayName}
+              </span>
+              <ChevronDown
+                size={13}
+                className={`text-[var(--text-secondary)] transition-transform duration-200 ${
+                  isProfileMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
             </button>
-          )}
+
+            {/* Profile Dropdown Popover */}
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-64 p-2 bg-white/95 dark:bg-[#151518]/95 backdrop-blur-xl rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl z-50 animate-enter-smooth select-none">
+                {/* User Info Header */}
+                <div className="px-3 py-2.5 mb-1.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.04] flex items-center gap-2.5">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={effectiveDisplayName}
+                      className="w-8 h-8 rounded-full object-cover border border-[var(--accent)]/60 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] font-bold text-xs flex items-center justify-center border border-[var(--accent)]/50 shrink-0">
+                      {effectiveDisplayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] truncate">
+                      {effectiveDisplayName}
+                    </div>
+                    <div className="text-[10px] text-black/50 dark:text-white/50 truncate">
+                      {isAuthenticated ? currentUser?.email : 'Guest Session'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Menu Item: Profile */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    onOpenProfile();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition cursor-pointer text-left"
+                >
+                  <User size={15} className="text-[var(--accent)]" />
+                  <div>
+                    <div className="leading-tight">Profile</div>
+                    <div className="text-[10px] text-black/45 dark:text-white/45">Change name & photo</div>
+                  </div>
+                </button>
+
+                {/* Menu Item: Permanent Links */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    if (isAuthenticated) {
+                      onOpenPermanentLinks();
+                    } else {
+                      onOpenAuth();
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Link2 size={15} className="text-[var(--accent)]" />
+                    <div>
+                      <div className="leading-tight">Permanent Links</div>
+                      <div className="text-[10px] text-black/45 dark:text-white/45">Manage unexpiring rooms</div>
+                    </div>
+                  </div>
+                  {!isAuthenticated && <Lock size={12} className="text-black/40 dark:text-white/40" />}
+                </button>
+
+                {/* Menu Item: Calendar & Scheduler */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    if (isAuthenticated) {
+                      onOpenScheduler();
+                    } else {
+                      onOpenAuth();
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Calendar size={15} className="text-[var(--accent)]" />
+                    <div>
+                      <div className="leading-tight">Schedule Meeting</div>
+                      <div className="text-[10px] text-black/45 dark:text-white/45">Calendar & email invites</div>
+                    </div>
+                  </div>
+                  {!isAuthenticated && <Lock size={12} className="text-black/40 dark:text-white/40" />}
+                </button>
+
+                {/* Menu Item: Settings */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    onOpenSettings();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#1D1D1F] dark:text-[#F5F5F7] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition cursor-pointer text-left"
+                >
+                  <Settings size={15} className="text-[var(--accent)]" />
+                  <div>
+                    <div className="leading-tight">Settings</div>
+                    <div className="text-[10px] text-black/45 dark:text-white/45">Camera, audio & defaults</div>
+                  </div>
+                </button>
+
+                <div className="my-1.5 border-t border-black/[0.06] dark:border-white/[0.06]" />
+
+                {/* Menu Item: Auth action */}
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#FF453A] hover:bg-[#FF453A]/10 transition cursor-pointer text-left"
+                  >
+                    <LogOut size={15} />
+                    <span>Sign Out</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      onOpenAuth();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition cursor-pointer text-left"
+                  >
+                    <LogIn size={15} />
+                    <span>Sign In as Host</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -219,13 +437,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                 setActiveTab('create');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center font-medium cursor-pointer ${
+              className={`py-2.5 rounded-xl font-medium transition cursor-pointer ${
                 activeTab === 'create'
-                  ? 'bg-white dark:bg-white/[0.14] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                  ? 'bg-white dark:bg-white/10 text-[var(--text-primary)] shadow-xs font-semibold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span>Create Watchroom</span>
+              Host Watchroom
             </button>
             <button
               type="button"
@@ -233,18 +451,19 @@ export const Lobby: React.FC<LobbyProps> = ({
                 setActiveTab('join');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center font-medium cursor-pointer ${
+              className={`py-2.5 rounded-xl font-medium transition cursor-pointer ${
                 activeTab === 'join'
-                  ? 'bg-white dark:bg-white/[0.14] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                  ? 'bg-white dark:bg-white/10 text-[var(--text-primary)] shadow-xs font-semibold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span>Join with Code</span>
+              Join with Code
             </button>
           </div>
 
+          {/* Feedback Message */}
           {errorMessage && (
-            <div className="mb-5 p-3.5 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
+            <div className="mb-5 p-3 rounded-xl bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 text-[var(--destructive)] text-xs flex items-center justify-between">
               <span>{errorMessage}</span>
               <button
                 type="button"
@@ -319,7 +538,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                       <span className={`w-2.5 h-2.5 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
                     <span className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                      Share your browser tab or desktop display.
+                      Share your screen, Chrome tab, or media window with your guests.
                     </span>
                   </div>
 
@@ -420,6 +639,92 @@ export const Lobby: React.FC<LobbyProps> = ({
             </form>
           )}
         </div>
+
+        {/* Permanent Rooms Section on Home (Signed-In Hosts) */}
+        {isAuthenticated && permanentRooms.length > 0 && (
+          <div className="w-full max-w-lg mt-8 p-5 sm:p-6 realistic-glass rounded-2xl sm:rounded-3xl animate-enter-smooth border border-black/[0.06] dark:border-white/[0.06]">
+            <div className="flex items-center justify-between mb-3.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
+                <Link2 size={15} className="text-[var(--accent)]" />
+                <span>Your Permanent Rooms</span>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenPermanentLinks}
+                className="text-[11px] text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+              >
+                View All ({permanentRooms.length})
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {permanentRooms.slice(0, 3).map((room) => {
+                const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                const fullUrl = `${origin}/?room=${room.id}`;
+                const isCopied = copiedHomeRoomId === room.id;
+
+                return (
+                  <div
+                    key={room.id}
+                    className="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between gap-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 rounded bg-[var(--accent)]/15 text-[var(--accent)] shrink-0">
+                          {room.mediaMode === 'screen' ? <Tv size={11} /> : <Film size={11} />}
+                        </span>
+                        <span className="text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] truncate">
+                          {room.name}
+                        </span>
+                        <span className="text-[9px] font-mono px-1 rounded bg-black/[0.05] dark:bg-white/[0.06] text-black/60 dark:text-white/60">
+                          {formatRoomCode(room.id)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-black/40 dark:text-white/40 truncate">
+                        {fullUrl}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyHomeRoom(room.id)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition cursor-pointer ${
+                          isCopied
+                            ? 'bg-[#30D158]/15 text-[#30D158]'
+                            : 'bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-black/75 dark:text-white/75'
+                        }`}
+                        title="Copy URL"
+                      >
+                        {isCopied ? <Check size={11} /> : <Copy size={11} />}
+                        <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareHomeRoom(room)}
+                        className="p-1 rounded bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] text-black/75 dark:text-white/75 transition cursor-pointer"
+                        title="Share"
+                      >
+                        <Share2 size={12} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onJoinRoom(room.id)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--accent)] text-black text-[11px] font-bold hover:opacity-90 transition cursor-pointer"
+                        title="Enter Room"
+                      >
+                        <ExternalLink size={11} />
+                        <span>Launch</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Symmetrical Clean Footer with Privacy & Terms */}

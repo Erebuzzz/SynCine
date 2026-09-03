@@ -23,11 +23,34 @@ import { NotFound } from './components/NotFound';
 import { CustomCursor } from './components/CustomCursor';
 import { LiquidGlassFilters } from './components/LiquidGlassFilters';
 import { ShaderCanvas } from './components/ShaderCanvas';
+import { ProfileModal } from './components/ProfileModal';
+import { PermanentLinksModal, saveLocalPermanentRoom } from './components/PermanentLinksModal';
+import { MeetingSchedulerModal } from './components/MeetingSchedulerModal';
+import { SettingsModal } from './components/SettingsModal';
+import {
+  getAudioInputDevices,
+  getAudioOutputDevices,
+  getVideoInputDevices,
+  captureUserMedia,
+  MediaDeviceInfoItem,
+  VideoResolution
+} from './lib/media-capture';
 import type { Models } from 'appwrite';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Models.User<Models.Preferences> | null>(null);
-  const [userName, setUserName] = useState<string>('');
+  const [userName, setUserName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-user-name') || '';
+    }
+    return '';
+  });
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-user-avatar') || '';
+    }
+    return '';
+  });
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
@@ -35,7 +58,28 @@ export const App: React.FC = () => {
   const [isDocsModalOpen, setIsDocsModalOpen] = useState<boolean>(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isPermanentLinksModalOpen, setIsPermanentLinksModalOpen] = useState<boolean>(false);
+  const [isSchedulerModalOpen, setIsSchedulerModalOpen] = useState<boolean>(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [is404, setIs404] = useState<boolean>(false);
+
+  // Device settings for global SettingsModal
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfoItem[]>([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>('');
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string>('');
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string>('');
+  const [selectedResolution, setSelectedResolution] = useState<VideoResolution>('1080p');
+  const [isNoiseSuppressionEnabled, setIsNoiseSuppressionEnabled] = useState(true);
+  const [isCameraMirrored, setIsCameraMirrored] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('syncine-camera-mirrored') === 'true';
+    }
+    return false;
+  });
+  const [settingsPreviewStream, setSettingsPreviewStream] = useState<MediaStream | null>(null);
 
   // Determine initial theme: User manual preference or Indian Standard Time (IST) Day/Night cycle
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -87,6 +131,9 @@ export const App: React.FC = () => {
         if (user.name && !user.name.startsWith('Guest ')) {
           setUserName(user.name);
         }
+        if (user.prefs?.avatar) {
+          setAvatarUrl(user.prefs.avatar);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const roomFromUrl = params.get('room');
@@ -103,6 +150,54 @@ export const App: React.FC = () => {
 
     init();
   }, []);
+
+  // Sync settings modal preview stream and available devices
+  useEffect(() => {
+    if (isSettingsModalOpen && !activeRoomId) {
+      getAudioInputDevices().then(setAudioInputDevices);
+      getAudioOutputDevices().then(setAudioOutputDevices);
+      getVideoInputDevices().then(setVideoInputDevices);
+
+      captureUserMedia(true)
+        .then((s) => setSettingsPreviewStream(s))
+        .catch(console.warn);
+    } else {
+      if (settingsPreviewStream) {
+        settingsPreviewStream.getTracks().forEach((t) => t.stop());
+        setSettingsPreviewStream(null);
+      }
+    }
+  }, [isSettingsModalOpen, activeRoomId]);
+
+  const handleSelectAudioInputDevice = async (deviceId: string) => {
+    setSelectedAudioDeviceId(deviceId);
+    localStorage.setItem('syncine-preferred-audio-input', deviceId);
+  };
+
+  const handleSelectAudioOutputDevice = async (deviceId: string) => {
+    setSelectedAudioOutputDeviceId(deviceId);
+    localStorage.setItem('syncine-preferred-audio-output', deviceId);
+  };
+
+  const handleSelectVideoInputDevice = async (deviceId: string) => {
+    setSelectedVideoDeviceId(deviceId);
+    localStorage.setItem('syncine-preferred-video-input', deviceId);
+  };
+
+  const handleSelectResolution = async (res: VideoResolution) => {
+    setSelectedResolution(res);
+    localStorage.setItem('syncine-preferred-resolution', res);
+  };
+
+  const handleToggleNoiseSuppression = async (enabled: boolean) => {
+    setIsNoiseSuppressionEnabled(enabled);
+    localStorage.setItem('syncine-noise-suppression', enabled ? 'true' : 'false');
+  };
+
+  const handleToggleCameraMirror = (mirrored: boolean) => {
+    setIsCameraMirrored(mirrored);
+    localStorage.setItem('syncine-camera-mirrored', mirrored ? 'true' : 'false');
+  };
 
   const handleToggleTheme = () => {
     const nextTheme = !isDark;
@@ -146,6 +241,15 @@ export const App: React.FC = () => {
         Permission.delete(Role.any())
       ]
     );
+
+    if (isPermanent) {
+      saveLocalPermanentRoom({
+        id: newRoomId,
+        name,
+        mediaMode,
+        createdAt: new Date().toISOString()
+      });
+    }
 
     window.history.pushState({}, '', `?room=${newRoomId}`);
     setActiveRoomId(newRoomId);
@@ -221,6 +325,11 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     if (user.name) {
       setUserName(user.name);
+      localStorage.setItem('syncine-user-name', user.name);
+    }
+    if (user.prefs?.avatar) {
+      setAvatarUrl(user.prefs.avatar);
+      localStorage.setItem('syncine-user-avatar', user.prefs.avatar);
     }
   };
 
@@ -230,6 +339,9 @@ export const App: React.FC = () => {
       const guestUser = await logoutUser();
       setCurrentUser(guestUser);
       setUserName('');
+      setAvatarUrl('');
+      localStorage.removeItem('syncine-user-avatar');
+      localStorage.removeItem('syncine-user-name');
     } catch (err) {
       console.warn('Logout error:', err);
     } finally {
@@ -290,6 +402,64 @@ export const App: React.FC = () => {
         onAuthSuccess={handleAuthSuccess}
       />
 
+      {/* User Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        userName={userName}
+        onSaveName={(name) => {
+          setUserName(name);
+          localStorage.setItem('syncine-user-name', name);
+        }}
+        avatarUrl={avatarUrl}
+        onSaveAvatar={(url) => {
+          setAvatarUrl(url);
+          localStorage.setItem('syncine-user-avatar', url);
+        }}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+      />
+
+      {/* Permanent Links Modal */}
+      <PermanentLinksModal
+        isOpen={isPermanentLinksModalOpen}
+        onClose={() => setIsPermanentLinksModalOpen(false)}
+        currentUser={currentUser}
+        onJoinRoom={handleJoinRoom}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+      />
+
+      {/* Meeting Scheduler & Calendar Modal */}
+      <MeetingSchedulerModal
+        isOpen={isSchedulerModalOpen}
+        onClose={() => setIsSchedulerModalOpen(false)}
+        currentUser={currentUser}
+        onJoinRoom={handleJoinRoom}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+      />
+
+      {/* Global Settings Modal (Lobby) */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen && !activeRoomId}
+        onClose={() => setIsSettingsModalOpen(false)}
+        audioInputDevices={audioInputDevices}
+        audioOutputDevices={audioOutputDevices}
+        selectedAudioDeviceId={selectedAudioDeviceId}
+        selectedAudioOutputDeviceId={selectedAudioOutputDeviceId}
+        onSelectAudioInputDevice={handleSelectAudioInputDevice}
+        onSelectAudioOutputDevice={handleSelectAudioOutputDevice}
+        isNoiseSuppressionEnabled={isNoiseSuppressionEnabled}
+        onToggleNoiseSuppression={handleToggleNoiseSuppression}
+        videoInputDevices={videoInputDevices}
+        selectedVideoDeviceId={selectedVideoDeviceId}
+        onSelectVideoInputDevice={handleSelectVideoInputDevice}
+        selectedResolution={selectedResolution}
+        onSelectResolution={handleSelectResolution}
+        previewStream={settingsPreviewStream}
+        isCameraMirrored={isCameraMirrored}
+        onToggleCameraMirror={handleToggleCameraMirror}
+      />
+
       {activeRoomId && currentUser ? (
         <RoomView
           roomId={activeRoomId}
@@ -302,12 +472,17 @@ export const App: React.FC = () => {
           currentUser={currentUser}
           userName={userName}
           onUserNameChange={setUserName}
+          avatarUrl={avatarUrl}
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           onOpenDocs={() => setIsDocsModalOpen(true)}
           onOpenPrivacy={() => setIsPrivacyModalOpen(true)}
           onOpenTerms={() => setIsTermsModalOpen(true)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+          onOpenPermanentLinks={() => setIsPermanentLinksModalOpen(true)}
+          onOpenScheduler={() => setIsSchedulerModalOpen(true)}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
           onLogout={handleLogout}
           isDark={isDark}
           onToggleTheme={handleToggleTheme}

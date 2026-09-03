@@ -36,8 +36,8 @@ export interface SettingsModalProps {
   selectedResolution: VideoResolution;
   onSelectResolution: (resolution: VideoResolution) => void;
   previewStream?: MediaStream | null;
-  telemetry: TelemetryStats;
-  latencyHistory: LatencyDataPoint[];
+  telemetry?: TelemetryStats;
+  latencyHistory?: LatencyDataPoint[];
   isCameraMirrored?: boolean;
   onToggleCameraMirror?: (mirrored: boolean) => void;
 }
@@ -59,9 +59,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   selectedResolution,
   onSelectResolution,
   previewStream,
-  telemetry,
-  latencyHistory,
-  isCameraMirrored = true,
+  telemetry = {
+    rtt: 0,
+    jitter: 0,
+    packetLoss: 0,
+    downstreamKbps: 0,
+    upstreamKbps: 0,
+    systemLoad: 5,
+    cpuCores: typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 4,
+    memoryUsedMb: null,
+    memoryLimitMb: null,
+    status: 'healthy',
+    verdict: 'Optimal Configuration',
+    recommendation: 'Ready to stream.'
+  },
+  latencyHistory = [],
+  isCameraMirrored = false,
   onToggleCameraMirror
 }) => {
   const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'diagnostics'>('audio');
