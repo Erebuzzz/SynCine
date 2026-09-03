@@ -118,7 +118,7 @@ export const EmojiReactions: React.FC<EmojiReactionsProps> = ({
       {isOpen && (
         <div
           ref={trayRef}
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 z-50 w-auto max-w-[94vw] p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl animate-enter-smooth select-none"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-auto max-w-[94vw] p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl animate-enter-smooth select-none"
         >
           {/* Header toolbar when customizing */}
           {isCustomizing && (

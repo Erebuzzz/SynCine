@@ -123,7 +123,7 @@ export const PermanentLinksModal: React.FC<PermanentLinksModalProps> = ({
 
   const handleCopy = (id: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullUrl = `${origin}/?room=${id}`;
+    const fullUrl = `${origin}/${formatRoomCode(id)}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -131,7 +131,7 @@ export const PermanentLinksModal: React.FC<PermanentLinksModalProps> = ({
 
   const handleShare = async (room: PermanentRoomItem) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullUrl = `${origin}/?room=${room.id}`;
+    const fullUrl = `${origin}/${formatRoomCode(room.id)}`;
 
     if (navigator.share) {
       try {

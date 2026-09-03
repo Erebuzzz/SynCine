@@ -96,14 +96,16 @@ function generateICSContent(meeting: ScheduledMeeting, roomUrl: string): string 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${meeting.id}@syncine.com`,
+    `UID:${meeting.id}@syncine.confluxa.app`,
     `DTSTAMP:${now}`,
     `DTSTART:${dtStart}`,
     `DTEND:${dtEnd}`,
     `SUMMARY:${meeting.title} - SynCine Watchroom`,
-    `DESCRIPTION:${meeting.description ? meeting.description + '\\n\\n' : ''}Join Watchroom: ${roomUrl}\\nRoom Code: ${formatRoomCode(meeting.roomId)}`,
+    `DESCRIPTION:${meeting.description ? meeting.description + '\\n\\n' : ''}Join Watchroom Link: ${roomUrl}\\nRoom Code: ${formatRoomCode(meeting.roomId)}\\n\\n(Use SynCine link to join. No software installation required.)`,
     `LOCATION:${roomUrl}`,
     `URL:${roomUrl}`,
+    `CONFERENCE;VALUE=URI:${roomUrl}`,
+    'X-GOOGLE-CONFERENCE:DISABLED',
     'STATUS:CONFIRMED',
     'END:VEVENT',
     'END:VCALENDAR'
@@ -124,11 +126,11 @@ function generateGoogleCalendarUrl(meeting: ScheduledMeeting, roomUrl: string): 
   const dates = `${formatGCal(startDateTime)}/${formatGCal(endDateTime)}`;
   const text = encodeURIComponent(`${meeting.title} • SynCine Watchroom`);
   const details = encodeURIComponent(
-    `${meeting.description ? meeting.description + '\n\n' : ''}Join Watchroom Link: ${roomUrl}\nRoom Code: ${formatRoomCode(meeting.roomId)}\n\nSynchronized cinema experience powered by SynCine.`
+    `${meeting.description ? meeting.description + '\n\n' : ''}🎬 SynCine Watchroom Link: ${roomUrl}\n🔑 Room Code: ${formatRoomCode(meeting.roomId)}\n\n⚠️ Note: Click the SynCine Watchroom link above to join.\nSynchronized cinema experience powered by SynCine.`
   );
   const location = encodeURIComponent(roomUrl);
 
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}&addv=0`;
 }
 
 export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({

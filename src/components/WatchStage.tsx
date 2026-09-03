@@ -210,6 +210,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   onLeaveRoom,
   videoRefCallback,
   childrenChat,
+  childrenSettings,
   unreadChatCount = 0,
   isChatOpen: controlledChatOpen,
   onToggleChat,
@@ -288,7 +289,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   };
 
   const handleCopyInviteLink = () => {
-    const inviteUrl = `${window.location.origin}?room=${roomId}`;
+    const inviteUrl = `${window.location.origin}/${formatRoomCode(roomId)}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -361,6 +362,11 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTyping(e.target)) return;
+
+      // Never intercept browser or system key combinations (e.g. Ctrl+Shift+I for DevTools, Ctrl+S, Ctrl+C, Cmd+R)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
 
       // Space: Push-to-Talk (Hold space to speak)
       if (e.code === 'Space') {
@@ -1365,6 +1371,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         isOpen={isDrmGuideOpen}
         onClose={() => setIsDrmGuideOpen(false)}
       />
+
+      {/* Watchroom Settings Modal */}
+      {childrenSettings}
     </div>
   );
 };

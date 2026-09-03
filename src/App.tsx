@@ -27,6 +27,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { PermanentLinksModal, saveLocalPermanentRoom } from './components/PermanentLinksModal';
 import { MeetingSchedulerModal } from './components/MeetingSchedulerModal';
 import { SettingsModal } from './components/SettingsModal';
+import { RejoinBuffer } from './components/RejoinBuffer';
 import {
   getAudioInputDevices,
   getAudioOutputDevices,
@@ -52,6 +53,7 @@ export const App: React.FC = () => {
     return '';
   });
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [justLeftRoom, setJustLeftRoom] = useState<{ roomId: string; roomName?: string } | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(true);
   const [initialRoomParam, setInitialRoomParam] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -135,11 +137,25 @@ export const App: React.FC = () => {
           setAvatarUrl(user.prefs.avatar);
         }
 
+        // Extract room from query (?room=... or ?id=...) or clean path (/e89-ag8-zm5)
         const params = new URLSearchParams(window.location.search);
-        const roomFromUrl = params.get('room');
-        if (roomFromUrl) {
-          const cleanId = normalizeRoomCode(roomFromUrl);
-          setInitialRoomParam(cleanId);
+        const queryRoom = params.get('room') || params.get('id');
+        let targetRoomCode = queryRoom ? normalizeRoomCode(queryRoom) : '';
+
+        if (!targetRoomCode && window.location.pathname) {
+          const rawPath = window.location.pathname.replace(/^\/(?:room\/|join\/)?/, '').replace(/\/$/, '').trim();
+          if (rawPath && rawPath !== '404' && rawPath !== 'lobby') {
+            const cleanPath = normalizeRoomCode(rawPath);
+            if (cleanPath.length >= 6) {
+              targetRoomCode = cleanPath;
+            }
+          }
+        }
+
+        if (targetRoomCode) {
+          setInitialRoomParam(targetRoomCode);
+          // Directly enter room join interface (Green Room)
+          setActiveRoomId(targetRoomCode);
         }
       } catch (err) {
         console.error('Authentication initialization error:', err);
@@ -316,7 +332,10 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveRoom = () => {
-    window.history.pushState({}, '', window.location.pathname);
+    window.history.pushState({}, '', '/');
+    if (activeRoomId) {
+      setJustLeftRoom({ roomId: activeRoomId });
+    }
     setActiveRoomId(null);
     setInitialRoomParam('');
   };
@@ -466,6 +485,16 @@ export const App: React.FC = () => {
           currentUserId={currentUser.$id}
           currentUserName={userName || 'Host'}
           onLeave={handleLeaveRoom}
+        />
+      ) : justLeftRoom ? (
+        <RejoinBuffer
+          roomId={justLeftRoom.roomId}
+          roomName={justLeftRoom.roomName}
+          onRejoin={() => {
+            setActiveRoomId(justLeftRoom.roomId);
+            setJustLeftRoom(null);
+          }}
+          onReturnHome={() => setJustLeftRoom(null)}
         />
       ) : (
         <Lobby

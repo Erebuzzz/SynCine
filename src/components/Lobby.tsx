@@ -166,7 +166,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const handleCopyHomeRoom = (id: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullUrl = `${origin}/?room=${id}`;
+    const fullUrl = `${origin}/${formatRoomCode(id)}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedHomeRoomId(id);
     setTimeout(() => setCopiedHomeRoomId(null), 2000);
@@ -174,7 +174,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const handleShareHomeRoom = async (room: PermanentRoomItem) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullUrl = `${origin}/?room=${room.id}`;
+    const fullUrl = `${origin}/${formatRoomCode(room.id)}`;
     if (navigator.share) {
       try {
         await navigator.share({

@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SynLogo, LiquidMicIcon, LiquidMicOffIcon, ScreenCastIcon } from './icons/SynIcons';
 import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X } from 'lucide-react';
-import { formatRoomCode } from '../lib/appwrite';
+import {
+  formatRoomCode,
+  databases,
+  realtime,
+  APPWRITE_DATABASE_ID,
+  COLLECTIONS,
+  RoomDocument
+} from '../lib/appwrite';
 
 interface GreenRoomProps {
   roomName: string;
@@ -27,12 +34,40 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [liveOccupancy, setLiveOccupancy] = useState<number | null>(null);
   const [isMirrored] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('syncine-camera-mirrored') === 'true';
     }
     return false;
   });
+
+  // Query live room occupancy and subscribe to realtime participant count
+  useEffect(() => {
+    let isMounted = true;
+
+    databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
+      .then((doc) => {
+        if (isMounted && typeof doc.participantCount === 'number') {
+          setLiveOccupancy(doc.participantCount);
+        }
+      })
+      .catch(() => {});
+
+    const unsubscribe = realtime.subscribe(
+      `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.ROOMS}.documents.${roomId}`,
+      (event: any) => {
+        if (isMounted && event?.payload?.participantCount !== undefined) {
+          setLiveOccupancy(event.payload.participantCount);
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [roomId]);
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const audioMeterBarRef = useRef<HTMLDivElement | null>(null);
@@ -240,7 +275,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   };
 
   const handleCopyLink = () => {
-    const inviteUrl = `${window.location.origin}?room=${roomId}`;
+    const inviteUrl = `${window.location.origin}/${formatRoomCode(roomId)}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -344,13 +379,35 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
         <div className="lg:col-span-5 flex flex-col justify-center">
           <div className="p-5 sm:p-8 space-y-5 sm:space-y-6 realistic-glass rounded-2xl sm:rounded-3xl">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium text-[var(--accent)]">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="text-xs font-semibold text-[var(--accent)]">
                   {isHost ? 'Host Session' : 'Guest Session'}
                 </span>
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)] border border-black/[0.06] dark:border-white/[0.08]">
                   {formatRoomCode(roomId)}
                 </span>
+                {liveOccupancy !== null && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      liveOccupancy > 0
+                        ? 'bg-[#30D158]/10 text-[#30D158] border-[#30D158]/20'
+                        : 'bg-black/[0.03] dark:bg-white/[0.05] text-[var(--text-tertiary)] border-black/[0.06] dark:border-white/[0.08]'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        liveOccupancy > 0 ? 'bg-[#30D158] animate-pulse' : 'bg-gray-400'
+                      }`}
+                    />
+                    <span>
+                      {liveOccupancy > 0
+                        ? liveOccupancy === 1
+                          ? '1 person waiting in room'
+                          : `${liveOccupancy} people in room`
+                        : 'No one is in the room yet'}
+                    </span>
+                  </span>
+                )}
               </div>
               <h2 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
                 {roomName}

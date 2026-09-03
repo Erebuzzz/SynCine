@@ -60,6 +60,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [errorState, setErrorState] = useState<string | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<'connected' | 'reconnecting' | 'offline'>('connected');
 
   // In-room Settings & Telemetry state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -257,6 +258,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
         roomId,
         currentUserId,
         currentUserName: effectiveUserName,
+        onConnectionStatusChange: (status) => {
+          if (isMounted) {
+            setNetworkStatus(status);
+          }
+        },
         onPeerDiscovered: (peerId, remoteUserName) => {
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
@@ -759,8 +765,20 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const effectiveMediaStream = isHost ? mediaStream : remoteScreenStream;
 
   return (
-    <WatchStage
-      roomName={room.name}
+    <>
+      {networkStatus !== 'connected' && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-amber-500/90 text-black font-bold text-xs shadow-2xl backdrop-blur-md animate-enter-smooth select-none">
+          <div className="w-2 h-2 rounded-full bg-black animate-ping" />
+          <span>
+            {networkStatus === 'offline'
+              ? 'Internet connection lost. Waiting to reconnect...'
+              : 'Connection interrupted. Reconnecting to watchroom...'}
+          </span>
+        </div>
+      )}
+
+      <WatchStage
+        roomName={room.name}
       roomId={roomId}
       mediaMode={room.mediaMode}
       isHost={isHost}
@@ -837,5 +855,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
         />
       }
     />
-  );
+  </>
+);
 };

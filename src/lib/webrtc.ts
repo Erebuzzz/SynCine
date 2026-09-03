@@ -14,6 +14,7 @@ export interface WebRTCEngineOptions {
   onHostCommandReceived?: (command: string, targetId?: string) => void;
   onEmojiReactionReceived?: (emojiId: string, senderName?: string) => void;
   onCameraMirrorChanged?: (peerId: string, isMirrored: boolean) => void;
+  onConnectionStatusChange?: (status: 'connected' | 'reconnecting' | 'offline') => void;
 }
 
 export class WebRTCEngine {
@@ -42,6 +43,45 @@ export class WebRTCEngine {
   constructor(private opts: WebRTCEngineOptions) {
     this.db = new Databases(opts.client);
     this.initSignaling();
+    this.attachNetworkListeners();
+  }
+
+  private handleOnline = async () => {
+    this.opts.onConnectionStatusChange?.('reconnecting');
+    if (this.opts.currentUserName) {
+      await this.announceJoin(this.opts.currentUserName);
+    }
+    for (const [peerId, pc] of this.peers.entries()) {
+      try {
+        if (typeof pc.restartIce === 'function') {
+          pc.restartIce();
+        }
+        if (this.opts.currentUserId > peerId) {
+          await this.initiateConnection(peerId);
+        }
+      } catch (err) {
+        console.warn(`ICE restart error for peer ${peerId}:`, err);
+      }
+    }
+    this.opts.onConnectionStatusChange?.('connected');
+  };
+
+  private handleOffline = () => {
+    this.opts.onConnectionStatusChange?.('offline');
+  };
+
+  private attachNetworkListeners() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleOnline);
+      window.addEventListener('offline', this.handleOffline);
+    }
+  }
+
+  private detachNetworkListeners() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline);
+      window.removeEventListener('offline', this.handleOffline);
+    }
   }
 
   private initSignaling() {
@@ -84,8 +124,13 @@ export class WebRTCEngine {
               userName: this.opts.currentUserName || 'Participant'
             });
 
-            // Ensure peer connection is initialized
+            // Initialize peer connection
             this.getOrCreatePeer(doc.senderId);
+
+            // Deterministic politeness initiator: designated peer creates offer immediately
+            if (this.opts.currentUserId > doc.senderId) {
+              await this.initiateConnection(doc.senderId);
+            }
 
             if (this.localScreenStream) {
               await this.sendSignal(doc.senderId, 'candidate', {
@@ -98,8 +143,13 @@ export class WebRTCEngine {
             this.peerNames.set(doc.senderId, remoteName);
             this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
 
-            // Ensure peer connection is initialized
+            // Initialize peer connection
             this.getOrCreatePeer(doc.senderId);
+
+            // Deterministic politeness initiator: designated peer creates offer immediately
+            if (this.opts.currentUserId > doc.senderId) {
+              await this.initiateConnection(doc.senderId);
+            }
           } else if (payload && payload.action === 'announce-leave') {
             // Cleanly remove departing peer
             this.handlePeerLeave(doc.senderId);
@@ -581,6 +631,7 @@ export class WebRTCEngine {
   }
 
   public destroy() {
+    this.detachNetworkListeners();
     this.announceLeave().catch(() => {});
 
     if (this.unsubscribe) {
