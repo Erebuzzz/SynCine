@@ -74,7 +74,18 @@ export const App: React.FC = () => {
   const [isPermanentLinksModalOpen, setIsPermanentLinksModalOpen] = useState<boolean>(false);
   const [isSchedulerModalOpen, setIsSchedulerModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
-  const [is404, setIs404] = useState<boolean>(false);
+  const [is404, setIs404] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      if (p === '/404') return true;
+      const rawPath = p.replace(/^\/(?:room\/|join\/)?/, '').replace(/\/$/, '').trim();
+      if (rawPath && rawPath !== 'lobby') {
+        const clean = normalizeRoomCode(rawPath);
+        if (clean.length < 6) return true;
+      }
+    }
+    return false;
+  });
 
   // Device settings for global SettingsModal
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfoItem[]>([]);
