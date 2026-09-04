@@ -378,17 +378,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
             ];
           });
         },
+        onRemoteScreenStream: (_peerId, stream) => {
+          setRemoteScreenStream(stream);
+        },
         onRemoteTrackAdded: (peerId, stream, peerName) => {
-          // Check if this stream is the screen broadcast
-          if (screenStreamIdRef.current && stream.id === screenStreamIdRef.current) {
-            setRemoteScreenStream(stream);
-            return;
-          }
-
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
-            const hasAudio = stream.getAudioTracks().some((t) => t.enabled);
-            const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
+            const hasAudio = stream.getAudioTracks().length > 0;
+            const hasVideo = stream.getVideoTracks().length > 0;
             const displayName =
               peerName ||
               (existingIndex >= 0 ? prev[existingIndex].name : undefined) ||
@@ -458,20 +455,23 @@ export const RoomView: React.FC<RoomViewProps> = ({
       webrtcRef.current = engine;
 
       // Attach local mic and camera tracks if captured
-      if (localUserMediaRef.current) {
-        if (isMicActive) {
-          engine.attachMicStream(localUserMediaRef.current);
+      const media = localUserMediaRef.current;
+      if (media) {
+        const audioTracks = media.getAudioTracks();
+        const videoTracks = media.getVideoTracks();
+        if (audioTracks.length > 0 && (isMicActive || audioTracks.some((t) => t.enabled))) {
+          engine.attachMicStream(media);
         }
-        if (isCameraActive && localUserMediaRef.current.getVideoTracks().length > 0) {
+        if (videoTracks.length > 0 && (isCameraActive || videoTracks.some((t) => t.enabled))) {
           if (backgroundBlur.isEnabled()) {
             try {
-              const processed = await backgroundBlur.processStream(localUserMediaRef.current);
+              const processed = await backgroundBlur.processStream(media);
               engine.attachCameraStream(processed);
             } catch {
-              engine.attachCameraStream(localUserMediaRef.current);
+              engine.attachCameraStream(media);
             }
           } else {
-            engine.attachCameraStream(localUserMediaRef.current);
+            engine.attachCameraStream(media);
           }
         }
       }
@@ -954,7 +954,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
     );
   }
 
-  const effectiveMediaStream = isHost ? mediaStream : remoteScreenStream;
+  const effectiveMediaStream = isSharingScreen ? mediaStream : remoteScreenStream;
 
   return (
     <>

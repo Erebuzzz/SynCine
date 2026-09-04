@@ -110,6 +110,7 @@ interface StreamVideoPlayerProps {
   stream?: MediaStream;
   src?: string;
   isMuted?: boolean;
+  isCamera?: boolean;
   volume?: number;
   isMirrored?: boolean;
   className?: string;
@@ -121,11 +122,14 @@ interface StreamVideoPlayerProps {
  * High-performance, memoized video player for WebRTC and media streams.
  * Eliminates frame flickering by isolating stream attachment and volume adjustments
  * from React component re-render cycles.
+ * For camera video feeds (isCamera=true), the video element is permanently muted so
+ * autoplay is guaranteed without user gesture blocking.
  */
 const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
   stream,
   src,
   isMuted = false,
+  isCamera = false,
   volume = 1,
   isMirrored = false,
   className = '',
@@ -139,32 +143,73 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     if (!video) return;
 
     if (stream) {
-      if (video.srcObject !== stream) {
-        video.srcObject = stream;
+      // For camera feeds, isolate video tracks to avoid audio track collision or stalling
+      let targetStream: MediaStream;
+      if (isCamera) {
+        const videoTracks = stream.getVideoTracks();
+        if (videoTracks.length === 0) {
+          video.srcObject = null;
+          return;
+        }
+        targetStream = new MediaStream(videoTracks);
+      } else {
+        targetStream = stream;
       }
-      video.muted = isMuted;
+
+      if (video.srcObject !== targetStream) {
+        video.srcObject = targetStream;
+      }
+
+      // Camera feeds must always be muted to guarantee instant autoplay without user gesture block
+      video.muted = isCamera ? true : isMuted;
 
       const attemptPlay = () => {
-        video.play().catch((err) => {
-          if (err.name !== 'AbortError') {
-            console.warn('Playback error encountered:', err);
-          }
-        });
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (err.name === 'NotAllowedError' && !video.muted) {
+              console.warn('Autoplay blocked with sound. Falling back to muted playback:', err);
+              video.muted = true;
+              video.play().catch(() => {});
+            } else if (err.name !== 'AbortError') {
+              console.warn('Playback error encountered:', err);
+            }
+          });
+        }
       };
 
       attemptPlay();
 
+      // Listen for unmute event on video track (fires when first RTP packet arrives)
+      const primaryVideoTrack = targetStream.getVideoTracks()[0];
+      if (primaryVideoTrack) {
+        primaryVideoTrack.addEventListener('unmute', attemptPlay);
+      }
+
       const handleTrackChange = () => {
-        if (video.srcObject !== stream) {
-          video.srcObject = stream;
+        if (isCamera) {
+          const freshTracks = stream.getVideoTracks();
+          if (freshTracks.length > 0) {
+            video.srcObject = new MediaStream(freshTracks);
+            attemptPlay();
+          } else {
+            video.srcObject = null;
+          }
+        } else {
+          if (video.srcObject !== stream) {
+            video.srcObject = stream;
+          }
+          attemptPlay();
         }
-        attemptPlay();
       };
 
       stream.addEventListener('addtrack', handleTrackChange);
       stream.addEventListener('removetrack', handleTrackChange);
 
       return () => {
+        if (primaryVideoTrack) {
+          primaryVideoTrack.removeEventListener('unmute', attemptPlay);
+        }
         stream.removeEventListener('addtrack', handleTrackChange);
         stream.removeEventListener('removetrack', handleTrackChange);
       };
@@ -175,14 +220,14 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     } else {
       video.srcObject = null;
     }
-  }, [stream, src, isMuted]);
+  }, [stream, src, isMuted, isCamera]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = isMuted;
-    video.volume = isMuted ? 0 : Math.max(0, Math.min(1, volume));
-  }, [isMuted, volume]);
+    video.muted = isCamera ? true : isMuted;
+    video.volume = (isCamera || isMuted) ? 0 : Math.max(0, Math.min(1, volume));
+  }, [isMuted, isCamera, volume]);
 
   useEffect(() => {
     if (videoRef.current && onMount) {
@@ -196,10 +241,72 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
       autoPlay
       playsInline
       controls={controls}
-      muted={isMuted}
+      muted={isCamera ? true : isMuted}
       className={`w-full h-full ${isMirrored ? 'scale-x-[-1]' : ''} ${className}`}
     />
   );
+});
+
+interface RemoteAudioPlayerProps {
+  peerId: string;
+  stream?: MediaStream;
+  isMuted?: boolean;
+  volume?: number;
+}
+
+/**
+ * Dedicated, invisible audio player for remote participant WebRTC audio feeds.
+ * Decoupled from video rendering to ensure remote audio plays continuously
+ * whether the participant has their camera enabled or disabled.
+ */
+const RemoteAudioPlayer: React.FC<RemoteAudioPlayerProps> = React.memo(({
+  peerId,
+  stream,
+  isMuted = false,
+  volume = 0.8
+}) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (stream && stream.getAudioTracks().length > 0) {
+      const audioStream = new MediaStream(stream.getAudioTracks());
+      audio.srcObject = audioStream;
+      audio.muted = isMuted;
+      audio.volume = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+
+      const playAudio = () => {
+        audio.play().catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.warn(`Remote audio playback issue for peer ${peerId}:`, err);
+          }
+        });
+      };
+
+      playAudio();
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.addEventListener('unmute', playAudio);
+        return () => {
+          audioTrack.removeEventListener('unmute', playAudio);
+        };
+      }
+    } else {
+      audio.srcObject = null;
+    }
+  }, [stream, isMuted, volume, peerId]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = isMuted;
+    audio.volume = isMuted ? 0 : Math.max(0, Math.min(1, volume));
+  }, [isMuted, volume]);
+
+  return <audio ref={audioRef} autoPlay playsInline className="hidden" />;
 });
 
 interface TileActionControlsProps {
@@ -907,8 +1014,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               {pinnedParticipant ? (
                 <StreamVideoPlayer
                   stream={pinnedParticipant.stream}
-                  isMuted={pinnedParticipant.isSelf || mutedPeers[pinnedParticipant.id]}
-                  volume={pinnedParticipant.isSelf ? 0 : volumes[pinnedParticipant.id] ?? 0.8}
+                  isCamera={true}
+                  isMuted={true}
+                  volume={0}
                   isMirrored={pinnedParticipant.isMirrored ?? pinnedParticipant.isSelf}
                   className="object-contain max-h-full"
                 />
@@ -934,6 +1042,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               ) : mediaStream ? (
                 <StreamVideoPlayer
                   stream={mediaStream}
+                  isCamera={false}
                   isMuted={isSharingScreen ? true : mainVideoMuted}
                   volume={mainVideoVolume}
                   className="object-contain max-h-full"
@@ -1077,8 +1186,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       {hasVideo ? (
                         <StreamVideoPlayer
                           stream={p.stream}
-                          isMuted={p.isSelf || mutedPeers[p.id]}
-                          volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                          isCamera={true}
+                          isMuted={true}
+                          volume={0}
                           isMirrored={p.isMirrored ?? p.isSelf}
                           className="object-cover"
                         />
@@ -1196,8 +1306,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     {hasVideo ? (
                       <StreamVideoPlayer
                         stream={p.stream}
-                        isMuted={p.isSelf || mutedPeers[p.id]}
-                        volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                        isCamera={true}
+                        isMuted={true}
+                        volume={0}
                         isMirrored={p.isMirrored ?? p.isSelf}
                         className="object-cover"
                       />
@@ -1319,8 +1430,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   {hasVideo ? (
                     <StreamVideoPlayer
                       stream={p.stream}
-                      isMuted={p.isSelf || mutedPeers[p.id]}
-                      volume={p.isSelf ? 0 : volumes[p.id] ?? 0.8}
+                      isCamera={true}
+                      isMuted={true}
+                      volume={0}
                       isMirrored={p.isMirrored ?? p.isSelf}
                       className="object-cover"
                     />
@@ -1737,6 +1849,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             onToggleNightMode: setNightMode
           })
         : childrenSettings}
+
+      {/* Dedicated Remote Audio Players (Decoupled from camera video elements to guarantee autoplay) */}
+      {participants
+        .filter((p) => !p.isSelf && p.stream && p.stream.getAudioTracks().length > 0)
+        .map((p) => (
+          <RemoteAudioPlayer
+            key={`remote-audio-${p.id}`}
+            peerId={p.id}
+            stream={p.stream}
+            isMuted={Boolean(mutedPeers[p.id])}
+            volume={volumes[p.id] ?? 0.8}
+          />
+        ))}
     </div>
   );
 };

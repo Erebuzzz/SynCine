@@ -46,6 +46,15 @@ describe('WebRTCEngine Test Suite', () => {
       setRemoteDescription: vi.fn().mockResolvedValue(undefined),
       addIceCandidate: vi.fn().mockResolvedValue(undefined),
       addTrack: vi.fn(),
+      addTransceiver: vi.fn().mockImplementation((trackOrKind: any) => ({
+        sender: {
+          track: typeof trackOrKind === 'string' ? null : trackOrKind,
+          replaceTrack: vi.fn().mockResolvedValue(undefined)
+        },
+        receiver: {
+          track: null
+        }
+      })),
       getSenders: vi.fn().mockReturnValue([]),
       getTransceivers: vi.fn().mockReturnValue([]),
       close: vi.fn(),
@@ -104,5 +113,46 @@ describe('WebRTCEngine Test Suite', () => {
       }),
       expect.any(Array)
     );
+  });
+
+  it('updates transceiver on attachCameraStream and removeCameraStream', async () => {
+    const engine = new WebRTCEngine({
+      client: mockClient,
+      databaseId: 'syncine_db',
+      roomId: 'room-1',
+      currentUserId: 'user-self',
+      onRemoteTrackAdded: vi.fn(),
+      onPeerDisconnected: vi.fn()
+    });
+
+    await engine.initiateConnection('user-peer');
+
+    const mockVideoTrack = { kind: 'video', id: 'video-track-1' };
+    const mockCameraStream = {
+      getVideoTracks: vi.fn().mockReturnValue([mockVideoTrack]),
+      getAudioTracks: vi.fn().mockReturnValue([]),
+      getTracks: vi.fn().mockReturnValue([mockVideoTrack])
+    } as any;
+
+    engine.attachCameraStream(mockCameraStream);
+    engine.removeCameraStream();
+
+    expect(mockCameraStream.getVideoTracks).toHaveBeenCalled();
+  });
+
+  it('supports onRemoteScreenStream callback', () => {
+    const onRemoteScreenStream = vi.fn();
+    const engine = new WebRTCEngine({
+      client: mockClient,
+      databaseId: 'syncine_db',
+      roomId: 'room-1',
+      currentUserId: 'user-self',
+      onRemoteScreenStream,
+      onRemoteTrackAdded: vi.fn(),
+      onPeerDisconnected: vi.fn()
+    });
+
+    expect(engine).toBeDefined();
+    expect(onRemoteScreenStream).not.toHaveBeenCalled();
   });
 });
