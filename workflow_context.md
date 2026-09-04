@@ -140,10 +140,9 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Direct zero-bandwidth streaming from YouTube CDN in 4K/1080p.
   - Hosts control playback, pause, and seek with drift compensation across all guests.
   - Guest scrubbers are locked with a tooltip explaining host playback authority.
-- **Recommendation 2: External Subtitle Loader (`subtitle-parser.ts`, `SubtitleOverlay.tsx`):**
-  - High-performance parser for SubRip (.srt) and WebVTT (.vtt) format captions.
-  - High-contrast cinema overlay with dark text-shadow protection, size scaling, and word wrapping.
-  - Subtitle offset calibration slider ([-10.0s ... +10.0s] with +0.5s / -0.5s nudge buttons) and quick 'V' hotkey toggle.
+- **Complete Subtitle System Deprecation:**
+  - Removed external subtitle parser, overlays, dock buttons, shortcuts, and tests.
+  - All modern streaming providers provide built-in captions natively, and local file sharing embeds subtitles directly inside the local player before screen sharing.
 - **Recommendation 3: Dynamic Cinema Ambilight Glow (`AmbilightGlow.tsx`):**
   - GPU-accelerated canvas ambient lighting sampling 32x18 edge frames every 120ms with CSS `filter: blur(64px)`.
   - Diffuses a soft reactive backlight glow behind the cinema player with zero CPU memory overhead.
@@ -203,8 +202,19 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Fixed capacity check in `App.tsx` and `RoomView.tsx` to handle 0 cleanly.
 
 ## 16. Verification & Validation Status
-- **Vitest Suites:** 8/8 test files passed (30/30 unit tests).
-- **TypeScript & Vite Build:** `tsc && vite build` passed with zero errors in 8.80s.
+- **Vitest Suites:** 8/8 test files passed (28/28 unit tests).
+- **TypeScript & Vite Build:** `tsc && vite build` passed with zero errors.
 - **Emdash Compliance:** 100% verified zero emdashes in entire repository.
+
+## 17. Streamlined Background Blur & Complete Subtitle Removal
+- **Background Blur Placement:**
+  - Standardized blur controls to exactly two places:
+    1. Settings Modal: In the Video & Quality tab (`SettingsModal.tsx`).
+    2. Video Tile Hover Action Bar (`TileActionControls` in `WatchStage.tsx`): Positioned beside the pin button on the user's video feed. Hovering displays the Sparkles button; clicking opens a popover containing preset chips (Off, Subtle, Portrait, Deep) and a continuous fine-tune slider (0-32px).
+- **External Subtitle Removal:**
+  - Completely removed external subtitle parser (`subtitle-parser.ts`), subtitle overlay (`SubtitleOverlay.tsx`), and tests (`subtitle.test.ts`).
+  - Removed subtitle toggle from cinema dock, settings modal, and shortcuts modal.
+  - Decoupled `YouTubeSyncPlayer.tsx` to use local `formatTime` helper.
+  - Updated all user-facing documentation and keyboard shortcuts accordingly.
 
 

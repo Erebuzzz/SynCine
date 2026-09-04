@@ -22,8 +22,7 @@ import {
   Moon,
   Sun,
   Zap,
-  Volume2,
-  Subtitles
+  Volume2
 } from 'lucide-react';
 import {
   VideoResolution,
@@ -1017,11 +1016,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
 
-              {/* Picture-in-Picture & Subtitles Quick Tip */}
+              {/* Picture-in-Picture Quick Tip */}
               <div className="p-3.5 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center gap-3">
-                <Subtitles size={18} className="text-[var(--accent)] shrink-0" />
+                <MonitorPlay size={18} className="text-[var(--accent)] shrink-0" />
                 <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                  External subtitles (.srt and .vtt) can be loaded directly from the cinema dock. Press <strong className="font-mono text-[var(--text-primary)]">V</strong> to toggle captions and <strong className="font-mono text-[var(--text-primary)]">Shift+P</strong> for Picture-in-Picture.
+                  Multitask across other tabs while streaming movies. Press <strong className="font-mono text-[var(--text-primary)]">Shift+P</strong> to pop out the Picture-in-Picture floating player.
                 </div>
               </div>
             </div>
@@ -1069,7 +1068,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     { key: 'F', label: 'Toggle Full Screen Mode', icon: <Command size={13} /> },
                     { key: 'Esc', label: 'Exit Full Screen / Close Menus', icon: <Command size={13} /> },
                     { key: 'Shift+P', label: 'Picture-in-Picture Floating Player', icon: <MonitorPlay size={13} /> },
-                    { key: 'V', label: 'Toggle Subtitles Overlay', icon: <Subtitles size={13} /> },
                     { key: 'A', label: 'Toggle Cinema Ambilight Glow', icon: <Sparkles size={13} /> },
                     { key: 'P', label: 'Pin / Unpin Active Feed', icon: <Pin size={13} /> },
                     { key: 'S', label: 'Open Settings & Diagnostics', icon: <Sliders size={13} /> },

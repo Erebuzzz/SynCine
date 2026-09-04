@@ -33,8 +33,6 @@ import {
   Command,
   HelpCircle,
   FlipHorizontal,
-  Subtitles,
-  FileText,
   Sparkles,
   Clock
 } from 'lucide-react';
@@ -46,9 +44,8 @@ import { ShortcutsModal } from './ShortcutsModal';
 import { DrmGuideModal } from './DrmGuideModal';
 import { YouTubeSyncPlayer } from './YouTubeSyncPlayer';
 import { AmbilightGlow } from './AmbilightGlow';
-import { SubtitleOverlay } from './SubtitleOverlay';
-import { parseSubtitleContent, SubtitleCue } from '../lib/subtitle-parser';
 import { CinemaAudioProcessor, DialogueBoostLevel } from '../lib/audio-processing';
+import { BLUR_PRESETS, MAX_BLUR_RADIUS } from '../lib/background-blur';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
 
@@ -205,6 +202,142 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
   );
 });
 
+interface TileActionControlsProps {
+  participant: Participant;
+  isPinned: boolean;
+  onTogglePin: () => void;
+  bgBlurRadius?: number;
+  onSetBlurRadius?: (radius: number) => void;
+  size?: 'sm' | 'md';
+}
+
+const TileActionControls: React.FC<TileActionControlsProps> = ({
+  participant,
+  isPinned,
+  onTogglePin,
+  bgBlurRadius,
+  onSetBlurRadius,
+  size = 'sm'
+}) => {
+  const [isBlurMenuOpen, setIsBlurMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isBlurMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsBlurMenuOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handleClickOutside);
+    return () => window.removeEventListener('pointerdown', handleClickOutside);
+  }, [isBlurMenuOpen]);
+
+  const paddingClass = size === 'md' ? 'p-2 rounded-xl' : 'p-1.5 rounded-lg';
+  const iconSize = size === 'md' ? 15 : 13;
+  const isBlurActive = typeof bgBlurRadius === 'number' && bgBlurRadius > 0;
+
+  return (
+    <div className={`absolute ${size === 'md' ? 'top-3 right-3' : 'top-2 right-2'} z-20 flex items-center gap-1.5`}>
+      {participant.isSelf && onSetBlurRadius && (
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsBlurMenuOpen((prev) => !prev);
+            }}
+            className={`${paddingClass} backdrop-blur-md border transition cursor-pointer ${
+              isBlurMenuOpen || isBlurActive
+                ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
+                : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+            }`}
+            title="Background Blur & Portrait Bokeh"
+          >
+            <Sparkles size={iconSize} />
+          </button>
+
+          {isBlurMenuOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full mt-1.5 right-0 w-56 sm:w-60 p-3 rounded-2xl bg-black/95 dark:bg-[#121215]/95 backdrop-blur-2xl border border-white/15 shadow-2xl z-50 animate-enter-smooth text-xs select-none text-white cursor-default"
+            >
+              <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-white/10 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-[var(--accent)]" />
+                  <span>Portrait Blur</span>
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-[var(--accent)]">
+                  {isBlurActive ? `${bgBlurRadius}px` : 'Off'}
+                </span>
+              </div>
+
+              {/* Preset chips */}
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                {[
+                  { label: 'Off', val: BLUR_PRESETS.OFF },
+                  { label: 'Subtle', val: BLUR_PRESETS.SUBTLE },
+                  { label: 'Portrait', val: BLUR_PRESETS.PORTRAIT },
+                  { label: 'Deep', val: BLUR_PRESETS.DEEP }
+                ].map((preset) => {
+                  const isSelected = (bgBlurRadius ?? 0) === preset.val;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => onSetBlurRadius(preset.val)}
+                      className={`py-1.5 px-1 rounded-xl text-center text-[10px] font-semibold transition cursor-pointer border ${
+                        isSelected
+                          ? 'bg-[var(--accent)] text-black border-transparent shadow-xs'
+                          : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-white/10'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Range slider */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-white/60">
+                  <span>Fine-tune Radius</span>
+                  <span className="font-mono">{bgBlurRadius ?? 0}px / {MAX_BLUR_RADIUS}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={MAX_BLUR_RADIUS}
+                  value={bgBlurRadius ?? 0}
+                  onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
+                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pin Feed Button on Hover */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePin();
+        }}
+        className={`${paddingClass} backdrop-blur-md border transition cursor-pointer ${
+          isPinned
+            ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
+            : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+        }`}
+        title={isPinned ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
+      >
+        {isPinned ? <PinOff size={iconSize} /> : <Pin size={iconSize} />}
+      </button>
+    </div>
+  );
+};
+
 export const WatchStage: React.FC<WatchStageProps> = ({
   roomName,
   roomId,
@@ -270,15 +403,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     }
     return true;
   });
-
-  // External Subtitles State
-  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
-  const [subtitleOffset, setSubtitleOffset] = useState<number>(0);
-  const [isSubtitlesVisible, setIsSubtitlesVisible] = useState(true);
-  const [subtitleFontSize, setSubtitleFontSize] = useState<'sm' | 'md' | 'lg'>('md');
-  const [isSubtitleMenuOpen, setIsSubtitleMenuOpen] = useState(false);
-  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
-  const subtitleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Audio Processing State (Dialogue Boost & Night Mode)
   const [dialogueBoost, setDialogueBoost] = useState<DialogueBoostLevel>(() => {
@@ -374,18 +498,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     }
   };
 
-  // Video tracking for subtitles, PiP events, and Cinema Web Audio
+  // Video tracking for PiP events and Cinema Web Audio
   useEffect(() => {
     const video = mainVideoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => {
-      setVideoCurrentTime(video.currentTime);
-    };
     const handleEnterPiP = () => setIsPiPActive(true);
     const handleLeavePiP = () => setIsPiPActive(false);
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('enterpictureinpicture', handleEnterPiP);
     video.addEventListener('leavepictureinpicture', handleLeavePiP);
 
@@ -396,7 +516,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     audioProcessorRef.current.attachMediaElement(video, { dialogueBoost, nightMode });
 
     return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('enterpictureinpicture', handleEnterPiP);
       video.removeEventListener('leavepictureinpicture', handleLeavePiP);
     };
@@ -417,23 +536,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       localStorage.setItem('syncine-ambilight', isAmbilightEnabled ? 'true' : 'false');
     }
   }, [isAmbilightEnabled]);
-
-  // Subtitle file import handler
-  const handleSubtitleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const parsed = parseSubtitleContent(content);
-        setSubtitleCues(parsed);
-        setIsSubtitlesVisible(true);
-      }
-    };
-    reader.readAsText(file);
-  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -580,11 +682,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       else if (key === 'p') {
         e.preventDefault();
         setPinnedFeedId((prev) => (prev ? null : 'screen'));
-      }
-      // V: Toggle Subtitles Visibility
-      else if (key === 'v') {
-        e.preventDefault();
-        setIsSubtitlesVisible((prev) => !prev);
       }
       // A: Toggle Dynamic Ambilight
       else if (key === 'a') {
@@ -847,15 +944,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 />
               ) : null}
 
-              {/* Subtitle Overlay */}
-              <SubtitleOverlay
-                cues={subtitleCues}
-                currentTime={videoCurrentTime}
-                offsetSeconds={subtitleOffset}
-                fontSize={subtitleFontSize}
-                isVisible={isSubtitlesVisible}
-              />
-
               {/* Feed Pinning Controls & Protected Content Help */}
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
                 {pinnedParticipant ? (
@@ -1003,22 +1091,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                         </div>
                       )}
 
-                      {/* Pin Feed Button on Hover */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
-                        }}
-                        className={`absolute top-2 right-2 z-20 p-1.5 rounded-lg backdrop-blur-md border transition cursor-pointer ${
-                          pinnedFeedId === p.id
-                            ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
-                            : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
-                        }`}
-                        title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
-                      >
-                        {pinnedFeedId === p.id ? <PinOff size={13} /> : <Pin size={13} />}
-                      </button>
+                      {/* Video Feed Controls on Hover (Pin & Background Blur) */}
+                      <TileActionControls
+                        participant={p}
+                        isPinned={pinnedFeedId === p.id}
+                        onTogglePin={() => setPinnedFeedId((prev) => (prev === p.id ? null : p.id))}
+                        bgBlurRadius={bgBlurRadius}
+                        onSetBlurRadius={onSetBlurRadius}
+                        size="sm"
+                      />
 
                       {/* Floating Bottom-Left Pill: Name & YOU (No border-t intersection = 0 dead pixels) */}
                       <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
@@ -1129,22 +1210,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       </div>
                     )}
 
-                    {/* Pin button on standby tile */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
-                      }}
-                      className={`absolute top-3 right-3 z-20 p-2 rounded-xl backdrop-blur-md border transition cursor-pointer ${
-                        pinnedFeedId === p.id
-                          ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
-                          : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
-                      }`}
-                      title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
-                    >
-                      {pinnedFeedId === p.id ? <PinOff size={15} /> : <Pin size={15} />}
-                    </button>
+                    {/* Standby tile action controls (Pin & Background Blur) */}
+                    <TileActionControls
+                      participant={p}
+                      isPinned={pinnedFeedId === p.id}
+                      onTogglePin={() => setPinnedFeedId((prev) => (prev === p.id ? null : p.id))}
+                      bgBlurRadius={bgBlurRadius}
+                      onSetBlurRadius={onSetBlurRadius}
+                      size="md"
+                    />
 
                     {/* Bottom Floating Pill Overlays */}
                     <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
@@ -1259,22 +1333,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     </div>
                   )}
 
-                  {/* Pin button on grid tile */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPinnedFeedId((prev) => (prev === p.id ? null : p.id));
-                    }}
-                    className={`absolute top-2 right-2 z-20 p-1.5 rounded-lg backdrop-blur-md border transition cursor-pointer ${
-                      pinnedFeedId === p.id
-                        ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
-                        : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
-                    }`}
-                    title={pinnedFeedId === p.id ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
-                  >
-                    {pinnedFeedId === p.id ? <PinOff size={13} /> : <Pin size={13} />}
-                  </button>
+                  {/* Grid tile action controls (Pin & Background Blur) */}
+                  <TileActionControls
+                    participant={p}
+                    isPinned={pinnedFeedId === p.id}
+                    onTogglePin={() => setPinnedFeedId((prev) => (prev === p.id ? null : p.id))}
+                    bgBlurRadius={bgBlurRadius}
+                    onSetBlurRadius={onSetBlurRadius}
+                    size="sm"
+                  />
 
                   <div className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md border border-white/15 text-white pointer-events-none shadow-sm">
                     <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-[11px] sm:text-xs font-bold truncate">
@@ -1519,136 +1586,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <PictureInPicture2 size={16} />
             {!isFullscreen && <span className="hidden sm:inline">{isPiPActive ? 'PiP Active' : 'PiP'}</span>}
           </button>
-
-          {/* Subtitles & Captions Menu */}
-          <div className="relative shrink-0">
-            <input
-              ref={subtitleFileInputRef}
-              type="file"
-              accept=".srt,.vtt,text/vtt"
-              onChange={handleSubtitleFileSelect}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => setIsSubtitleMenuOpen((prev) => !prev)}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
-                isSubtitleMenuOpen || (subtitleCues.length > 0 && isSubtitlesVisible)
-                  ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
-                  : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
-              }`}
-              title="External Subtitles & Captions (V)"
-            >
-              <Subtitles size={16} />
-              {!isFullscreen && (
-                <span className="hidden sm:inline">
-                  {subtitleCues.length > 0 ? (isSubtitlesVisible ? 'CC On' : 'CC Off') : 'Subtitles'}
-                </span>
-              )}
-            </button>
-
-            {/* Subtitle Settings Popover */}
-            {isSubtitleMenuOpen && (
-              <div className="absolute bottom-full mb-2 left-0 w-64 p-3 rounded-2xl bg-white/95 dark:bg-[#151518]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 shadow-2xl z-50 animate-enter-smooth text-xs select-none">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/10 dark:border-white/10 font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
-                  <span className="flex items-center gap-1.5">
-                    <Subtitles size={14} className="text-[var(--accent)]" />
-                    <span>Subtitles & Timing</span>
-                  </span>
-                  {subtitleCues.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsSubtitlesVisible(!isSubtitlesVisible)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
-                        isSubtitlesVisible ? 'bg-[#30D158]/20 text-[#30D158]' : 'bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50'
-                      }`}
-                    >
-                      {isSubtitlesVisible ? 'Enabled' : 'Hidden'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Upload Button */}
-                <button
-                  type="button"
-                  onClick={() => subtitleFileInputRef.current?.click()}
-                  className="w-full py-2 px-3 mb-2 rounded-xl bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1] border border-black/[0.06] dark:border-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] font-semibold flex items-center justify-center gap-2 cursor-pointer transition"
-                >
-                  <FileText size={14} />
-                  <span>{subtitleCues.length > 0 ? 'Replace Subtitles (.srt/.vtt)' : 'Load Subtitles (.srt/.vtt)'}</span>
-                </button>
-
-                {subtitleCues.length > 0 && (
-                  <>
-                    <div className="text-[10px] text-black/50 dark:text-white/50 mb-2">
-                      Loaded {subtitleCues.length} caption cues
-                    </div>
-
-                    {/* Sync Offset Calibration */}
-                    <div className="space-y-1.5 mb-2">
-                      <div className="flex justify-between text-[11px] text-black/60 dark:text-white/60">
-                        <span>Sync Offset</span>
-                        <span className="font-mono font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
-                          {subtitleOffset > 0 ? `+${subtitleOffset.toFixed(1)}s` : `${subtitleOffset.toFixed(1)}s`}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSubtitleOffset((prev) => Math.max(-10, prev - 0.5))}
-                          className="px-2 py-1 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-xs font-mono font-bold hover:bg-black/[0.1] dark:hover:bg-white/[0.12] cursor-pointer"
-                          title="Nudge -0.5s"
-                        >
-                          -0.5s
-                        </button>
-                        <input
-                          type="range"
-                          min="-5"
-                          max="5"
-                          step="0.1"
-                          value={subtitleOffset}
-                          onChange={(e) => setSubtitleOffset(parseFloat(e.target.value))}
-                          className="flex-1 h-1.5 accent-[var(--accent)] cursor-pointer"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSubtitleOffset((prev) => Math.min(10, prev + 0.5))}
-                          className="px-2 py-1 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-xs font-mono font-bold hover:bg-black/[0.1] dark:hover:bg-white/[0.12] cursor-pointer"
-                          title="Nudge +0.5s"
-                        >
-                          +0.5s
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Size Selector */}
-                    <div className="flex items-center justify-between pt-1 border-t border-black/10 dark:border-white/10">
-                      <span className="text-[11px] text-black/60 dark:text-white/60">Font Size</span>
-                      <div className="flex gap-1">
-                        {(['sm', 'md', 'lg'] as const).map((sz) => (
-                          <button
-                            key={sz}
-                            type="button"
-                            onClick={() => setSubtitleFontSize(sz)}
-                            className={`px-2 py-0.5 rounded-md text-[10px] uppercase font-bold cursor-pointer transition ${
-                              subtitleFontSize === sz
-                                ? 'bg-[var(--accent)] text-black'
-                                : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/50 dark:text-white/50'
-                            }`}
-                          >
-                            {sz}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Dynamic Ambilight Quick Toggle */}
           <button
             type="button"

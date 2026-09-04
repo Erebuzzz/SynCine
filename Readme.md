@@ -151,7 +151,7 @@ sequenceDiagram
 - **Dynamic Cinema Ambilight:** GPU-accelerated canvas ambient lighting that samples real-time edge colors at 32x18 resolution and diffuses a soft reactive backlight glow behind the cinema player.
 - **Speech Clarity EQ (Dialogue Booster):** Web Audio peaking equalizer filter calibrated at 2.5 kHz (+3.5 dB or +6.0 dB) to elevate human speech frequencies over intense background scores.
 - **Night Mode Dynamics Compression:** Dynamics compressor node that automatically tames sudden explosive sound effects while gently lifting whisper dialogues for late-night listening.
-- **External Subtitles Engine:** High-speed SubRip (`.srt`) and WebVTT (`.vtt`) parser with binary search cue matching, font sizing, and fine-grained +/-10s offset calibration.
+- **Background Blur & Bokeh:** Client-side camera segmentation with portrait bokeh blur presets (Subtle, Portrait, Deep) and fine-grained radius control accessible right from the video tile hover menu or settings.
 - **Picture-in-Picture (PiP):** Floating multitasking video window with instant toggle hotkey (`Shift+P`).
 
 ### 3. Participant Limits & Security
@@ -172,7 +172,6 @@ sequenceDiagram
 - `F`: Toggle Full Screen
 - `Esc`: Exit Full Screen / Close Active Modals
 - `Shift+P`: Picture-in-Picture Floating Window
-- `V`: Toggle Subtitles Visibility
 - `A`: Toggle Dynamic Ambilight Glow
 - `P`: Pin / Unpin Focused Video Feed
 - `S`: Settings Menu & Pipeline Diagnostics

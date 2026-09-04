@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Sparkles } from 'lucide-react';
-import { formatSubtitleTime } from '../lib/subtitle-parser';
+
+function formatTime(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hrs > 0) {
+    return `${hrs}:${remMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 declare global {
   interface Window {
@@ -224,7 +235,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
       <div className="absolute bottom-0 inset-x-0 p-3 sm:p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         {/* Scrubber Range Bar */}
         <div className="w-full flex items-center gap-2 text-[11px] text-white/70 font-mono">
-          <span>{formatSubtitleTime(currentTime)}</span>
+          <span>{formatTime(currentTime)}</span>
           <input
             type="range"
             min={0}
@@ -235,7 +246,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
             disabled={!isHost}
             className="flex-1 h-1.5 bg-white/20 hover:bg-white/30 rounded-lg appearance-none cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed transition"
           />
-          <span>{formatSubtitleTime(duration)}</span>
+          <span>{formatTime(duration)}</span>
         </div>
 
         {/* Dock Controls */}
