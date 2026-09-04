@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SynLogo, LiquidMicIcon, LiquidMicOffIcon, ScreenCastIcon } from './icons/SynIcons';
-import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X, Lock, Bell, AlertCircle } from 'lucide-react';
+import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X, Lock, Bell, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { ID } from 'appwrite';
 import {
   formatRoomCode,
@@ -10,6 +10,13 @@ import {
   COLLECTIONS,
   RoomDocument
 } from '../lib/appwrite';
+import {
+  backgroundBlur,
+  BLUR_PRESETS,
+  MAX_BLUR_RADIUS,
+  getStoredBlurRadius,
+  setStoredBlurRadius
+} from '../lib/background-blur';
 
 interface GreenRoomProps {
   roomName: string;
@@ -18,7 +25,7 @@ interface GreenRoomProps {
   currentUserId: string;
   mediaMode: 'screen' | 'local_file' | 'youtube';
   isHost: boolean;
-  onJoin: (userName: string, micEnabled: boolean, videoEnabled: boolean, presentImmediately: boolean) => void;
+  onJoin: (userName: string, micEnabled: boolean, videoEnabled: boolean, presentImmediately: boolean, blurRadius?: number) => void;
   onCancel: () => void;
 }
 
@@ -36,6 +43,10 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const rawCameraStreamRef = useRef<MediaStream | null>(null);
+  const [bgBlurRadius, setBgBlurRadius] = useState<number>(() => getStoredBlurRadius());
+  const [isBlurMenuOpen, setIsBlurMenuOpen] = useState(false);
+  const [isBlurLoading, setIsBlurLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [liveOccupancy, setLiveOccupancy] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -189,12 +200,24 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
           return;
         }
 
+        rawCameraStreamRef.current = stream;
+
         const hasVideo = stream.getVideoTracks().length > 0;
         const hasAudio = stream.getAudioTracks().length > 0;
 
-        setPreviewStream(stream);
         setIsVideoOn(hasVideo);
         setIsMicOn(hasAudio);
+
+        if (hasVideo && bgBlurRadius > 0) {
+          try {
+            const processed = await backgroundBlur.processStream(stream);
+            setPreviewStream(processed);
+          } catch {
+            setPreviewStream(stream);
+          }
+        } else {
+          setPreviewStream(stream);
+        }
 
         // Setup audio analysis for the level indicator
         if (hasAudio) {
@@ -305,34 +328,74 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     const nextState = !isVideoOn;
     setIsVideoOn(nextState);
 
+    const sourceStream = rawCameraStreamRef.current || previewStream;
+
     if (!nextState) {
-      if (previewStream) {
+      if (sourceStream) {
+        sourceStream.getVideoTracks().forEach((t) => {
+          t.enabled = false;
+        });
+      }
+      if (previewStream && previewStream !== sourceStream) {
         previewStream.getVideoTracks().forEach((t) => {
           t.enabled = false;
         });
       }
     } else {
-      if (previewStream) {
-        const liveVideoTrack = previewStream.getVideoTracks().find((t) => t.readyState === 'live');
+      if (sourceStream) {
+        const liveVideoTrack = sourceStream.getVideoTracks().find((t) => t.readyState === 'live');
         if (liveVideoTrack) {
           liveVideoTrack.enabled = true;
-          setPreviewStream(new MediaStream(previewStream.getTracks()));
+          if (bgBlurRadius > 0) {
+            try {
+              const processed = await backgroundBlur.processStream(sourceStream);
+              setPreviewStream(processed);
+            } catch {
+              setPreviewStream(new MediaStream(sourceStream.getTracks()));
+            }
+          } else {
+            setPreviewStream(new MediaStream(sourceStream.getTracks()));
+          }
         } else {
           try {
             const newStream = await navigator.mediaDevices.getUserMedia({
               video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
             });
-            const newTrack = newStream.getVideoTracks()[0];
-            if (newTrack) {
-              previewStream.getVideoTracks().forEach((t) => previewStream.removeTrack(t));
-              previewStream.addTrack(newTrack);
-              setPreviewStream(new MediaStream(previewStream.getTracks()));
+            rawCameraStreamRef.current = newStream;
+            if (bgBlurRadius > 0) {
+              const processed = await backgroundBlur.processStream(newStream);
+              setPreviewStream(processed);
+            } else {
+              setPreviewStream(newStream);
             }
           } catch (err) {
             console.warn('Unable to enable camera:', err);
             setIsVideoOn(false);
           }
         }
+      }
+    }
+  };
+
+  const handleSelectBlurRadius = async (radius: number) => {
+    setBgBlurRadius(radius);
+    setStoredBlurRadius(radius);
+    backgroundBlur.setBlurRadius(radius);
+
+    const sourceStream = rawCameraStreamRef.current || previewStream;
+    if (sourceStream && isVideoOn) {
+      if (radius > 0) {
+        setIsBlurLoading(true);
+        try {
+          const processed = await backgroundBlur.processStream(sourceStream);
+          setPreviewStream(processed);
+        } catch (err) {
+          console.warn('Failed to apply background blur preview:', err);
+        } finally {
+          setIsBlurLoading(false);
+        }
+      } else {
+        setPreviewStream(sourceStream);
       }
     }
   };
@@ -348,11 +411,17 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     if (previewStream) {
       previewStream.getTracks().forEach((t) => t.stop());
     }
-    onJoin(userName.trim() || 'Guest', isMicOn, isVideoOn, present);
+    if (rawCameraStreamRef.current && rawCameraStreamRef.current !== previewStream) {
+      rawCameraStreamRef.current.getTracks().forEach((t) => t.stop());
+    }
+    onJoin(userName.trim() || 'Guest', isMicOn, isVideoOn, present, bgBlurRadius);
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between select-none z-20">
+    <div
+      onClick={() => setIsBlurMenuOpen(false)}
+      className="relative min-h-screen w-full flex flex-col justify-between select-none z-20"
+    >
       {/* Top Header */}
       <header className="w-full flex items-center justify-between py-4 px-6 sm:px-12 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-black/[0.06] dark:border-white/[0.06] shrink-0">
         <div className="flex items-center gap-3">
@@ -421,6 +490,87 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                 >
                   {isVideoOn ? <Video size={16} /> : <VideoOff size={16} />}
                 </button>
+
+                {/* Background Blur Button & Popover */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsBlurMenuOpen((prev) => !prev)}
+                    className={`p-2.5 rounded-xl transition cursor-pointer min-h-[42px] min-w-[42px] flex items-center justify-center gap-1.5 ${
+                      bgBlurRadius > 0
+                        ? 'bg-[var(--accent)] text-black font-semibold shadow-sm'
+                        : 'bg-white/10 text-white border border-white/15 hover:bg-white/20'
+                    }`}
+                    title={bgBlurRadius > 0 ? `Background Blur Active (${bgBlurRadius}px)` : 'Adjust Background Blur'}
+                    aria-label="Adjust Background Blur"
+                  >
+                    {isBlurLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
+                    <span className="text-[11px] font-medium hidden sm:inline">
+                      {bgBlurRadius === 0 ? 'Blur' : `${bgBlurRadius}px`}
+                    </span>
+                  </button>
+
+                  {isBlurMenuOpen && (
+                    <div
+                      className="absolute bottom-full left-0 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-30 animate-enter-smooth space-y-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white">Background Blur</span>
+                        <span className="text-[11px] font-mono text-[var(--accent)]">
+                          {bgBlurRadius === 0 ? 'Off' : `${bgBlurRadius}px`}
+                        </span>
+                      </div>
+
+                      {/* Preset Chips */}
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { label: 'Off', val: BLUR_PRESETS.OFF },
+                          { label: 'Subtle', val: BLUR_PRESETS.SUBTLE },
+                          { label: 'Portrait', val: BLUR_PRESETS.PORTRAIT },
+                          { label: 'Deep', val: BLUR_PRESETS.DEEP }
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => handleSelectBlurRadius(preset.val)}
+                            className={`py-1.5 text-[10px] font-medium rounded-lg transition cursor-pointer text-center ${
+                              bgBlurRadius === preset.val
+                                ? 'bg-[var(--accent)] text-black font-bold'
+                                : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Continuous Slider */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-white/50">
+                          <span>Intensity</span>
+                          <span>{Math.round((bgBlurRadius / MAX_BLUR_RADIUS) * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={MAX_BLUR_RADIUS}
+                          value={bgBlurRadius}
+                          onChange={(e) => handleSelectBlurRadius(parseInt(e.target.value, 10))}
+                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                        />
+                      </div>
+
+                      <div className="text-[10px] text-white/50 leading-snug">
+                        Edge-refined portrait bokeh with sub-pixel feathering
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Audio Activity Indicator */}

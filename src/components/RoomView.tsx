@@ -37,6 +37,11 @@ import { GreenRoom } from './GreenRoom';
 import { SettingsModal } from './SettingsModal';
 import { FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
+import {
+  backgroundBlur,
+  getStoredBlurRadius,
+  setStoredBlurRadius
+} from '../lib/background-blur';
 
 interface RoomViewProps {
   roomId: string;
@@ -64,6 +69,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'connected' | 'reconnecting' | 'offline'>('connected');
+  const [bgBlurRadius, setBgBlurRadius] = useState<number>(() => getStoredBlurRadius());
 
   // In-room Settings & Telemetry state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -456,7 +462,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
           engine.attachMicStream(localUserMediaRef.current);
         }
         if (isCameraActive && localUserMediaRef.current.getVideoTracks().length > 0) {
-          engine.attachCameraStream(localUserMediaRef.current);
+          if (backgroundBlur.isEnabled()) {
+            try {
+              const processed = await backgroundBlur.processStream(localUserMediaRef.current);
+              engine.attachCameraStream(processed);
+            } catch {
+              engine.attachCameraStream(localUserMediaRef.current);
+            }
+          } else {
+            engine.attachCameraStream(localUserMediaRef.current);
+          }
         }
       }
 
@@ -561,9 +576,15 @@ export const RoomView: React.FC<RoomViewProps> = ({
     name: string,
     micEnabled: boolean,
     videoEnabled: boolean,
-    presentImmediately: boolean
+    presentImmediately: boolean,
+    blurRadius?: number
   ) => {
     setEffectiveUserName(name);
+    if (typeof blurRadius === 'number') {
+      setBgBlurRadius(blurRadius);
+      setStoredBlurRadius(blurRadius);
+      backgroundBlur.setBlurRadius(blurRadius);
+    }
 
     if (micEnabled || videoEnabled) {
       try {
@@ -575,7 +596,18 @@ export const RoomView: React.FC<RoomViewProps> = ({
           t.enabled = videoEnabled;
         });
         localUserMediaRef.current = stream;
-        setLocalUserMediaStream(stream);
+
+        if (videoEnabled && backgroundBlur.isEnabled()) {
+          try {
+            const processed = await backgroundBlur.processStream(stream);
+            setLocalUserMediaStream(processed);
+          } catch {
+            setLocalUserMediaStream(stream);
+          }
+        } else {
+          setLocalUserMediaStream(stream);
+        }
+
         setIsMicActive(micEnabled);
         setIsCameraActive(videoEnabled);
       } catch (err) {
@@ -589,6 +621,27 @@ export const RoomView: React.FC<RoomViewProps> = ({
       setTimeout(() => {
         handleToggleScreenShare();
       }, 500);
+    }
+  };
+
+  const handleSetBlurRadius = async (radius: number) => {
+    setBgBlurRadius(radius);
+    setStoredBlurRadius(radius);
+    backgroundBlur.setBlurRadius(radius);
+
+    if (localUserMediaRef.current && isCameraActive) {
+      if (radius > 0) {
+        try {
+          const processed = await backgroundBlur.processStream(localUserMediaRef.current);
+          webrtcRef.current?.attachCameraStream(processed);
+          setLocalUserMediaStream(processed);
+        } catch (err) {
+          console.warn('Failed to update background blur in stage:', err);
+        }
+      } else {
+        webrtcRef.current?.attachCameraStream(localUserMediaRef.current);
+        setLocalUserMediaStream(new MediaStream(localUserMediaRef.current.getTracks()));
+      }
     }
   };
 
@@ -650,8 +703,19 @@ export const RoomView: React.FC<RoomViewProps> = ({
           }
         }
         if (stream) {
-          webrtcRef.current?.attachCameraStream(stream);
-          setLocalUserMediaStream(new MediaStream(stream.getTracks()));
+          if (backgroundBlur.isEnabled()) {
+            try {
+              const processed = await backgroundBlur.processStream(stream);
+              webrtcRef.current?.attachCameraStream(processed);
+              setLocalUserMediaStream(processed);
+            } catch {
+              webrtcRef.current?.attachCameraStream(stream);
+              setLocalUserMediaStream(new MediaStream(stream.getTracks()));
+            }
+          } else {
+            webrtcRef.current?.attachCameraStream(stream);
+            setLocalUserMediaStream(new MediaStream(stream.getTracks()));
+          }
         }
         setIsCameraActive(true);
       } catch (err) {
@@ -940,6 +1004,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
       isCameraActive={isCameraActive}
       isCameraMirrored={isCameraMirrored}
       onToggleCameraMirror={handleToggleCameraMirror}
+      bgBlurRadius={bgBlurRadius}
+      onSetBlurRadius={handleSetBlurRadius}
       isSharingScreen={isSharingScreen}
       onToggleMic={handleToggleMic}
       onToggleCamera={handleToggleCamera}
@@ -1001,6 +1067,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
           latencyHistory={latencyHistory}
           isCameraMirrored={isCameraMirrored}
           onToggleCameraMirror={handleToggleCameraMirror}
+          bgBlurRadius={bgBlurRadius}
+          onSetBlurRadius={handleSetBlurRadius}
         />
       }
     />

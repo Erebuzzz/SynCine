@@ -35,6 +35,12 @@ import { TelemetryStats, LatencyDataPoint } from '../lib/diagnostics';
 import { DialogueBoostLevel } from '../lib/audio-processing';
 import { ThemeMode, getSavedThemeMode, setSavedThemeMode } from '../lib/time-cycle';
 import { applyPerformanceMode, isSoftwareRenderingDetected } from '../lib/performance-detect';
+import {
+  BLUR_PRESETS,
+  MAX_BLUR_RADIUS,
+  getStoredBlurRadius,
+  setStoredBlurRadius
+} from '../lib/background-blur';
 import { DrmGuideModal } from './DrmGuideModal';
 
 export interface SettingsModalProps {
@@ -58,6 +64,8 @@ export interface SettingsModalProps {
   latencyHistory?: LatencyDataPoint[];
   isCameraMirrored?: boolean;
   onToggleCameraMirror?: (mirrored: boolean) => void;
+  bgBlurRadius?: number;
+  onSetBlurRadius?: (radius: number) => void;
   isAmbilightEnabled?: boolean;
   onToggleAmbilight?: (enabled: boolean) => void;
   dialogueBoost?: DialogueBoostLevel;
@@ -102,6 +110,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   latencyHistory = [],
   isCameraMirrored = false,
   onToggleCameraMirror,
+  bgBlurRadius: propBlurRadius,
+  onSetBlurRadius,
   isAmbilightEnabled: propAmbilight,
   onToggleAmbilight,
   dialogueBoost: propDialogueBoost,
@@ -114,6 +124,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'cinema' | 'shortcuts' | 'diagnostics'>('audio');
   const [localThemeMode, setLocalThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
   const effectiveThemeMode = propThemeMode ?? localThemeMode;
+  const [localBlurRadius, setLocalBlurRadius] = useState<number>(() => getStoredBlurRadius());
+  const effectiveBlurRadius = propBlurRadius !== undefined ? propBlurRadius : localBlurRadius;
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalBlurRadius(propBlurRadius !== undefined ? propBlurRadius : getStoredBlurRadius());
+    }
+  }, [isOpen, propBlurRadius]);
 
   const [isPerformanceMode, setIsPerformanceMode] = useState<boolean>(() => {
     if (typeof document !== 'undefined') {
@@ -182,6 +200,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleTogglePerformance = (val: boolean) => {
     setIsPerformanceMode(val);
     applyPerformanceMode(val);
+  };
+
+  const handleSelectBlurRadius = (val: number) => {
+    setLocalBlurRadius(val);
+    setStoredBlurRadius(val);
+    if (onSetBlurRadius) {
+      onSetBlurRadius(val);
+    }
   };
 
   const [isPlayingTestChime, setIsPlayingTestChime] = useState(false);
@@ -724,6 +750,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* Background Blur & Portrait Bokeh */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-primary)]">
+                      <Sparkles size={15} />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-semibold text-[var(--text-primary)]">
+                        Background Blur & Portrait Bokeh
+                      </span>
+                      <span className="text-[11px] text-[var(--text-tertiary)]">
+                        Sub-pixel edge feathering with real-time subject segmentation
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md ${
+                      effectiveBlurRadius > 0
+                        ? 'bg-[var(--accent)] text-black'
+                        : 'bg-black/[0.06] dark:bg-white/[0.08] text-[var(--text-tertiary)]'
+                    }`}
+                  >
+                    {effectiveBlurRadius === 0 ? 'Off' : `${effectiveBlurRadius}px`}
+                  </span>
+                </div>
+
+                {/* Preset Chips */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Off', val: BLUR_PRESETS.OFF, desc: 'Raw feed' },
+                    { label: 'Subtle', val: BLUR_PRESETS.SUBTLE, desc: '8px' },
+                    { label: 'Portrait', val: BLUR_PRESETS.PORTRAIT, desc: '16px' },
+                    { label: 'Deep', val: BLUR_PRESETS.DEEP, desc: '24px' }
+                  ].map((preset) => {
+                    const isSelected = effectiveBlurRadius === preset.val;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => handleSelectBlurRadius(preset.val)}
+                        className={`py-2 px-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                          isSelected
+                            ? 'bg-[var(--accent)] text-black border-transparent font-bold shadow-sm'
+                            : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] text-[var(--text-secondary)] hover:border-black/[0.15] dark:hover:border-white/[0.15]'
+                        }`}
+                      >
+                        <span className="text-xs">{preset.label}</span>
+                        <span
+                          className={`text-[9px] mt-0.5 ${
+                            isSelected ? 'text-black/70' : 'text-[var(--text-tertiary)]'
+                          }`}
+                        >
+                          {preset.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Continuous Blur Intensity Slider */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[var(--text-tertiary)] font-medium">Fine-tune Blur Radius</span>
+                    <span className="font-mono text-[var(--text-secondary)]">
+                      {effectiveBlurRadius}px / {MAX_BLUR_RADIUS}px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={MAX_BLUR_RADIUS}
+                    value={effectiveBlurRadius}
+                    onChange={(e) => handleSelectBlurRadius(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-black/[0.08] dark:bg-white/[0.1] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                  />
+                </div>
+
+                <p className="text-[10px] text-[var(--text-tertiary)] leading-relaxed">
+                  Off mode completely bypasses model inference to ensure zero CPU/GPU overhead.
+                </p>
               </div>
             </div>
           )}

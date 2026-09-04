@@ -79,6 +79,8 @@ interface WatchStageProps {
   isCameraActive?: boolean;
   isCameraMirrored?: boolean;
   onToggleCameraMirror?: (mirrored: boolean) => void;
+  bgBlurRadius?: number;
+  onSetBlurRadius?: (radius: number) => void;
   isSharingScreen: boolean;
   onToggleMic: () => void;
   onToggleCamera?: () => void;
@@ -218,6 +220,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   isCameraActive = false,
   isCameraMirrored = false,
   onToggleCameraMirror,
+  bgBlurRadius = 0,
+  onSetBlurRadius,
   isSharingScreen,
   onToggleMic,
   onToggleCamera,
@@ -254,6 +258,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [isHostControlsOpen, setIsHostControlsOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
+  const [isBlurMenuOpen, setIsBlurMenuOpen] = useState(false);
 
   // Picture-in-Picture State
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -1392,6 +1397,88 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <FlipHorizontal size={16} />
               {!isFullscreen && <span className="hidden sm:inline">Mirror {isCameraMirrored ? 'On' : 'Off'}</span>}
             </button>
+          )}
+
+          {/* Background Blur Toggle & Popover */}
+          {onSetBlurRadius && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsBlurMenuOpen((prev) => !prev)}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
+                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                  bgBlurRadius > 0
+                    ? 'bg-[var(--accent)] text-black font-semibold border border-[var(--accent)] shadow-sm'
+                    : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+                }`}
+                title={bgBlurRadius > 0 ? `Background Blur Active (${bgBlurRadius}px)` : 'Background Blur (Off)'}
+              >
+                <Sparkles size={16} />
+                {!isFullscreen && (
+                  <span className="hidden sm:inline">
+                    {bgBlurRadius === 0 ? 'Blur: Off' : `Blur: ${bgBlurRadius}px`}
+                  </span>
+                )}
+              </button>
+
+              {isBlurMenuOpen && (
+                <div
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Background Blur</span>
+                    <span className="text-[11px] font-mono text-[var(--accent)]">
+                      {bgBlurRadius === 0 ? 'Off' : `${bgBlurRadius}px`}
+                    </span>
+                  </div>
+
+                  {/* Preset Chips */}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { label: 'Off', val: 0 },
+                      { label: 'Subtle', val: 8 },
+                      { label: 'Portrait', val: 16 },
+                      { label: 'Deep', val: 24 }
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => onSetBlurRadius(preset.val)}
+                        className={`py-1.5 text-[10px] font-medium rounded-lg transition cursor-pointer text-center ${
+                          bgBlurRadius === preset.val
+                            ? 'bg-[var(--accent)] text-black font-bold'
+                            : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Continuous Slider */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-white/50">
+                      <span>Intensity</span>
+                      <span>{Math.round((bgBlurRadius / 32) * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={32}
+                      value={bgBlurRadius}
+                      onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
+                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-white/50 leading-snug">
+                    Edge-refined portrait bokeh with sub-pixel feathering
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Screen Share Action (Host) */}
