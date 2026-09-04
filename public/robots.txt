@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://syncine.app/sitemap.xml
+Sitemap: https://syncine.confluxa.app/sitemap.xml
