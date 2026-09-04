@@ -137,11 +137,13 @@ export function applyISTReflectionCSS(state: ISTCycleState, isDark: boolean) {
   root.style.setProperty('--reflection-angle', `${state.reflectionAngle}deg`);
 
   if (isDark) {
+    // In dark mode, clamp specular reflection to a delicate sheen (0.05 max) to prevent milky white glaze
+    const darkSpecular = Math.min(state.specularOpacity, 0.05);
     root.style.setProperty(
       '--glass-reflection-gradient',
-      `linear-gradient(${state.reflectionAngle}deg, rgba(255, 255, 255, ${state.specularOpacity}) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%)`
+      `linear-gradient(${state.reflectionAngle}deg, rgba(255, 255, 255, ${darkSpecular}) 0%, rgba(255, 255, 255, 0.01) 40%, rgba(255, 255, 255, 0) 100%)`
     );
-    root.style.setProperty('--glass-specular-edge', 'rgba(255, 255, 255, 0.14)');
+    root.style.setProperty('--glass-specular-edge', 'rgba(255, 255, 255, 0.12)');
   } else {
     root.style.setProperty(
       '--glass-reflection-gradient',

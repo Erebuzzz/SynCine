@@ -438,6 +438,9 @@ export const App: React.FC = () => {
             window.history.pushState({}, '', '/');
             setIs404(false);
           }}
+          isDark={isDark}
+          themeMode={themeMode}
+          onToggleTheme={handleToggleTheme}
         />
       </>
     );
@@ -451,7 +454,7 @@ export const App: React.FC = () => {
       {/* Subtle atmospheric canvas and film grain on Lobby only (disabled in watchrooms to guarantee smooth, zero-flicker hardware video playback) */}
       {!activeRoomId && (
         <>
-          <ShaderCanvas />
+          <ShaderCanvas isDark={isDark} />
           <LiquidGlassFilters />
           <div className="film-grain-layer" />
         </>

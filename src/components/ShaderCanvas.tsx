@@ -1,20 +1,34 @@
 import React, { useRef, useEffect } from 'react';
 import { isSoftwareRenderingDetected } from '../lib/performance-detect';
 
+interface ShaderCanvasProps {
+  isDark?: boolean;
+}
+
 /**
  * Barely perceptible warm atmospheric drift on pure black.
- * Uses 2D canvas with extremely subtle radial gradients that shift slowly.
- * Falls back gracefully when WebGL is unavailable.
+ * Uses 2D canvas with transparent alpha and subtle radial gradients.
+ * Leaves the body background (pure OLED black in dark mode) completely unmasked.
  */
-export const ShaderCanvas: React.FC = () => {
+export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({ isDark: propIsDark }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number>(0);
+  const isDarkRef = useRef<boolean | undefined>(propIsDark);
+  const renderRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    isDarkRef.current = propIsDark;
+    if (renderRef.current) {
+      renderRef.current();
+    }
+  }, [propIsDark]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d', { alpha: false });
+    // Standard alpha-enabled 2D context allowing transparent background
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let width = window.innerWidth;
@@ -27,29 +41,36 @@ export const ShaderCanvas: React.FC = () => {
       height = window.innerHeight;
       canvas.width = width;
       canvas.height = height;
+      if (renderRef.current) {
+        renderRef.current();
+      }
     };
     window.addEventListener('resize', handleResize);
 
-    // Check if user is in dark mode
-    const isDark = () => document.documentElement.classList.contains('dark');
+    const resolveIsDark = (): boolean => {
+      if (typeof isDarkRef.current === 'boolean') {
+        return isDarkRef.current;
+      }
+      return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    };
 
     let time = 0;
 
     const render = () => {
       time += 0.003;
+      const effectiveDark = resolveIsDark();
 
-      if (isDark()) {
-        // Pure black base
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, width, height);
+      // Clear the canvas to keep native transparency without opaque color fills
+      ctx.clearRect(0, 0, width, height);
 
-        // Barely perceptible warm drift -- two very faint radial spots that move
+      if (effectiveDark) {
+        // Pure OLED dark drift: two faint amber/warm radial glow spots
         const cx1 = width * 0.3 + Math.sin(time * 0.7) * width * 0.08;
         const cy1 = height * 0.4 + Math.cos(time * 0.5) * height * 0.06;
         const r1 = Math.min(width, height) * 0.5;
 
         const g1 = ctx.createRadialGradient(cx1, cy1, 0, cx1, cy1, r1);
-        g1.addColorStop(0, 'rgba(40, 30, 18, 0.08)');
+        g1.addColorStop(0, 'rgba(200, 169, 126, 0.035)');
         g1.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = g1;
         ctx.fillRect(0, 0, width, height);
@@ -59,15 +80,12 @@ export const ShaderCanvas: React.FC = () => {
         const r2 = Math.min(width, height) * 0.4;
 
         const g2 = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, r2);
-        g2.addColorStop(0, 'rgba(30, 24, 14, 0.06)');
+        g2.addColorStop(0, 'rgba(180, 140, 90, 0.025)');
         g2.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = g2;
         ctx.fillRect(0, 0, width, height);
       } else {
-        // Light mode: very faint warm radial on white
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-
+        // Light mode: very faint warm radial sunbeam drift
         const cx1 = width * 0.4 + Math.sin(time * 0.5) * width * 0.05;
         const cy1 = height * 0.35 + Math.cos(time * 0.4) * height * 0.04;
         const r1 = Math.min(width, height) * 0.6;
@@ -78,34 +96,63 @@ export const ShaderCanvas: React.FC = () => {
         ctx.fillStyle = g1;
         ctx.fillRect(0, 0, width, height);
       }
-
-      animFrameRef.current = requestAnimationFrame(render);
     };
+
+    renderRef.current = render;
 
     // Respect reduced motion or software-rendering mode to save CPU
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const isSoftware = isSoftwareRenderingDetected();
-    if (motionQuery.matches || isSoftware) {
-      // Render once to establish background, but do not burn CPU in a 60fps loop
+    const shouldThrottle = motionQuery.matches || isSoftware;
+
+    let isRunning = false;
+    const loop = () => {
       render();
-      cancelAnimationFrame(animFrameRef.current);
+      if (!shouldThrottle) {
+        animFrameRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    if (shouldThrottle) {
+      render();
     } else {
-      render();
+      isRunning = true;
+      animFrameRef.current = requestAnimationFrame(loop);
+    }
+
+    // Observer for external theme changes when propIsDark is not passed
+    let observer: MutationObserver | null = null;
+    if (typeof MutationObserver !== 'undefined') {
+      observer = new MutationObserver(() => {
+        if (typeof isDarkRef.current !== 'boolean') {
+          render();
+        }
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class']
+      });
     }
 
     // Pause when tab is hidden
     const handleVisibility = () => {
       if (document.hidden) {
         cancelAnimationFrame(animFrameRef.current);
+      } else if (!shouldThrottle) {
+        animFrameRef.current = requestAnimationFrame(loop);
       } else {
         render();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
-
     return () => {
-      cancelAnimationFrame(animFrameRef.current);
+      if (isRunning) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (observer) {
+        observer.disconnect();
+      }
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
@@ -115,7 +162,6 @@ export const ShaderCanvas: React.FC = () => {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none z-0"
-      style={{ opacity: 0.6 }}
       aria-hidden="true"
     />
   );

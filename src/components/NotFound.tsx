@@ -14,6 +14,9 @@ import {
 interface NotFoundProps {
   onReturnHome: () => void;
   message?: string;
+  isDark?: boolean;
+  themeMode?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 interface Star {
@@ -47,7 +50,10 @@ interface Particle {
 
 export const NotFound: React.FC<NotFoundProps> = ({
   onReturnHome,
-  message = 'The requested watchroom or page could not be located.'
+  message = 'The requested watchroom or page could not be located.',
+  isDark: propIsDark,
+  themeMode: propThemeMode,
+  onToggleTheme: propOnToggleTheme
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -63,21 +69,31 @@ export const NotFound: React.FC<NotFoundProps> = ({
   });
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
-  // Theme state: dark vs light
-  const [, setThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
-  const [isDark, setIsDark] = useState<boolean>(() => {
+  // Theme state: dark vs light with fallback to global localStorage
+  const [localThemeMode, setLocalThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
+  const [localIsDark, setLocalIsDark] = useState<boolean>(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark') || resolveThemeIsDark(getSavedThemeMode());
     }
     return true;
   });
 
-  const handleToggleTheme = () => {
-    const nextMode: ThemeMode = isDark ? 'light' : 'dark';
-    setThemeMode(nextMode);
+  const effectiveThemeMode = propThemeMode ?? localThemeMode;
+  const effectiveIsDark = propIsDark ?? (propThemeMode ? resolveThemeIsDark(propThemeMode) : localIsDark);
+
+  const handleLocalToggleTheme = () => {
+    let nextMode: ThemeMode = 'auto';
+    if (effectiveThemeMode === 'auto') {
+      nextMode = effectiveIsDark ? 'light' : 'dark';
+    } else if (effectiveThemeMode === 'light') {
+      nextMode = 'dark';
+    } else {
+      nextMode = 'auto';
+    }
+    setLocalThemeMode(nextMode);
     setSavedThemeMode(nextMode);
-    const nextDark = nextMode === 'dark';
-    setIsDark(nextDark);
+    const nextDark = resolveThemeIsDark(nextMode);
+    setLocalIsDark(nextDark);
 
     if (typeof document !== 'undefined') {
       const root = document.documentElement;
@@ -92,6 +108,8 @@ export const NotFound: React.FC<NotFoundProps> = ({
       applyISTReflectionCSS(state, nextDark);
     }
   };
+
+  const handleToggleTheme = propOnToggleTheme ?? handleLocalToggleTheme;
 
   // Mutable internal game engine ref
   const gameRef = useRef({
@@ -332,7 +350,7 @@ export const NotFound: React.FC<NotFoundProps> = ({
       ctx.font = '10px monospace';
       ctx.fillStyle = 'rgba(255, 140, 110, 0.85)';
       ctx.textAlign = 'right';
-      ctx.fillText('GRAVITY WELL // DANGER', well.x - 22, well.y + 4);
+      ctx.fillText('GRAVITY WELL', well.x - 22, well.y + 4);
 
       // 4. Render "Room" Planet (Reachable Objective / Win Node)
       const room = g.roomPlanet;
@@ -668,9 +686,9 @@ export const NotFound: React.FC<NotFoundProps> = ({
   };
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-3 sm:p-6 text-center bg-[#F7F7F9] dark:bg-[#070709] text-[var(--text-primary)] select-none z-10 relative overflow-hidden transition-colors duration-300">
+    <main className="min-h-screen w-full flex flex-col items-center justify-center p-3 sm:p-6 text-center bg-[#FAFAFA] dark:bg-black text-[var(--text-primary)] select-none z-10 relative overflow-hidden transition-colors duration-300">
       {/* Background ambient canvas */}
-      <ShaderCanvas />
+      <ShaderCanvas isDark={effectiveIsDark} />
 
       <div className="w-full max-w-2xl p-5 sm:p-7 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-[#121215]/95 border border-black/[0.08] dark:border-white/[0.12] flex flex-col items-center animate-enter-smooth relative z-10 shadow-2xl backdrop-blur-2xl transition-all duration-300">
         {/* Top Header Bar inside Card with Logo and Theme Toggle */}
@@ -683,22 +701,26 @@ export const NotFound: React.FC<NotFoundProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Theme Toggle Button */}
+            {/* Theme Switcher (Day/Night Indicator) - identical to Lobby */}
             <button
               type="button"
               onClick={handleToggleTheme}
-              className="p-1.5 sm:p-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer flex items-center gap-1.5"
-              title={isDark ? 'Switch to Light theme' : 'Switch to Dark theme'}
-              aria-label="Toggle theme mode"
+              className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer flex items-center gap-1.5"
+              title={
+                effectiveThemeMode === 'auto'
+                  ? `Auto Real-Time Theme (${effectiveIsDark ? 'Night' : 'Day'} Mode active) · Click to switch to Light`
+                  : effectiveThemeMode === 'light'
+                  ? 'Light Theme · Click to switch to Dark'
+                  : 'Dark Theme · Click to switch to Auto Real-Time'
+              }
+              aria-label="Toggle visual theme"
             >
-              {isDark ? (
-                <Sun size={14} className="text-amber-400" />
-              ) : (
-                <Moon size={14} className="text-indigo-500" />
+              {effectiveIsDark ? <Moon size={16} /> : <Sun size={16} />}
+              {effectiveThemeMode === 'auto' && (
+                <span className="text-[10px] font-bold text-[var(--accent)] hidden sm:inline uppercase tracking-wider">
+                  Auto
+                </span>
               )}
-              <span className="text-[10px] font-semibold hidden sm:inline text-[var(--text-secondary)]">
-                {isDark ? 'Light' : 'Dark'}
-              </span>
             </button>
           </div>
         </div>
