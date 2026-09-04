@@ -201,20 +201,22 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Replaced `'1 person waiting in room'` with `'1 person in room'` in `GreenRoom.tsx` (and `'No one is in the room yet'` when occupancy is 0).
   - Fixed capacity check in `App.tsx` and `RoomView.tsx` to handle 0 cleanly.
 
-## 16. Verification & Validation Status
-- **Vitest Suites:** 8/8 test files passed (28/28 unit tests).
-- **TypeScript & Vite Build:** `tsc && vite build` passed with zero errors.
-- **Emdash Compliance:** 100% verified zero emdashes in entire repository.
+## 18. WebRTC Black Video Resolution & Late-Joiner Screen Cast Sync
+- **Root Cause & Architectural Failure:**
+  1. Participant video feeds in `WatchStage.tsx` were rendered with `isMuted={false}` so remote participant audio would play through the same `<video>` element. Chromium and Safari autoplay policies strictly block unmuted video playback on newly mounted WebRTC streams without an element-level user click, freezing the video on frame 0 as a solid black rectangle.
+  2. Forcing `H.264` codec preferences in `webrtc.ts` caused negotiation stalls or black output on systems where browser hardware acceleration was turned off.
+  3. `pc.ontrack` merged all incoming tracks into a single stream with a random ID, breaking screen share detection (`stream.id === screenStreamIdRef.current`).
+  4. Late joiners received neither screen cast metadata in `announce-join`/`announce-ack` nor track ID differentiation.
+- **Resolution Implemented:**
+  1. **Permanent Muted Autoplay on Camera Feeds (`StreamVideoPlayer` in `WatchStage.tsx`):** Camera feeds in sidebar, standby, grid, and pinned views now pass `isCamera={true}`, which permanently sets `muted={true}` and binds a video-only `MediaStream(stream.getVideoTracks())`. Autoplay on muted video is unconditionally allowed by W3C and browser standards without user gestures. Added `unmute` event listeners on tracks to trigger playback as soon as the first RTP frame arrives.
+  2. **Dedicated Invisible Audio Players (`RemoteAudioPlayer` in `WatchStage.tsx`):** Remote participant audio is completely decoupled from camera video rendering. Audio plays even if a participant has camera disabled, and muting/unmuting microphone or changing volume never blanks out or interrupts camera video feeds.
+  3. **Transceiver-Based Track Swapping (`webrtc.ts`):** Cached audio and video transceivers per peer. Camera mute/unmute and background blur switches call `sender.replaceTrack(track)` or `sender.replaceTrack(null)` without renegotiation or glare collisions.
+  4. **Late Joiner Screen Cast Synchronization (`webrtc.ts`):** `announce-join` and `announce-ack` exchange `hasScreenCast`, `screenStreamId`, and `screenTrackId`. When an existing peer is screen casting, it immediately emits `screen-cast-started` upon detecting a newly joined peer. Screen tracks are segregated from camera/mic tracks and delivered via `onRemoteScreenStream`.
+  5. **Stage Screen Cast Selection (`RoomView.tsx`):** Cleaned up `effectiveMediaStream` to `isSharingScreen ? mediaStream : remoteScreenStream`.
+- **Verification:**
+  - Vitest: 8/8 test files passed (30/30 tests).
+  - TypeScript & Vite Build: `tsc && vite build` passed with zero errors.
+  - Deployed to GitHub `main` branch.
 
-## 17. Streamlined Background Blur & Complete Subtitle Removal
-- **Background Blur Placement:**
-  - Standardized blur controls to exactly two places:
-    1. Settings Modal: In the Video & Quality tab (`SettingsModal.tsx`).
-    2. Video Tile Hover Action Bar (`TileActionControls` in `WatchStage.tsx`): Positioned beside the pin button on the user's video feed. Hovering displays the Sparkles button; clicking opens a popover containing preset chips (Off, Subtle, Portrait, Deep) and a continuous fine-tune slider (0-32px).
-- **External Subtitle Removal:**
-  - Completely removed external subtitle parser (`subtitle-parser.ts`), subtitle overlay (`SubtitleOverlay.tsx`), and tests (`subtitle.test.ts`).
-  - Removed subtitle toggle from cinema dock, settings modal, and shortcuts modal.
-  - Decoupled `YouTubeSyncPlayer.tsx` to use local `formatTime` helper.
-  - Updated all user-facing documentation and keyboard shortcuts accordingly.
 
 
