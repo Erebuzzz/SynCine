@@ -160,7 +160,11 @@ sequenceDiagram
 - **Document-Level Security (DLS):** Ephemeral WebRTC signaling documents (`signaling`) are restricted so only the intended recipient can read the SDP payloads.
 - **Automated Ephemeral Cleanup:** An Appwrite serverless function executes on a 5-minute cron schedule (`*/5 * * * *`) to purge signaling documents older than 10 minutes.
 
-### 4. Keyboard Shortcuts
+### 4. DRM Streaming & Hardware Acceleration Best Practice
+- **DRM Black Screen Mitigation:** Streaming platforms like Disney+ Hotstar, Netflix, and Prime Video enforce HDCP hardware encryption via Widevine DRM. When capturing through your browser, GPU hardware acceleration blacks out video frames to prevent recording.
+- **Dual-Profile Isolation Workflow:** If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+
+### 5. Keyboard Shortcuts
 - `M`: Mute / Unmute Microphone
 - `Space`: Push-to-Talk (Hold to speak, release to mute)
 - `O`: Camera On / Off
@@ -282,6 +286,6 @@ npm run build
 
 1. **Anonymous Authentication:** Navigating to the application URL creates an anonymous session instantly without authentication screens.
 2. **Safari Compatibility:** The host interface detects Safari and falls back to Local File Sync mode without crashing `getDisplayMedia`.
-3. **DRM Protected Media:** Streaming Netflix/Prime from Chrome or Edge functions without black screens when hardware acceleration is disabled in browser settings.
+3. **DRM Protected Media:** Streaming Netflix/Prime/Hotstar functions without black screens when hardware acceleration is disabled in the source player. For optimal responsiveness, keep hardware acceleration enabled in the SynCine window and isolate DRM streaming in a secondary browser profile.
 4. **Touch-Action Isolation:** Dragging floating video boxes on iPadOS Safari or touch displays repositions tiles smoothly without scrolling or zooming the webpage.
 5. **Ephemeral Cleanup:** The Appwrite cron function purges signaling documents older than 10 minutes to respect database quotas.

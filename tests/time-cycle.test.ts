@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   format12HourTime,
-  resolveThemeIsDark,
-  ThemeMode
+  resolveThemeIsDark
 } from '../src/lib/time-cycle';
 import { isSoftwareRenderingDetected, applyPerformanceMode } from '../src/lib/performance-detect';
 

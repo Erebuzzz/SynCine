@@ -253,6 +253,9 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                 <div className="font-semibold text-black/80 dark:text-white/80 text-[11px]">
                   Solution: Open Chrome Settings (chrome://settings/system) &gt; turn OFF "Use hardware acceleration when available" &gt; click Relaunch. Hotstar and Netflix tabs will now share with full video and audio.
                 </div>
+                <div className="mt-2 p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.06] text-[11px] leading-relaxed">
+                  <strong className="text-[var(--accent)]">Best Practice for Streaming DRM Content (Hotstar / Netflix / Prime):</strong> If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+                </div>
               </div>
             </div>
           )}

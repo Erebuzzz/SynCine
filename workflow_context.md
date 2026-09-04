@@ -184,7 +184,16 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Paused continuous 60fps canvas loop in `ShaderCanvas.tsx` when software rendering or reduced motion is detected.
   - Skipped `CustomCursor.tsx` DOM trailing follower in software rendering mode to preserve instant native pointer response.
 
-## 13. Verification & Validation Status
+## 13. DRM Streaming Best Practice & Documentation
+- **Dual-Profile / Secondary Browser Recommendation:**
+  - Added clear documentation in `src/components/DocsModal.tsx`, `src/components/DrmGuideModal.tsx`, and `Readme.md`:
+  > "Best Practice for Streaming DRM Content (Hotstar / Netflix / Prime): If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed."
+- **Build Fix in Tests:**
+  - Resolved `tests/time-cycle.test.ts(5,3): error TS6133: 'ThemeMode' is declared but its value is never read` by removing unused type import to satisfy `noUnusedLocals: true`.
+
+## 14. Verification & Validation Status
 - **Vitest Suites:** 8/8 test files passed (30/30 unit tests) covering media capture, drift synchronization, WebRTC signaling, performance diagnostics, subtitles, YouTube video ID extraction, audio processing, and 12-hour time/theme cycle formatting.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 6.26s.
-- **Main Branch:** Ready to commit and push to `origin/main`.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 5.13s.
+- **Emdash Compliance:** 100% verified zero emdashes (`—`) in entire repository.
+- **Main Branch:** Committed and pushed to `origin/main`.
+

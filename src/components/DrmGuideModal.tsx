@@ -91,9 +91,19 @@ export const DrmGuideModal: React.FC<DrmGuideModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Tip for tab sharing vs full screen */}
-        <div className="p-3 rounded-xl bg-[#30D158]/10 border border-[#30D158]/20 text-xs text-[#30D158] dark:text-[#30D158] mb-5 flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-[#30D158]/10 border border-[#30D158]/20 text-xs text-[#30D158] dark:text-[#30D158] mb-3 flex items-center gap-2">
           <CheckCircle2 size={16} className="shrink-0" />
           <span>Pro Tip: When sharing, choose <strong>"Chrome Tab"</strong> and check <strong>"Also share tab audio"</strong> for optimal sync!</span>
+        </div>
+
+        {/* Dual Profile / Browser Isolation Best Practice */}
+        <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] text-xs mb-5 space-y-1">
+          <div className="font-semibold text-[var(--accent)]">
+            Best Practice for Streaming DRM Content (Hotstar / Netflix / Prime)
+          </div>
+          <p className="text-black/70 dark:text-white/70 text-[11px] leading-relaxed">
+            If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+          </p>
         </div>
 
         {/* Action Button */}
