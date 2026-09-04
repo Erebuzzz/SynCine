@@ -14,7 +14,15 @@ import {
   RoomDocument,
   MAX_PARTICIPANTS
 } from './lib/appwrite';
-import { getISTCycleState, applyISTReflectionCSS } from './lib/time-cycle';
+import {
+  getISTCycleState,
+  applyISTReflectionCSS,
+  ThemeMode,
+  getSavedThemeMode,
+  setSavedThemeMode,
+  resolveThemeIsDark
+} from './lib/time-cycle';
+import { applyPerformanceMode } from './lib/performance-detect';
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
@@ -85,24 +93,22 @@ export const App: React.FC = () => {
   });
   const [settingsPreviewStream, setSettingsPreviewStream] = useState<MediaStream | null>(null);
 
-  // Determine initial theme: User manual preference or Indian Standard Time (IST) Day/Night cycle
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('syncine-theme-manual');
-      if (stored === 'dark') return true;
-      if (stored === 'light') return false;
+  // Theme mode: 'auto' (real-time day/night sync), 'light', or 'dark'
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
+  const [isDark, setIsDark] = useState<boolean>(() => resolveThemeIsDark(getSavedThemeMode()));
 
-      // Automatic IST cycle: Sunrise 06:00 to Sunset 18:30 IST is Light mode, else Dark mode
-      const { isDaytime } = getISTCycleState();
-      return !isDaytime;
-    }
-    return true;
-  });
+  // Detect software rendering and apply zero-lag optimizations on mount
+  useEffect(() => {
+    applyPerformanceMode();
+  }, []);
 
-  // Apply theme class and dynamic IST reflection system
+  // Apply theme class and dynamic IST reflection system with active real-time clock syncing
   useEffect(() => {
     const root = document.documentElement;
-    if (isDark) {
+    const dark = resolveThemeIsDark(themeMode);
+    setIsDark(dark);
+
+    if (dark) {
       root.classList.add('dark');
       root.classList.remove('light');
     } else {
@@ -111,16 +117,29 @@ export const App: React.FC = () => {
     }
 
     const state = getISTCycleState();
-    applyISTReflectionCSS(state, isDark);
+    applyISTReflectionCSS(state, dark);
 
-    // Periodically update the solar reflection angle
+    // Active timer to ensure real-time theme switches accurately when the clock turns
     const interval = setInterval(() => {
       const currentState = getISTCycleState();
-      applyISTReflectionCSS(currentState, isDark);
-    }, 60000);
+      if (themeMode === 'auto') {
+        const autoDark = resolveThemeIsDark('auto');
+        setIsDark(autoDark);
+        if (autoDark) {
+          root.classList.add('dark');
+          root.classList.remove('light');
+        } else {
+          root.classList.remove('dark');
+          root.classList.add('light');
+        }
+        applyISTReflectionCSS(currentState, autoDark);
+      } else {
+        applyISTReflectionCSS(currentState, dark);
+      }
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [isDark]);
+  }, [themeMode]);
 
   useEffect(() => {
     async function init() {
@@ -218,10 +237,22 @@ export const App: React.FC = () => {
   };
 
   const handleToggleTheme = () => {
-    const nextTheme = !isDark;
-    setIsDark(nextTheme);
-    localStorage.setItem('syncine-theme-manual', nextTheme ? 'dark' : 'light');
-    applyISTReflectionCSS(getISTCycleState(), nextTheme);
+    // Cycles through Auto (real-time sync) -> Light -> Dark -> Auto
+    let nextMode: ThemeMode = 'auto';
+    if (themeMode === 'auto') {
+      nextMode = isDark ? 'light' : 'dark';
+    } else if (themeMode === 'light') {
+      nextMode = 'dark';
+    } else {
+      nextMode = 'auto';
+    }
+    setThemeMode(nextMode);
+    setSavedThemeMode(nextMode);
+  };
+
+  const handleSetThemeMode = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    setSavedThemeMode(mode);
   };
 
   const handleCreateRoom = async (
@@ -493,6 +524,8 @@ export const App: React.FC = () => {
         previewStream={settingsPreviewStream}
         isCameraMirrored={isCameraMirrored}
         onToggleCameraMirror={handleToggleCameraMirror}
+        themeMode={themeMode}
+        onSetThemeMode={handleSetThemeMode}
       />
 
       {activeRoomId && currentUser ? (
@@ -530,6 +563,7 @@ export const App: React.FC = () => {
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onLogout={handleLogout}
           isDark={isDark}
+          themeMode={themeMode}
           onToggleTheme={handleToggleTheme}
           initialRoomId={initialRoomParam}
           isAuthenticating={isAuthenticating}

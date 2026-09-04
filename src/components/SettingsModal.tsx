@@ -20,6 +20,8 @@ import {
   Copy,
   Sparkles,
   Moon,
+  Sun,
+  Zap,
   Volume2,
   Subtitles
 } from 'lucide-react';
@@ -31,6 +33,8 @@ import {
 } from '../lib/media-capture';
 import { TelemetryStats, LatencyDataPoint } from '../lib/diagnostics';
 import { DialogueBoostLevel } from '../lib/audio-processing';
+import { ThemeMode, getSavedThemeMode, setSavedThemeMode } from '../lib/time-cycle';
+import { applyPerformanceMode, isSoftwareRenderingDetected } from '../lib/performance-detect';
 import { DrmGuideModal } from './DrmGuideModal';
 
 export interface SettingsModalProps {
@@ -60,6 +64,8 @@ export interface SettingsModalProps {
   onSelectDialogueBoost?: (level: DialogueBoostLevel) => void;
   nightMode?: boolean;
   onToggleNightMode?: (enabled: boolean) => void;
+  themeMode?: ThemeMode;
+  onSetThemeMode?: (mode: ThemeMode) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -101,9 +107,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   dialogueBoost: propDialogueBoost,
   onSelectDialogueBoost,
   nightMode: propNightMode,
-  onToggleNightMode
+  onToggleNightMode,
+  themeMode: propThemeMode,
+  onSetThemeMode
 }) => {
   const [activeTab, setActiveTab] = useState<'audio' | 'video' | 'cinema' | 'shortcuts' | 'diagnostics'>('audio');
+  const [localThemeMode, setLocalThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
+  const effectiveThemeMode = propThemeMode ?? localThemeMode;
+
+  const [isPerformanceMode, setIsPerformanceMode] = useState<boolean>(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('software-rendering') || isSoftwareRenderingDetected();
+    }
+    return false;
+  });
   const [localAmbilight, setLocalAmbilight] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('syncine-ambilight') !== 'false';
@@ -143,6 +160,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalNightMode(val);
     if (onToggleNightMode) onToggleNightMode(val);
     if (typeof window !== 'undefined') localStorage.setItem('syncine-night-mode', val ? 'true' : 'false');
+  };
+
+  const handleSelectThemeMode = (mode: ThemeMode) => {
+    setLocalThemeMode(mode);
+    setSavedThemeMode(mode);
+    if (onSetThemeMode) {
+      onSetThemeMode(mode);
+    } else if (typeof document !== 'undefined') {
+      const dark = mode === 'dark' || (mode === 'auto' && (new Date().getHours() < 6 || new Date().getHours() >= 18.5));
+      if (dark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+    }
+  };
+
+  const handleTogglePerformance = (val: boolean) => {
+    setIsPerformanceMode(val);
+    applyPerformanceMode(val);
   };
 
   const [isPlayingTestChime, setIsPlayingTestChime] = useState(false);
@@ -789,6 +828,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div
                     className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-0.5 ${
                       effectiveNightMode ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Real-Time Theme Mode */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Sun size={16} className="text-amber-500" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Real-Time Day / Night Theme
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                    {effectiveThemeMode === 'auto' ? 'Clock Synchronized' : 'Manual'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-tertiary)] mb-3 leading-relaxed">
+                  Automatic mode dynamically shifts to clean Light theme during daylight hours (06:00 to 18:30) and switches to OLED Cinema Black at night.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { id: 'auto', label: 'Auto (Real-Time)', desc: 'Follows daylight clock' },
+                      { id: 'light', label: 'Light', desc: 'Always daylight' },
+                      { id: 'dark', label: 'Dark', desc: 'Always cinema black' }
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleSelectThemeMode(opt.id as ThemeMode)}
+                      className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                        effectiveThemeMode === opt.id
+                          ? 'bg-black/[0.06] dark:bg-white/[0.1] border-[var(--accent)] text-[var(--text-primary)] shadow-sm'
+                          : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] text-[var(--text-secondary)] hover:border-black/[0.12] dark:hover:border-white/[0.12]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold">{opt.label}</span>
+                        {effectiveThemeMode === opt.id && <Check size={13} className="text-[var(--accent)]" />}
+                      </div>
+                      <span className="text-[10px] text-[var(--text-tertiary)] leading-tight block">
+                        {opt.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Performance Mode (Zero-Lag Fallback) */}
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+                <div className="pr-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap size={16} className="text-amber-400" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Performance Mode (Zero-Lag Fallback)
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+                    Disables expensive CPU Gaussian blurs and filters. Automatically activated when browser Hardware Acceleration is disabled or on lower-end devices to guarantee smooth 60fps streaming.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTogglePerformance(!isPerformanceMode)}
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                    isPerformanceMode ? 'bg-[var(--accent)]' : 'bg-black/20 dark:bg-white/20'
+                  }`}
+                  title="Toggle Performance Mode"
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-0.5 ${
+                      isPerformanceMode ? 'left-[22px]' : 'left-0.5'
                     }`}
                   />
                 </button>

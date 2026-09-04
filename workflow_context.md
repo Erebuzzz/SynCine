@@ -160,7 +160,31 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - Host receives real-time signal, synthesizes pleasant Web Audio doorbell chime (587 Hz to 880 Hz sine wave), and displays floating banner with Admit and Decline options.
   - Admitted guests automatically enter the watchroom stage without manual reloading.
 
-## 11. Verification & Validation Status
-- **Vitest Suites:** 7/7 test files passed (27/27 unit tests) covering media capture constraints, synchronizer jitter thresholds, WebRTC signaling, performance diagnostics, subtitle parsing, YouTube video ID extraction, and cinema audio processing.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 3.38s.
-- **Main Branch:** Synced and ready to push to GitHub repository `origin/main`.
+## 11. Real-Time Day/Night Theme & Meeting Top Bar Clock
+- **Root Cause Analysis of Theme Issue:**
+  - A legacy `localStorage` key (`syncine-theme-manual`) previously locked the theme permanently to `dark` or `light` upon user click, preventing subsequent real-time clock evaluations.
+  - The periodic 60s interval updated CSS reflection gradients but never checked whether the sun had risen or set to transition `isDark`.
+  - Hardcoded `<html class="dark">` in `index.html` produced a momentary flash of dark mode before hydration.
+- **Resolution:**
+  - Added a 3-mode theme system (`ThemeMode: 'auto' | 'light' | 'dark'`) defaulting to `'auto'`.
+  - Added early synchronous theme initialization script in `<head>` of `index.html` to evaluate `syncine-theme-mode` and real-world clock prior to DOM paint.
+  - In `'auto'` mode, active 10s timer evaluates daytime status (06:00 to 18:30 is Light Mode, 18:30 to 06:00 is OLED Dark Mode) and switches dynamically.
+  - Exposed 3-option theme selector in `SettingsModal.tsx` Cinema tab and interactive 3-state cycling button in `Lobby.tsx` with an active "Auto" badge.
+- **12-Hour Meeting Top Bar Clock:**
+  - Added a live 12-hour format clock pill (`h:mm A`, e.g. `9:58 AM`) with `<Clock size={12} />` in the meeting header of `WatchStage.tsx`.
+  - Updates on a 1-second interval with tabular font formatting matching Google Meet.
+
+## 12. Zero-Lag Optimization for Disabled Hardware Acceleration
+- **Root Cause of Browser Lag when Hardware Acceleration is Disabled:**
+  - When browser Hardware Acceleration is disabled in settings to bypass DRM black screens, Chromium reverts to CPU software rasterization (SwiftShader / Mesa).
+  - CSS `backdrop-filter: blur(...)` and full-screen SVG `feTurbulence` filters must then be calculated on the CPU for every pixel on every animation frame, consuming 100% CPU and causing severe browser stutter.
+- **Resolution:**
+  - Built `src/lib/performance-detect.ts` to detect SwiftShader and software rendering via WebGL debug renderer info.
+  - Added `.software-rendering` fallbacks in `src/index.css` that eliminate CPU Gaussian blurs and hide SVG turbulence filters, switching to crisp high-performance solid surfaces.
+  - Paused continuous 60fps canvas loop in `ShaderCanvas.tsx` when software rendering or reduced motion is detected.
+  - Skipped `CustomCursor.tsx` DOM trailing follower in software rendering mode to preserve instant native pointer response.
+
+## 13. Verification & Validation Status
+- **Vitest Suites:** 8/8 test files passed (30/30 unit tests) covering media capture, drift synchronization, WebRTC signaling, performance diagnostics, subtitles, YouTube video ID extraction, audio processing, and 12-hour time/theme cycle formatting.
+- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 6.26s.
+- **Main Branch:** Ready to commit and push to `origin/main`.

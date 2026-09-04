@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { isSoftwareRenderingDetected } from '../lib/performance-detect';
 
 /**
  * Barely perceptible warm atmospheric drift on pure black.
@@ -81,10 +82,11 @@ export const ShaderCanvas: React.FC = () => {
       animFrameRef.current = requestAnimationFrame(render);
     };
 
-    // Respect reduced motion
+    // Respect reduced motion or software-rendering mode to save CPU
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (motionQuery.matches) {
-      // Render once, no animation
+    const isSoftware = isSoftwareRenderingDetected();
+    if (motionQuery.matches || isSoftware) {
+      // Render once to establish background, but do not burn CPU in a 60fps loop
       render();
       cancelAnimationFrame(animFrameRef.current);
     } else {

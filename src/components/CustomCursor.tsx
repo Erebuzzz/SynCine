@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { isSoftwareRenderingDetected } from '../lib/performance-detect';
 
 export const CustomCursor: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -13,10 +14,11 @@ export const CustomCursor: React.FC = () => {
   const rafId = useRef<number | null>(null);
 
   useEffect(() => {
-    // Check if device supports fine pointer (mouse/trackpad) and not reduced motion
+    // Check if device supports fine pointer (mouse/trackpad) and not reduced motion or software-rendering
     const isFinePointer = window.matchMedia('(pointer: fine)').matches;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!isFinePointer || prefersReducedMotion) return;
+    const isSoftware = isSoftwareRenderingDetected();
+    if (!isFinePointer || prefersReducedMotion || isSoftware) return;
 
     const onMouseMove = (e: MouseEvent) => {
       mousePos.current = { x: e.clientX, y: e.clientY };

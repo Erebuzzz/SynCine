@@ -102,6 +102,28 @@ body {
   filter: url(#film-grain-filter);
 }
 
+/* Zero-Lag Fallbacks when Hardware Acceleration is turned off in browser */
+.software-rendering .film-grain-layer {
+  display: none !important;
+}
+
+.software-rendering .realistic-glass {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.software-rendering [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.software-rendering header,
+.software-rendering footer,
+.software-rendering nav {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Isolated Hardware-Accelerated Video Rendering (Prevents GPU Compositor Flickering) */
 video {
   transform: translateZ(0);

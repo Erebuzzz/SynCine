@@ -31,12 +31,14 @@ import {
 import type { Models } from 'appwrite';
 import { formatRoomCode, extractYouTubeId } from '../lib/appwrite';
 import { getLocalPermanentRooms, PermanentRoomItem } from './PermanentLinksModal';
+import { ThemeMode } from '../lib/time-cycle';
 
 interface LobbyProps {
   currentUser: Models.User<Models.Preferences> | null;
   userName: string;
   onUserNameChange: (name: string) => void;
   avatarUrl?: string;
+  themeMode?: ThemeMode;
   onCreateRoom: (name: string, mediaMode: 'screen' | 'local_file' | 'youtube', isPermanent: boolean, youtubeUrl?: string) => Promise<void>;
   onJoinRoom: (roomId: string) => Promise<void>;
   onOpenAuth: () => void;
@@ -71,6 +73,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onOpenSettings,
   onLogout,
   isDark,
+  themeMode = 'auto',
   onToggleTheme,
   initialRoomId = '',
   isAuthenticating
@@ -234,11 +237,22 @@ export const Lobby: React.FC<LobbyProps> = ({
           <button
             type="button"
             onClick={onToggleTheme}
-            className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer"
-            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition cursor-pointer flex items-center gap-1.5"
+            title={
+              themeMode === 'auto'
+                ? `Auto Real-Time Theme (${isDark ? 'Night' : 'Day'} Mode active) · Click to switch to Light`
+                : themeMode === 'light'
+                ? 'Light Theme · Click to switch to Dark'
+                : 'Dark Theme · Click to switch to Auto Real-Time'
+            }
             aria-label="Toggle visual theme"
           >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? <Moon size={16} /> : <Sun size={16} />}
+            {themeMode === 'auto' && (
+              <span className="text-[10px] font-bold text-[var(--accent)] hidden sm:inline uppercase tracking-wider">
+                Auto
+              </span>
+            )}
           </button>
 
           {/* Functional Profile Name Button & Dropdown Menu */}

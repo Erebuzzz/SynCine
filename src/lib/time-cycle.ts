@@ -1,17 +1,19 @@
 /**
- * Indian Standard Time (IST) Day/Night Cycle & Solar Position Tracker
+ * Real-Time Day/Night Cycle & Solar Reflection System
  *
- * IST is UTC+5:30.
- * In India:
- * - Sunrise is approximately 06:00 IST
- * - Sunset is approximately 18:30 IST
+ * Automatically synchronizes visual themes with the real-world clock:
+ * - Daytime (06:00 to 18:30): Light Mode with morning and afternoon solar sheen.
+ * - Nighttime (18:30 to 06:00): OLED Cinema Dark Mode with moonlit specular reflection.
  *
- * Daytime (06:00 to 18:30 IST): Automatically suggests Light Mode.
- * Nighttime (18:30 to 06:00 IST): Automatically suggests Dark Mode.
- *
- * The solar reflection angle also continuously sweeps across glassmorphic surfaces
- * to simulate realistic ambient light reflection based on the time of day.
+ * Supports three theme modes:
+ * - 'auto': Real-time dynamic day/night mode tracking the live clock.
+ * - 'light': Forced Light Mode.
+ * - 'dark': Forced OLED Dark Mode.
  */
+
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
+export const THEME_STORAGE_KEY = 'syncine-theme-mode';
 
 export interface ISTCycleState {
   isDaytime: boolean;
@@ -20,6 +22,61 @@ export interface ISTCycleState {
   reflectionAngle: number;
   specularOpacity: number;
   timeLabel: string;
+}
+
+/**
+ * Formats a Date object into 12-hour time format (e.g., "9:58 AM", "12:05 PM").
+ */
+export function format12HourTime(date: Date = new Date()): string {
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // Hour '0' is 12 AM
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+/**
+ * Returns whether the current device local time corresponds to daytime (06:00 to 18:30).
+ * Sunrise = 06:00 (360 min), Sunset = 18:30 (1110 min).
+ */
+export function isCurrentlyDaytime(): boolean {
+  const now = new Date();
+  const totalMinutes = now.getHours() * 60 + now.getMinutes();
+  return totalMinutes >= 360 && totalMinutes < 1110;
+}
+
+/**
+ * Resolves whether dark mode should be enabled based on user's theme mode.
+ */
+export function resolveThemeIsDark(mode: ThemeMode): boolean {
+  if (mode === 'dark') return true;
+  if (mode === 'light') return false;
+  // 'auto' mode: Light during daytime, Dark at nighttime
+  return !isCurrentlyDaytime();
+}
+
+/**
+ * Retrieves the saved theme mode, defaulting to 'auto' for real-time day/night sync.
+ */
+export function getSavedThemeMode(): ThemeMode {
+  if (typeof window === 'undefined') return 'auto';
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  if (saved === 'light' || saved === 'dark' || saved === 'auto') {
+    return saved;
+  }
+  // Remove legacy key if present to allow smooth migration to real-time auto mode
+  localStorage.removeItem('syncine-theme-manual');
+  return 'auto';
+}
+
+/**
+ * Saves the selected theme mode to localStorage.
+ */
+export function setSavedThemeMode(mode: ThemeMode): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(THEME_STORAGE_KEY, mode);
+  localStorage.removeItem('syncine-theme-manual');
 }
 
 export function getISTCycleState(): ISTCycleState {
@@ -71,7 +128,7 @@ export function getISTCycleState(): ISTCycleState {
 }
 
 /**
- * Applies the IST reflection variables directly to documentElement CSS
+ * Applies the solar reflection variables directly to documentElement CSS
  */
 export function applyISTReflectionCSS(state: ISTCycleState, isDark: boolean) {
   if (typeof document === 'undefined') return;

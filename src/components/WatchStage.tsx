@@ -35,8 +35,10 @@ import {
   FlipHorizontal,
   Subtitles,
   FileText,
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react';
+import { format12HourTime } from '../lib/time-cycle';
 import { EmojiReactions, type FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
 import { HostControlsModal } from './HostControlsModal';
@@ -287,6 +289,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     return false;
   });
   const audioProcessorRef = useRef<CinemaAudioProcessor | null>(null);
+
+  // Live Meeting Current Time (12-Hour Format)
+  const [currentTime, setCurrentTime] = useState<string>(() => format12HourTime());
+  useEffect(() => {
+    const updateTime = () => setCurrentTime(format12HourTime());
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Feed Pinning State
   const [pinnedFeedId, setPinnedFeedId] = useState<string | null>(null);
@@ -673,6 +683,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <span>{totalUsersInRoom}/4</span>
             </span>
           </div>
+        </div>
+
+        {/* Live Meeting Clock (12-Hour Format) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.08] text-xs font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] select-none shrink-0 shadow-2xs">
+          <Clock size={12} className="text-[var(--accent)] shrink-0" />
+          <span className="tabular-nums font-mono text-[11px] sm:text-xs tracking-tight">{currentTime}</span>
         </div>
 
         {/* Action Controls */}
