@@ -35,6 +35,7 @@ import { WatchStage, Participant } from './WatchStage';
 import { ChatSidebar } from './ChatSidebar';
 import { GreenRoom } from './GreenRoom';
 import { SettingsModal } from './SettingsModal';
+import { NotFound } from './NotFound';
 import { FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
 import {
@@ -895,6 +896,20 @@ export const RoomView: React.FC<RoomViewProps> = ({
   }, [currentUserId, effectiveUserName, localUserMediaStream, isMicActive, isCameraActive, isCameraMirrored, participants]);
 
   if (errorState) {
+    const isRoomMissing =
+      errorState.toLowerCase().includes('not found') ||
+      errorState.includes('404') ||
+      errorState.toLowerCase().includes('expired');
+
+    if (isRoomMissing) {
+      return (
+        <NotFound
+          onReturnHome={onLeave}
+          message={errorState}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-md bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] backdrop-blur-xl rounded-2xl p-8 shadow-2xl">

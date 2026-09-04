@@ -169,6 +169,8 @@ export const App: React.FC = () => {
             const cleanPath = normalizeRoomCode(rawPath);
             if (cleanPath.length >= 6) {
               targetRoomCode = cleanPath;
+            } else {
+              setIs404(true);
             }
           }
         }
