@@ -213,7 +213,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
             name: title.trim(),
             hostId: currentUser.$id,
             mediaMode,
-            participantCount: 1,
+            participantCount: 0,
             maxParticipants: 4,
             syncState: '',
             isPermanent: true,

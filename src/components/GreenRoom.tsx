@@ -465,7 +465,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                     <span>
                       {liveOccupancy > 0
                         ? liveOccupancy === 1
-                          ? '1 person waiting in room'
+                          ? '1 person in room'
                           : `${liveOccupancy} people in room`
                         : 'No one is in the room yet'}
                     </span>

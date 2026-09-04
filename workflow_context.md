@@ -191,9 +191,20 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - **Build Fix in Tests:**
   - Resolved `tests/time-cycle.test.ts(5,3): error TS6133: 'ThemeMode' is declared but its value is never read` by removing unused type import to satisfy `noUnusedLocals: true`.
 
-## 14. Verification & Validation Status
-- **Vitest Suites:** 8/8 test files passed (30/30 unit tests) covering media capture, drift synchronization, WebRTC signaling, performance diagnostics, subtitles, YouTube video ID extraction, audio processing, and 12-hour time/theme cycle formatting.
-- **TypeScript & Vite Build:** `tsc && vite build` completed successfully with zero compiler errors in 5.13s.
-- **Emdash Compliance:** 100% verified zero emdashes (`—`) in entire repository.
-- **Main Branch:** Committed and pushed to `origin/main`.
+## 15. Green Room Occupancy & Participant Count Fix
+- **Root Cause Analysis:**
+  - Rooms previously initialized `participantCount: 1` on creation in `App.tsx` and `MeetingSchedulerModal.tsx` before anyone actually entered the watchroom stage.
+  - `GreenRoom.tsx` rendered the string `'1 person waiting in room'` whenever `liveOccupancy === 1`, causing room creators in the preview screen to see a misleading "1 person waiting in room" badge.
+  - `RoomView.tsx` only incremented `participantCount` for non-hosts, and only decremented down to a minimum of 1 for non-hosts.
+- **Resolution:**
+  - Initialized `participantCount: 0` on room creation in `App.tsx` and `MeetingSchedulerModal.tsx`.
+  - Updated `RoomView.tsx` to increment `participantCount` when any participant (host or guest) enters the stage, and decrement down to 0 when anyone leaves.
+  - Replaced `'1 person waiting in room'` with `'1 person in room'` in `GreenRoom.tsx` (and `'No one is in the room yet'` when occupancy is 0).
+  - Fixed capacity check in `App.tsx` and `RoomView.tsx` to handle 0 cleanly.
+
+## 16. Verification & Validation Status
+- **Vitest Suites:** 8/8 test files passed (30/30 unit tests).
+- **TypeScript & Vite Build:** `tsc && vite build` passed with zero errors in 8.80s.
+- **Emdash Compliance:** 100% verified zero emdashes in entire repository.
+
 

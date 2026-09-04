@@ -281,7 +281,7 @@ export const App: React.FC = () => {
       name,
       hostId: user.$id,
       mediaMode,
-      participantCount: 1,
+      participantCount: 0,
       maxParticipants: MAX_PARTICIPANTS,
       syncState: '',
       isPermanent,
@@ -364,7 +364,8 @@ export const App: React.FC = () => {
         }
       }
 
-      if ((doc.participantCount || 1) >= MAX_PARTICIPANTS && doc.hostId !== currentUser?.$id) {
+      const occupancy = typeof doc.participantCount === 'number' ? doc.participantCount : 0;
+      if (occupancy >= MAX_PARTICIPANTS && doc.hostId !== currentUser?.$id) {
         throw new Error(`Watchroom is full (Maximum ${MAX_PARTICIPANTS} participants allowed).`);
       }
 

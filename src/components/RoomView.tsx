@@ -222,7 +222,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         }
 
         // Check participant capacity
-        const currentCount = doc.participantCount || 1;
+        const currentCount = typeof doc.participantCount === 'number' ? doc.participantCount : 0;
         if (currentCount >= MAX_PARTICIPANTS && doc.hostId !== currentUserId) {
           setErrorState(`Watchroom is at full capacity (Maximum ${MAX_PARTICIPANTS} participants).`);
           return;
@@ -318,15 +318,22 @@ export const RoomView: React.FC<RoomViewProps> = ({
     async function initStage() {
       if (!isMounted || !room) return;
 
-      // Increment participant count for non-host
-      if (room.hostId !== currentUserId) {
-        const currentCount = room.participantCount || 1;
+      // Increment participant count when entering stage
+      try {
+        const freshDoc = await databases.getDocument<RoomDocument>(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.ROOMS,
+          roomId
+        );
+        const currentCount = typeof freshDoc.participantCount === 'number' ? freshDoc.participantCount : 0;
         await databases.updateDocument(
           APPWRITE_DATABASE_ID,
           COLLECTIONS.ROOMS,
           roomId,
           { participantCount: Math.min(MAX_PARTICIPANTS, currentCount + 1) }
-        ).catch(console.warn);
+        );
+      } catch (err) {
+        console.warn('Failed to update participant count on join:', err);
       }
 
       // Initialize WebRTC Engine
@@ -522,10 +529,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
       unsubscribeRoom();
       unsubscribeSignaling();
 
-      if (room && room.hostId !== currentUserId) {
+      if (room) {
         databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
           .then((d) => {
-            const newCount = Math.max(1, (d.participantCount || 2) - 1);
+            const prev = typeof d.participantCount === 'number' ? d.participantCount : 1;
+            const newCount = Math.max(0, prev - 1);
             return databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
               participantCount: newCount
             });
