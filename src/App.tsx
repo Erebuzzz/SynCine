@@ -324,17 +324,58 @@ export const App: React.FC = () => {
       payload.youtubeUrl = youtubeUrl;
     }
 
-    await databases.createDocument<RoomDocument>(
-      APPWRITE_DATABASE_ID,
-      COLLECTIONS.ROOMS,
-      newRoomId,
-      payload,
-      [
-        Permission.read(Role.any()),
-        Permission.update(Role.any()),
-        Permission.delete(Role.any())
-      ]
-    );
+    try {
+      await databases.createDocument<RoomDocument>(
+        APPWRITE_DATABASE_ID,
+        COLLECTIONS.ROOMS,
+        newRoomId,
+        payload,
+        [
+          Permission.read(Role.any()),
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
+        ]
+      );
+    } catch (err: any) {
+      const isSchemaMismatch = err?.code === 400 && (
+        err?.message?.includes('youtubeVideoId') ||
+        err?.message?.includes('mediaMode') ||
+        err?.message?.includes('Unknown attribute') ||
+        err?.type === 'document_invalid_structure'
+      );
+
+      if (isSchemaMismatch && mediaMode === 'youtube') {
+        console.warn('Appwrite project schema lacks native YouTube attributes. Using resilient syncState fallback.');
+        const fallbackPayload: any = {
+          name,
+          hostId: user.$id,
+          mediaMode: 'screen',
+          participantCount: 1,
+          maxParticipants: MAX_PARTICIPANTS,
+          syncState: JSON.stringify({
+            mode: 'youtube',
+            youtubeVideoId: ytId || '',
+            youtubeUrl: youtubeUrl || ''
+          }),
+          isPermanent,
+          expiresAt
+        };
+
+        await databases.createDocument<RoomDocument>(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.ROOMS,
+          newRoomId,
+          fallbackPayload,
+          [
+            Permission.read(Role.any()),
+            Permission.update(Role.any()),
+            Permission.delete(Role.any())
+          ]
+        );
+      } else {
+        throw err;
+      }
+    }
 
     if (isPermanent) {
       saveLocalPermanentRoom({

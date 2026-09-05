@@ -52,6 +52,37 @@ export interface SignalingDocument extends Models.Document {
 }
 
 /**
+ * Normalizes a room document to handle both native Appwrite schemas and
+ * resilient fallback schemas where YouTube metadata or lock status are encoded in syncState.
+ */
+export function normalizeRoomDocument(doc: RoomDocument): RoomDocument {
+  if (!doc) return doc;
+  const normalized: RoomDocument = { ...doc };
+  if (normalized.syncState) {
+    try {
+      const parsed = typeof normalized.syncState === 'string'
+        ? JSON.parse(normalized.syncState)
+        : normalized.syncState;
+      if (parsed && (parsed.mode === 'youtube' || parsed.youtubeVideoId)) {
+        normalized.mediaMode = 'youtube';
+        if (!normalized.youtubeVideoId && parsed.youtubeVideoId) {
+          normalized.youtubeVideoId = parsed.youtubeVideoId;
+        }
+        if (!normalized.youtubeUrl && parsed.youtubeUrl) {
+          normalized.youtubeUrl = parsed.youtubeUrl;
+        }
+      }
+      if (parsed && parsed.isLocked !== undefined && normalized.isLocked === undefined) {
+        normalized.isLocked = Boolean(parsed.isLocked);
+      }
+    } catch {
+      // Regular playback sync packets or unparseable strings
+    }
+  }
+  return normalized;
+}
+
+/**
  * Parses a YouTube URL or video ID into an 11-character video ID.
  * Supports standard watch, shortened youtu.be, embed, live, and direct ID.
  */

@@ -107,9 +107,17 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
       (event: any) => {
         const payload = event?.payload;
         if (payload?.roomId === roomId && payload?.receiverId === currentUserId) {
-          if (payload.type === 'knock-admitted') {
+          let parsedPayload: any = {};
+          try {
+            parsedPayload = JSON.parse(payload.payload || '{}');
+          } catch {}
+
+          const isAdmitted = payload.type === 'knock-admitted' || parsedPayload.__knockType === 'knock-admitted';
+          const isDeclined = payload.type === 'knock-declined' || parsedPayload.__knockType === 'knock-declined';
+
+          if (isAdmitted) {
             handleJoinClick(false);
-          } else if (payload.type === 'knock-declined') {
+          } else if (isDeclined) {
             setKnockStatus('declined');
             setHasKnocked(false);
           }
@@ -138,8 +146,31 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
           payload: JSON.stringify({ guestName: userName.trim() || 'Guest', guestId: currentUserId })
         }
       );
-    } catch (err) {
-      console.warn('Failed to send knock request:', err);
+    } catch (err: any) {
+      if (err?.code === 400) {
+        try {
+          await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            COLLECTIONS.SIGNALING,
+            ID.unique(),
+            {
+              roomId,
+              senderId: currentUserId,
+              receiverId: hostId,
+              type: 'candidate',
+              payload: JSON.stringify({
+                __knockType: 'knock',
+                guestName: userName.trim() || 'Guest',
+                guestId: currentUserId
+              })
+            }
+          );
+        } catch (fallbackErr) {
+          console.warn('Failed to send fallback knock request:', fallbackErr);
+        }
+      } else {
+        console.warn('Failed to send knock request:', err);
+      }
     }
   };
 

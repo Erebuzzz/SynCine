@@ -9,10 +9,11 @@ import {
   RoomDocument,
   MAX_PARTICIPANTS,
   RealtimeResponseEvent,
-  extractYouTubeId
+  extractYouTubeId,
+  normalizeRoomDocument
 } from '../lib/appwrite';
 import { WebRTCEngine } from '../lib/webrtc';
-import { PlaybackSynchronizer, SyncPacket } from '../lib/sync-engine';
+import { PlaybackSynchronizer } from '../lib/sync-engine';
 import {
   captureDisplayMedia,
   captureUserMedia,
@@ -165,8 +166,23 @@ export const RoomView: React.FC<RoomViewProps> = ({
           payload: '{}'
         }
       );
-    } catch (err) {
-      console.warn('Failed to admit guest:', err);
+    } catch (err: any) {
+      if (err?.code === 400) {
+        databases.createDocument(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.SIGNALING,
+          ID.unique(),
+          {
+            roomId,
+            senderId: currentUserId,
+            receiverId: senderId,
+            type: 'candidate',
+            payload: JSON.stringify({ __knockType: 'knock-admitted' })
+          }
+        ).catch(console.warn);
+      } else {
+        console.warn('Failed to admit guest:', err);
+      }
     }
   };
 
@@ -185,18 +201,38 @@ export const RoomView: React.FC<RoomViewProps> = ({
           payload: '{}'
         }
       );
-    } catch (err) {
-      console.warn('Failed to decline guest:', err);
+    } catch (err: any) {
+      if (err?.code === 400) {
+        databases.createDocument(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.SIGNALING,
+          ID.unique(),
+          {
+            roomId,
+            senderId: currentUserId,
+            receiverId: senderId,
+            type: 'candidate',
+            payload: JSON.stringify({ __knockType: 'knock-declined' })
+          }
+        ).catch(console.warn);
+      } else {
+        console.warn('Failed to decline guest:', err);
+      }
     }
   };
 
   const handleYouTubeSyncAction = useCallback((state: { currentTime: number; isPlaying: boolean }) => {
     if (!room || room.hostId !== currentUserId) return;
-    const packet: SyncPacket = {
+    const packet: any = {
       action: state.isPlaying ? 'play' : 'pause',
       currentTime: state.currentTime,
       originTimestamp: Date.now()
     };
+    if (room.youtubeVideoId) {
+      packet.mode = 'youtube';
+      packet.youtubeVideoId = room.youtubeVideoId;
+      packet.youtubeUrl = room.youtubeUrl;
+    }
     databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
       syncState: JSON.stringify(packet)
     }).catch((err) => {
@@ -224,9 +260,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
         if (!isMounted) return;
 
+        const normalizedDoc = normalizeRoomDocument(doc);
+
         // Verify 3-hour TTL expiration for non-permanent rooms
-        if (!doc.isPermanent && doc.expiresAt) {
-          const expirationTime = new Date(doc.expiresAt).getTime();
+        if (!normalizedDoc.isPermanent && normalizedDoc.expiresAt) {
+          const expirationTime = new Date(normalizedDoc.expiresAt).getTime();
           if (Date.now() > expirationTime) {
             setErrorState('This watchroom has expired (3-hour guest buffer exceeded).');
             return;
@@ -234,13 +272,13 @@ export const RoomView: React.FC<RoomViewProps> = ({
         }
 
         // Check participant capacity
-        const currentCount = typeof doc.participantCount === 'number' ? doc.participantCount : 0;
-        if (currentCount >= MAX_PARTICIPANTS && doc.hostId !== currentUserId) {
+        const currentCount = typeof normalizedDoc.participantCount === 'number' ? normalizedDoc.participantCount : 0;
+        if (currentCount >= MAX_PARTICIPANTS && normalizedDoc.hostId !== currentUserId) {
           setErrorState(`Watchroom is at full capacity (Maximum ${MAX_PARTICIPANTS} participants).`);
           return;
         }
 
-        setRoom(doc);
+        setRoom(normalizedDoc);
       } catch (err: any) {
         if (isMounted) {
           setErrorState(err?.message || 'Failed to load watchroom details.');
@@ -506,12 +544,13 @@ export const RoomView: React.FC<RoomViewProps> = ({
     const unsubscribeRoom = realtime.subscribe<RoomDocument>(roomChannel, (event: RealtimeResponseEvent<RoomDocument>) => {
       const updatedDoc = event.payload;
       if (updatedDoc) {
-        setRoom(updatedDoc);
+        const normalized = normalizeRoomDocument(updatedDoc);
+        setRoom(normalized);
 
         if (updatedDoc.syncState) {
           try {
-            const packet: SyncPacket = JSON.parse(updatedDoc.syncState);
-            if (synchronizerRef.current) {
+            const packet: any = JSON.parse(updatedDoc.syncState);
+            if (synchronizerRef.current && packet.action) {
               synchronizerRef.current.applyRemoteUpdate(packet);
             }
             if (packet.originTimestamp) {
@@ -532,15 +571,21 @@ export const RoomView: React.FC<RoomViewProps> = ({
     const signalingChannel = `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.SIGNALING}.documents`;
     const unsubscribeSignaling = realtime.subscribe(signalingChannel, (event: any) => {
       const payload = event?.payload;
-      if (payload?.roomId === roomId && payload?.receiverId === currentUserId && payload?.type === 'knock') {
+      if (payload?.roomId === roomId && payload?.receiverId === currentUserId) {
+        let parsedPayload: any = {};
         try {
-          const data = JSON.parse(payload.payload);
+          parsedPayload = JSON.parse(payload.payload || '{}');
+        } catch {}
+
+        const isKnock = payload.type === 'knock' || parsedPayload.__knockType === 'knock';
+        if (isKnock) {
+          const guestName = parsedPayload.guestName || 'A guest';
           playDoorbellChime();
           setActiveKnocks((prev) => {
             if (prev.some((k) => k.senderId === payload.senderId)) return prev;
-            return [...prev, { senderId: payload.senderId, guestName: data.guestName || 'Guest' }];
+            return [...prev, { senderId: payload.senderId, guestName }];
           });
-        } catch {}
+        }
       }
     });
 

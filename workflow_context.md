@@ -230,6 +230,29 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - TypeScript & Vite Build: `tsc && vite build` passed with zero errors.
   - Deployed to GitHub `main` branch.
 
+## 20. Resilient YouTube Watchroom Schema & Appwrite Project Scoping
+- **Appwrite Project Scoping Context:**
+  - In Appwrite Cloud, API keys are strictly project-scoped. An API key generated in project `69e76bf4000773ccd6e1` ("Confluxa") has permissions only within `69e76bf4000773ccd6e1`.
+  - Project `69e76bf4000773ccd6e1` has all YouTube attributes provisioned (`youtubeVideoId`, `youtubeUrl`, `isLocked`, and `mediaMode: ['screen', 'local_file', 'youtube']`).
+  - Project `6a97c0ed000188adaed0` ("SynCine") has the initial schema from September 2, 2026, where `mediaMode` is restricted to `('screen', 'local_file')` and `youtubeVideoId` is not defined.
+  - Passing `youtubeVideoId` or `mediaMode: 'youtube'` directly into `databases.createDocument` on project `6a97c0ed000188adaed0` previously caused Appwrite to reject room creation with HTTP 400 (`Invalid document structure: Unknown attribute: "youtubeVideoId"`).
+- **Resilient Fallback Implementation:**
+  1. **Dual-Path Creation (`App.tsx`):**
+     - First attempts primary creation with native attributes (`mediaMode: 'youtube'`, `youtubeVideoId`, `youtubeUrl`).
+     - If rejected with code 400 schema mismatch (`Unknown attribute` or invalid enum format), catches the error and creates the room using `mediaMode: 'screen'` with full YouTube metadata (`mode: 'youtube'`, `youtubeVideoId`, `youtubeUrl`) serialized inside the 4096-character `syncState` field.
+  2. **Automatic Normalization (`normalizeRoomDocument` in `appwrite.ts`):**
+     - When fetching rooms or receiving realtime document updates in `RoomView.tsx`, checks if `syncState` contains serialized YouTube configuration.
+     - Automatically elevates `mediaMode` to `'youtube'` and populates `youtubeVideoId` and `youtubeUrl` so stage components render the native YouTube sync player without modifications.
+  3. **Realtime Sync Preservation (`RoomView.tsx`):**
+     - `handleYouTubeSyncAction` preserves `mode: 'youtube'` and video ID metadata during ongoing play/pause/seek synchronization so state is never lost.
+  4. **Fallback Knock & Doorbell Signaling (`GreenRoom.tsx` and `RoomView.tsx`):**
+     - When `type: 'knock'` is rejected by legacy signaling enums, gracefully delivers knocks disguised as `type: 'candidate'` with `{ __knockType: 'knock' }` payload.
+     - Handlers in `RoomView.tsx` inspect both native `knock` events and wrapped candidate events, allowing full admission control on both new and legacy database schemas.
+- **Verification:**
+  - Vitest: 8/8 test files passed (36/36 unit tests, including dedicated `normalizeRoomDocument` tests).
+  - TypeScript & Vite Build: `npm run build` compiled cleanly in 5.15s.
+  - Live API Verification: Verified primary rejection and instant fallback creation/cleanup against project `6a97c0ed000188adaed0` with HTTP 201 Created and HTTP 204 Deleted.
+
 
 
 
