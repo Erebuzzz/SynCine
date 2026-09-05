@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const projectId = process.env.APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
+const projectId = process.env.APPWRITE_PROJECT_ID || '69e76bf4000773ccd6e1';
 const apiKey = process.env.APPWRITE_API_KEY;
 const dbId = process.env.APPWRITE_DATABASE_ID || 'syncine_db';
 
