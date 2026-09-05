@@ -312,7 +312,7 @@ export const App: React.FC = () => {
       name,
       hostId: user.$id,
       mediaMode,
-      participantCount: 0,
+      participantCount: 1,
       maxParticipants: MAX_PARTICIPANTS,
       syncState: '',
       isPermanent,
