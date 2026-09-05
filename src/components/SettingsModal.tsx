@@ -32,7 +32,7 @@ import {
 } from '../lib/media-capture';
 import { TelemetryStats, LatencyDataPoint } from '../lib/diagnostics';
 import { DialogueBoostLevel } from '../lib/audio-processing';
-import { ThemeMode, getSavedThemeMode, setSavedThemeMode } from '../lib/time-cycle';
+import { ThemeMode, getSavedThemeMode, setSavedThemeMode, resolveThemeIsDark } from '../lib/time-cycle';
 import { applyPerformanceMode, isSoftwareRenderingDetected } from '../lib/performance-detect';
 import {
   BLUR_PRESETS,
@@ -129,8 +129,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLocalBlurRadius(propBlurRadius !== undefined ? propBlurRadius : getStoredBlurRadius());
+      setLocalThemeMode(propThemeMode ?? getSavedThemeMode());
     }
-  }, [isOpen, propBlurRadius]);
+  }, [isOpen, propBlurRadius, propThemeMode]);
 
   const [isPerformanceMode, setIsPerformanceMode] = useState<boolean>(() => {
     if (typeof document !== 'undefined') {
@@ -185,7 +186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (onSetThemeMode) {
       onSetThemeMode(mode);
     } else if (typeof document !== 'undefined') {
-      const dark = mode === 'dark' || (mode === 'auto' && (new Date().getHours() < 6 || new Date().getHours() >= 18.5));
+      const dark = resolveThemeIsDark(mode);
       if (dark) {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');

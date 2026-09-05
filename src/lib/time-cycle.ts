@@ -77,6 +77,7 @@ export function setSavedThemeMode(mode: ThemeMode): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(THEME_STORAGE_KEY, mode);
   localStorage.removeItem('syncine-theme-manual');
+  window.dispatchEvent(new CustomEvent('syncine-theme-change', { detail: { mode } }));
 }
 
 export function getISTCycleState(): ISTCycleState {

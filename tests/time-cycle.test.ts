@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   format12HourTime,
-  resolveThemeIsDark
+  resolveThemeIsDark,
+  getSavedThemeMode,
+  setSavedThemeMode,
+  THEME_STORAGE_KEY
 } from '../src/lib/time-cycle';
 import { isSoftwareRenderingDetected, applyPerformanceMode } from '../src/lib/performance-detect';
 
 describe('Time Cycle and Real-Time Theme Suite', () => {
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    localStorage.clear();
   });
   it('formats dates accurately into 12-hour format with AM and PM indicators', () => {
     const morning = new Date(2026, 8, 4, 9, 58, 0); // 09:58 AM
@@ -33,6 +37,28 @@ describe('Time Cycle and Real-Time Theme Suite', () => {
     // In auto mode, daytime (06:00 to 18:30) resolves to light (isDark = false)
     const autoResult = resolveThemeIsDark('auto');
     expect(typeof autoResult).toBe('boolean');
+  });
+
+  it('persists theme mode and broadcasts syncine-theme-change event', () => {
+    expect(getSavedThemeMode()).toBe('auto');
+
+    let receivedMode: string | null = null;
+    const listener = (e: Event) => {
+      receivedMode = (e as CustomEvent).detail.mode;
+    };
+    window.addEventListener('syncine-theme-change', listener);
+
+    setSavedThemeMode('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    expect(getSavedThemeMode()).toBe('dark');
+    expect(receivedMode).toBe('dark');
+
+    setSavedThemeMode('light');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    expect(getSavedThemeMode()).toBe('light');
+    expect(receivedMode).toBe('light');
+
+    window.removeEventListener('syncine-theme-change', listener);
   });
 
   it('detects software rendering and manages performance class safely', () => {

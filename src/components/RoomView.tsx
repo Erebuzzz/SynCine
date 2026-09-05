@@ -43,19 +43,24 @@ import {
   getStoredBlurRadius,
   setStoredBlurRadius
 } from '../lib/background-blur';
+import { ThemeMode } from '../lib/time-cycle';
 
 interface RoomViewProps {
   roomId: string;
   currentUserId: string;
   currentUserName: string;
   onLeave: () => void;
+  themeMode?: ThemeMode;
+  onSetThemeMode?: (mode: ThemeMode) => void;
 }
 
 export const RoomView: React.FC<RoomViewProps> = ({
   roomId,
   currentUserId,
   currentUserName,
-  onLeave
+  onLeave,
+  themeMode,
+  onSetThemeMode
 }) => {
   const [room, setRoom] = useState<RoomDocument | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -1084,6 +1089,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
           onToggleCameraMirror={handleToggleCameraMirror}
           bgBlurRadius={bgBlurRadius}
           onSetBlurRadius={handleSetBlurRadius}
+          themeMode={themeMode}
+          onSetThemeMode={onSetThemeMode}
         />
       }
     />

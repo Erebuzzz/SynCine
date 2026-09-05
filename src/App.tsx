@@ -132,6 +132,12 @@ export const App: React.FC = () => {
 
     // Active timer to ensure real-time theme switches accurately when the clock turns
     const interval = setInterval(() => {
+      const savedMode = getSavedThemeMode();
+      if (savedMode !== themeMode) {
+        setThemeMode(savedMode);
+        return;
+      }
+
       const currentState = getISTCycleState();
       if (themeMode === 'auto') {
         const autoDark = resolveThemeIsDark('auto');
@@ -149,7 +155,19 @@ export const App: React.FC = () => {
       }
     }, 10000);
 
-    return () => clearInterval(interval);
+    const handleExternalThemeChange = () => {
+      const savedMode = getSavedThemeMode();
+      setThemeMode(savedMode);
+    };
+
+    window.addEventListener('storage', handleExternalThemeChange);
+    window.addEventListener('syncine-theme-change', handleExternalThemeChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleExternalThemeChange);
+      window.removeEventListener('syncine-theme-change', handleExternalThemeChange);
+    };
   }, [themeMode]);
 
   useEffect(() => {
@@ -551,6 +569,8 @@ export const App: React.FC = () => {
           currentUserId={currentUser.$id}
           currentUserName={userName || 'Host'}
           onLeave={handleLeaveRoom}
+          themeMode={themeMode}
+          onSetThemeMode={handleSetThemeMode}
         />
       ) : justLeftRoom ? (
         <RejoinBuffer
