@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const projectId = process.env.APPWRITE_PROJECT_ID || '69e76bf4000773ccd6e1';
+const projectId = process.env.APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
 const apiKey = process.env.APPWRITE_API_KEY;
 const dbId = process.env.APPWRITE_DATABASE_ID || 'syncine_db';
 
@@ -97,11 +97,14 @@ async function bootstrap() {
     { type: 'string', key: 'name', size: 64, required: true },
     { type: 'string', key: 'hostId', size: 36, required: true },
     { type: 'string', key: 'syncState', size: 4096, required: false },
-    { type: 'enum', key: 'mediaMode', elements: ['screen', 'local_file'], required: true },
-    { type: 'integer', key: 'participantCount', required: false, min: 1, max: 4, default: 1 },
+    { type: 'enum', key: 'mediaMode', elements: ['screen', 'local_file', 'youtube'], required: true },
+    { type: 'integer', key: 'participantCount', required: false, min: 0, max: 4, default: 1 },
     { type: 'integer', key: 'maxParticipants', required: false, min: 1, max: 4, default: 4 },
     { type: 'boolean', key: 'isPermanent', required: false, default: false },
     { type: 'string', key: 'expiresAt', size: 64, required: false },
+    { type: 'string', key: 'youtubeVideoId', size: 32, required: false },
+    { type: 'string', key: 'youtubeUrl', size: 2048, required: false },
+    { type: 'boolean', key: 'isLocked', required: false, default: false },
   ];
 
   for (const attr of roomAttributes) {
@@ -138,7 +141,27 @@ async function bootstrap() {
       await sleep(500);
     } catch (err: any) {
       if (err.message?.includes('already exists') || err.message?.includes('409')) {
-        console.log(`Attribute rooms.${attr.key} already exists.`);
+        console.log(`Attribute rooms.${attr.key} already exists. Attempting update...`);
+        try {
+          if (attr.type === 'enum') {
+            await apiRequest(`/databases/${dbId}/collections/rooms/attributes/enum/${attr.key}`, 'PATCH', {
+              elements: (attr as any).elements,
+              required: attr.required,
+              default: 'screen',
+            });
+            console.log(`Attribute rooms.${attr.key} updated with new elements.`);
+          } else if (attr.type === 'integer') {
+            await apiRequest(`/databases/${dbId}/collections/rooms/attributes/integer/${attr.key}`, 'PATCH', {
+              required: attr.required,
+              min: attr.min,
+              max: attr.max,
+              default: attr.default,
+            });
+            console.log(`Attribute rooms.${attr.key} updated.`);
+          }
+        } catch (updateErr: any) {
+          console.warn(`Attribute rooms.${attr.key} update note:`, updateErr.message);
+        }
       } else {
         console.warn(`Attribute rooms.${attr.key} warning:`, err.message);
       }
@@ -175,7 +198,7 @@ async function bootstrap() {
     { type: 'string', key: 'roomId', size: 36, required: true },
     { type: 'string', key: 'senderId', size: 36, required: true },
     { type: 'string', key: 'receiverId', size: 36, required: true },
-    { type: 'enum', key: 'type', elements: ['offer', 'answer', 'candidate'], required: true },
+    { type: 'enum', key: 'type', elements: ['offer', 'answer', 'candidate', 'knock', 'knock-admitted', 'knock-declined'], required: true },
     { type: 'string', key: 'payload', size: 8192, required: true },
   ];
 
@@ -199,7 +222,19 @@ async function bootstrap() {
       await sleep(500);
     } catch (err: any) {
       if (err.message?.includes('already exists') || err.message?.includes('409')) {
-        console.log(`Attribute signaling.${attr.key} already exists.`);
+        console.log(`Attribute signaling.${attr.key} already exists. Attempting update...`);
+        try {
+          if (attr.type === 'enum') {
+            await apiRequest(`/databases/${dbId}/collections/signaling/attributes/enum/${attr.key}`, 'PATCH', {
+              elements: (attr as any).elements,
+              required: attr.required,
+              default: 'offer',
+            });
+            console.log(`Attribute signaling.${attr.key} updated with new elements.`);
+          }
+        } catch (updateErr: any) {
+          console.warn(`Attribute signaling.${attr.key} update note:`, updateErr.message);
+        }
       } else {
         console.warn(`Attribute signaling.${attr.key} warning:`, err.message);
       }
