@@ -213,10 +213,23 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   3. **Transceiver-Based Track Swapping (`webrtc.ts`):** Cached audio and video transceivers per peer. Camera mute/unmute and background blur switches call `sender.replaceTrack(track)` or `sender.replaceTrack(null)` without renegotiation or glare collisions.
   4. **Late Joiner Screen Cast Synchronization (`webrtc.ts`):** `announce-join` and `announce-ack` exchange `hasScreenCast`, `screenStreamId`, and `screenTrackId`. When an existing peer is screen casting, it immediately emits `screen-cast-started` upon detecting a newly joined peer. Screen tracks are segregated from camera/mic tracks and delivered via `onRemoteScreenStream`.
   5. **Stage Screen Cast Selection (`RoomView.tsx`):** Cleaned up `effectiveMediaStream` to `isSharingScreen ? mediaStream : remoteScreenStream`.
-- **Verification:**
-  - Vitest: 8/8 test files passed (30/30 tests).
+## 19. VP8 Codec Prioritization & Widevine L1/L3 Documentation
+- **VP8 Prioritization:**
+  - Added `prioritizeVp8Codec()` helper to `webrtc.ts` that reorders transceiver codec preferences using `RTCRtpSender.getCapabilities('video')`.
+  - Places `video/VP8` at the top of the SDP preference list with graceful fallbacks to `video/VP9` and `video/H264`.
+  - Applied to camera video transceivers on initialization and screen share transceivers when screen sharing starts.
+  - Guarantees that clients with hardware acceleration disabled automatically utilize Chromium's native multi-threaded `libvpx` software pipeline without relying on external OpenH264 binaries or DirectX texture allocations.
+- **Widevine L1 vs L3 DRM Workflows Documented:**
+  - Documented Widevine L1 (GPU hardware encryption with OS display protection flag `WDA_MONITOR`) vs Widevine L3 (sandboxed browser software memory decryption).
+  - Method 1 (Recommended): Dual-browser/profile isolation setup where source movie player runs in secondary browser with hardware acceleration OFF (Widevine L3) and SynCine runs in primary browser with hardware acceleration ON (120fps GPU performance).
+  - Method 2: Global hardware acceleration toggle in `chrome://settings/system`.
+  - Chrome Tab vs Window capture explanation: highlighting internal compositor frame readback with native tab audio loopback.
+  - Added to `src/components/DrmGuideModal.tsx`, `src/components/DocsModal.tsx`, and `Readme.md`.
+- **Validation:**
+  - Vitest: 8/8 test files passed (31/31 unit tests).
   - TypeScript & Vite Build: `tsc && vite build` passed with zero errors.
   - Deployed to GitHub `main` branch.
+
 
 
 
