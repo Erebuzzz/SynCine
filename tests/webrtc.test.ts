@@ -53,7 +53,8 @@ describe('WebRTCEngine Test Suite', () => {
         },
         receiver: {
           track: null
-        }
+        },
+        setCodecPreferences: vi.fn()
       })),
       getSenders: vi.fn().mockReturnValue([]),
       getTransceivers: vi.fn().mockReturnValue([]),
@@ -66,6 +67,16 @@ describe('WebRTCEngine Test Suite', () => {
       onconnectionstatechange: null,
       oniceconnectionstatechange: null,
     }));
+
+    (global as any).RTCRtpSender = {
+      getCapabilities: vi.fn().mockReturnValue({
+        codecs: [
+          { mimeType: 'video/H264' },
+          { mimeType: 'video/VP8' },
+          { mimeType: 'video/VP9' }
+        ]
+      })
+    };
 
     (global as any).RTCSessionDescription = vi.fn().mockImplementation((init) => init);
     (global as any).RTCIceCandidate = vi.fn().mockImplementation((init) => init);
@@ -154,5 +165,38 @@ describe('WebRTCEngine Test Suite', () => {
 
     expect(engine).toBeDefined();
     expect(onRemoteScreenStream).not.toHaveBeenCalled();
+  });
+
+  it('prioritizes VP8 codec on video transceivers', async () => {
+    const mockSetCodecPreferences = vi.fn();
+    (global as any).RTCPeerConnection = vi.fn().mockImplementation(() => ({
+      createOffer: vi.fn().mockResolvedValue({ type: 'offer', sdp: 'mock-sdp' }),
+      setLocalDescription: vi.fn().mockResolvedValue(undefined),
+      addTransceiver: vi.fn().mockImplementation(() => ({
+        sender: { track: null, replaceTrack: vi.fn().mockResolvedValue(undefined) },
+        receiver: { track: null },
+        setCodecPreferences: mockSetCodecPreferences
+      })),
+      getSenders: vi.fn().mockReturnValue([]),
+      getTransceivers: vi.fn().mockReturnValue([]),
+      close: vi.fn()
+    }));
+
+    const engine = new WebRTCEngine({
+      client: mockClient,
+      databaseId: 'syncine_db',
+      roomId: 'room-1',
+      currentUserId: 'user-self',
+      onRemoteTrackAdded: vi.fn(),
+      onPeerDisconnected: vi.fn()
+    });
+
+    await engine.initiateConnection('peer-1');
+
+    expect(mockSetCodecPreferences).toHaveBeenCalledWith([
+      { mimeType: 'video/VP8' },
+      { mimeType: 'video/H264' },
+      { mimeType: 'video/VP9' }
+    ]);
   });
 });

@@ -97,10 +97,10 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                 <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]">
                   <div className="flex items-center gap-2 text-[var(--text-primary)] font-semibold mb-1">
                     <ScreenCastIcon size={15} />
-                    <span>Hardware H.264 Acceleration</span>
+                    <span>Adaptive Codecs (VP8 Prioritized)</span>
                   </div>
                   <p className="text-[11px] leading-relaxed">
-                    Screen broadcasts prefer hardware-accelerated H.264 encoding with automatic fallback to VP8 across all modern browsers.
+                    Camera and screen broadcasts prioritize software-safe VP8 encoding with graceful H.264 and VP9 fallbacks, guaranteeing zero driver crashes when hardware acceleration is disabled.
                   </p>
                 </div>
               </div>
@@ -248,13 +248,22 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                   <span>Fixing Black Screen on Hotstar, Netflix, or Prime Video</span>
                 </div>
                 <p className="text-black/70 dark:text-white/70 leading-relaxed text-[11px]">
-                  Protected streaming platforms enforce HDCP hardware encryption via Widevine DRM. When capturing through your browser, GPU hardware acceleration blacks out video frames to prevent recording.
+                  Protected streaming platforms negotiate Widevine L1 hardware encryption when GPU hardware acceleration is active. The operating system kernel enforces a hardware protection lock on the video overlay, outputting pure black pixels when captured.
                 </p>
-                <div className="font-semibold text-black/80 dark:text-white/80 text-[11px]">
-                  Solution: Open Chrome Settings (chrome://settings/system) &gt; turn OFF "Use hardware acceleration when available" &gt; click Relaunch. Hotstar and Netflix tabs will now share with full video and audio.
+                <div className="p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.06] text-[11px] leading-relaxed space-y-1">
+                  <strong className="text-[var(--accent)]">Method 1 (Recommended for 120fps Performance):</strong>
+                  <p className="text-black/70 dark:text-white/70">
+                    Open Netflix or Hotstar in a secondary browser (such as Firefox, Edge, or a second Chrome profile) with Hardware Acceleration turned OFF so Widevine drops to L3 software memory decoding. Keep SynCine in your primary browser with Hardware Acceleration ON for full 120fps GPU performance, then share the movie tab.
+                  </p>
                 </div>
-                <div className="mt-2 p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.06] text-[11px] leading-relaxed">
-                  <strong className="text-[var(--accent)]">Best Practice for Streaming DRM Content (Hotstar / Netflix / Prime):</strong> If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+                <div className="p-2.5 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.06] text-[11px] leading-relaxed space-y-1">
+                  <strong className="text-[var(--text-primary)] font-semibold">Method 2 (Quick Global Toggle):</strong>
+                  <p className="text-black/70 dark:text-white/70">
+                    Open Chrome Settings (chrome://settings/system) &gt; toggle OFF "Use graphics acceleration when available" &gt; click Relaunch. SynCine automatically activates its software rendering optimizations.
+                  </p>
+                </div>
+                <div className="text-[11px] text-black/60 dark:text-white/60">
+                  <strong>Source Tip:</strong> Always choose <strong>Chrome Tab</strong> when sharing to use direct browser compositor readback with tab audio sync.
                 </div>
               </div>
             </div>

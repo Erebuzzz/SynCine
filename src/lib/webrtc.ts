@@ -390,6 +390,7 @@ export class WebRTCEngine {
         direction: 'sendrecv',
         streams: this.localCameraStream ? [this.localCameraStream] : []
       });
+      this.prioritizeVp8Codec(videoT);
       this.cameraTransceivers.set(peerId, videoT);
     } else if (cameraTrack && this.localCameraStream) {
       pc.addTrack(cameraTrack, this.localCameraStream);
@@ -399,6 +400,12 @@ export class WebRTCEngine {
     if (this.localScreenStream) {
       this.localScreenStream.getTracks().forEach((track) => {
         pc.addTrack(track, this.localScreenStream!);
+        if (track.kind === 'video' && typeof pc.getTransceivers === 'function') {
+          const screenT = pc.getTransceivers().find((t) => t.sender.track?.id === track.id);
+          if (screenT) {
+            this.prioritizeVp8Codec(screenT);
+          }
+        }
       });
     }
 
@@ -529,6 +536,29 @@ export class WebRTCEngine {
     }
   }
 
+  private prioritizeVp8Codec(transceiver: RTCRtpTransceiver) {
+    if (
+      typeof RTCRtpSender === 'undefined' ||
+      typeof RTCRtpSender.getCapabilities !== 'function' ||
+      !transceiver.setCodecPreferences
+    ) {
+      return;
+    }
+    try {
+      const capabilities = RTCRtpSender.getCapabilities('video');
+      if (!capabilities?.codecs) return;
+
+      const vp8 = capabilities.codecs.filter((c) => c.mimeType.toLowerCase() === 'video/vp8');
+      const fallback = capabilities.codecs.filter((c) => c.mimeType.toLowerCase() !== 'video/vp8');
+
+      if (vp8.length > 0) {
+        transceiver.setCodecPreferences([...vp8, ...fallback]);
+      }
+    } catch (err) {
+      console.warn('Failed to prioritize VP8 codec preference:', err);
+    }
+  }
+
   private async sendSignal(receiverId: string, type: 'offer' | 'answer' | 'candidate', payload: any) {
     try {
       const permissions = [
@@ -626,6 +656,12 @@ export class WebRTCEngine {
         const existing = senders.find((s) => s.track?.kind === track.kind && s.track?.id === track.id);
         if (!existing) {
           pc.addTrack(track, stream);
+          if (track.kind === 'video' && typeof pc.getTransceivers === 'function') {
+            const screenT = pc.getTransceivers().find((t) => t.sender.track?.id === track.id);
+            if (screenT) {
+              this.prioritizeVp8Codec(screenT);
+            }
+          }
         }
       });
     });

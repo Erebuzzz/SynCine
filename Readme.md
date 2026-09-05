@@ -143,7 +143,7 @@ sequenceDiagram
 ## Core Capabilities
 
 ### 1. Tri-Mode Cinema Streaming
-- **Screen / Tab Sharing:** The host captures a tab or application window with `getDisplayMedia`. Audio and video tracks are negotiated via H.264 over direct WebRTC peer connections. Presenter audio is muted locally to prevent acoustic feedback loops and double audio echo.
+- **Screen / Tab Sharing:** The host captures a tab or application window with `getDisplayMedia`. Audio and video tracks prioritize software-safe VP8 encoding with graceful H.264 and VP9 fallbacks over direct WebRTC peer connections. Presenter audio is muted locally to prevent acoustic feedback loops and double audio echo.
 - **Local File Sync:** Zero upload bandwidth mode where participants drop identical local video files into their browsers (`URL.createObjectURL(file)`). Playback state (play, pause, seek) synchronizes with round-trip latency compensation.
 - **YouTube Cinema Sync:** Zero bandwidth streaming directly from YouTube CDN in 4K and 1080p. The host controls playback and seeking while all guests remain synchronized with drift compensation.
 
@@ -160,9 +160,14 @@ sequenceDiagram
 - **Document-Level Security (DLS):** Ephemeral WebRTC signaling documents (`signaling`) are restricted so only the intended recipient can read the SDP payloads.
 - **Automated Ephemeral Cleanup:** An Appwrite serverless function executes on a 5-minute cron schedule (`*/5 * * * *`) to purge signaling documents older than 10 minutes.
 
-### 4. DRM Streaming & Hardware Acceleration Best Practice
-- **DRM Black Screen Mitigation:** Streaming platforms like Disney+ Hotstar, Netflix, and Prime Video enforce HDCP hardware encryption via Widevine DRM. When capturing through your browser, GPU hardware acceleration blacks out video frames to prevent recording.
-- **Dual-Profile Isolation Workflow:** If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+### 4. DRM Streaming & Hardware Acceleration Architecture
+- **Widevine L1 vs L3 Explained:** Streaming platforms like Disney+ Hotstar, Netflix, and Prime Video negotiate Widevine L1 DRM when GPU hardware acceleration is active. The video is decoded directly in the graphics card hardware enclave, and the operating system places a hardware protection lock on the window (`WDA_MONITOR`), turning captured frames pure black. Turning off hardware acceleration for the player forces Widevine into L3 software memory decryption, allowing clean video capture without black screens.
+- **Method 1: Dual-Browser Setup (Recommended for 120fps GPU Performance):**
+  - Run the video source (Netflix, Hotstar, Prime) in a secondary browser window or separate browser profile (e.g. Firefox, Edge, or a secondary Chrome profile) with Hardware Acceleration **OFF**.
+  - Run SynCine in your primary browser with Hardware Acceleration **ON**.
+  - Share that movie tab in SynCine: the video captures with zero black screen, while SynCine retains full 120fps GPU performance, smooth UI, and reactive Ambilight glow.
+- **Method 2: Global Browser Toggle:** Turn off Hardware Acceleration in browser settings (`chrome://settings/system`) and relaunch. SynCine's automated software-rendering optimizer will automatically adapt.
+- **Chrome Tab vs Window Capture:** Always select **Chrome Tab** when sharing streaming media. Tab capture uses direct Chromium internal compositor frame readback with native tab audio loopback and zero OS window minimization issues. Window capture relies on the operating system window manager, which is vulnerable to DPI scaling mismatches, odd-pixel macroblock stride drops, and background window pauses.
 
 ### 5. Keyboard Shortcuts
 - `M`: Mute / Unmute Microphone

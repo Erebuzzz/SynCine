@@ -39,70 +39,75 @@ export const DrmGuideModal: React.FC<DrmGuideModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Why this happens card */}
-        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 mb-4 leading-relaxed flex items-start gap-2.5">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-500" />
-          <div>
-            <span className="font-bold">Why the screen turns black: </span>
-            Streaming services like Disney+ Hotstar, Netflix, and Amazon Prime Video use Widevine DRM with hardware video decoding (HDCP). When screen capture is triggered, your GPU automatically blacks out the video frames to protect copyrighted content.
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 mb-4 leading-relaxed space-y-1.5">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-500" />
+            <div>
+              <span className="font-bold">Why the screen turns black (Widevine L1 vs L3): </span>
+              Streaming platforms like Disney+ Hotstar, Netflix, and Amazon Prime Video negotiate Widevine L1 DRM when Hardware Acceleration is active. In L1 mode, video is decoded directly in the GPU hardware enclave, and the operating system sets a hardware protection flag on the window, replacing captured frames with pure black pixels.
+            </div>
+          </div>
+          <div className="text-[11px] text-amber-800/90 dark:text-amber-300/90 pl-6">
+            When hardware acceleration is off for the video source, Widevine drops to L3 software memory decryption, allowing clean capture without black screens.
           </div>
         </div>
 
-        {/* 3 Step Solution */}
-        <h4 className="text-xs uppercase font-bold tracking-wider text-black/45 dark:text-white/45 mb-2.5">
-          The 10-Second Fix (Chrome, Brave, Edge)
-        </h4>
+        {/* Method 1 (Recommended): Dual-Profile / Browser Isolation */}
+        <div className="p-3.5 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-xs mb-4 space-y-2">
+          <div className="flex items-center gap-2 font-bold text-[var(--accent)]">
+            <span className="px-1.5 py-0.5 rounded bg-[var(--accent)] text-black text-[10px] font-bold">Method 1 (Recommended)</span>
+            <span>Dual-Browser / Profile Setup (120fps GPU Performance)</span>
+          </div>
+          <p className="text-black/75 dark:text-white/75 text-[11px] leading-relaxed">
+            Run the movie player (Netflix, Hotstar, Prime) in a secondary browser window or separate profile (such as Firefox, Edge, or a secondary Chrome profile) with Hardware Acceleration <strong>OFF</strong>. Run SynCine in your primary browser with Hardware Acceleration <strong>ON</strong>.
+          </p>
+          <div className="p-2 rounded-lg bg-black/[0.04] dark:bg-white/[0.05] text-[11px] text-black/70 dark:text-white/70">
+            <strong>Why this is best:</strong> SynCine retains full 120fps GPU performance, smooth camera tiles, and reactive Ambilight glow, while the movie stream is captured with zero black screen.
+          </div>
+        </div>
 
-        <div className="space-y-3 mb-5">
-          <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              1
-            </div>
-            <div className="text-xs">
-              <div className="font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Open Browser Settings</div>
-              <div className="text-black/60 dark:text-white/60 mt-0.5 font-mono text-[11px]">
-                Type <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 font-bold">chrome://settings/system</span> in your address bar
-              </div>
-            </div>
+        {/* Method 2: Global Browser Toggle */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 font-bold text-xs mb-2 text-[#1D1D1F] dark:text-[#F5F5F7]">
+            <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[10px] font-bold">Method 2</span>
+            <span>Quick Global Browser Toggle</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              2
-            </div>
-            <div className="text-xs">
-              <div className="font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Turn Off Graphics / Hardware Acceleration</div>
-              <div className="text-black/60 dark:text-white/60 mt-0.5">
-                Toggle <span className="font-medium">"Use graphics acceleration when available"</span> (or Hardware Acceleration) to <strong className="text-[#FF453A]">OFF</strong>.
+          <div className="space-y-2.5">
+            <div className="p-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-2.5">
+              <div className="w-5 h-5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                1
+              </div>
+              <div className="text-xs">
+                <div className="font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Open Browser Settings</div>
+                <div className="text-black/60 dark:text-white/60 text-[11px]">
+                  Navigate to <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono font-bold">chrome://settings/system</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              3
-            </div>
-            <div className="text-xs">
-              <div className="font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Click Relaunch</div>
-              <div className="text-black/60 dark:text-white/60 mt-0.5">
-                Relaunch your browser. Hotstar and Netflix tabs will now share with full, crisp video and clear audio.
+            <div className="p-2.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-2.5">
+              <div className="w-5 h-5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                2
+              </div>
+              <div className="text-xs">
+                <div className="font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Turn Off Hardware Acceleration</div>
+                <div className="text-black/60 dark:text-white/60 text-[11px]">
+                  Toggle "Use graphics acceleration when available" to <strong className="text-[#FF453A]">OFF</strong> and click <strong>Relaunch</strong>.
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tip for tab sharing vs full screen */}
-        <div className="p-3 rounded-xl bg-[#30D158]/10 border border-[#30D158]/20 text-xs text-[#30D158] dark:text-[#30D158] mb-3 flex items-center gap-2">
-          <CheckCircle2 size={16} className="shrink-0" />
-          <span>Pro Tip: When sharing, choose <strong>"Chrome Tab"</strong> and check <strong>"Also share tab audio"</strong> for optimal sync!</span>
-        </div>
-
-        {/* Dual Profile / Browser Isolation Best Practice */}
-        <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08] text-xs mb-5 space-y-1">
-          <div className="font-semibold text-[var(--accent)]">
-            Best Practice for Streaming DRM Content (Hotstar / Netflix / Prime)
+        {/* Tab Sharing vs Window Selection */}
+        <div className="p-3 rounded-xl bg-[#30D158]/10 border border-[#30D158]/20 text-xs text-[#30D158] dark:text-[#30D158] mb-4 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold">
+            <CheckCircle2 size={16} className="shrink-0" />
+            <span>Always Choose "Chrome Tab" Instead of "Window"</span>
           </div>
-          <p className="text-black/70 dark:text-white/70 text-[11px] leading-relaxed">
-            If you need to share a DRM-protected tab, you can keep Hardware Acceleration ON in the browser tab running SynCine, and open Hotstar in a secondary browser window or profile (e.g. Firefox or a second Chrome profile) with hardware acceleration off just for that source player. This allows SynCine to maintain 120fps GPU performance while capturing the unprotected video feed.
+          <p className="text-black/70 dark:text-white/70 text-[11px] leading-relaxed pl-5">
+            Tab capture reads directly from the internal browser compositor with pixel-perfect alignment and native tab audio loopback. Sharing an entire Window relies on OS window capture, which can drop frames or freeze if the window is resized or minimized.
           </p>
         </div>
 
