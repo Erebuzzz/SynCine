@@ -32,6 +32,7 @@ export class WebRTCEngine {
   private peerNames: Map<string, string> = new Map();
   private audioTransceivers: Map<string, RTCRtpTransceiver> = new Map();
   private cameraTransceivers: Map<string, RTCRtpTransceiver> = new Map();
+  private screenTransceivers: Map<string, RTCRtpTransceiver> = new Map();
   private db: Databases;
   private unsubscribe?: () => void;
   private localMicStream?: MediaStream;
@@ -43,7 +44,22 @@ export class WebRTCEngine {
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:relay.metered.ca:80' }
+      { urls: 'stun:openrelay.metered.ca:80' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
     ],
     iceCandidatePoolSize: 10
   };
@@ -205,36 +221,16 @@ export class WebRTCEngine {
             this.activeScreenSharerId = doc.senderId;
             this.opts.onScreenShareChanged?.(doc.senderId, streamId, true, trackId);
 
-            // Reconcile if the screen track was already received by the peer connection
-            const pc = this.peers.get(doc.senderId);
-            if (pc) {
-              const receivers = pc.getReceivers();
-              for (const r of receivers) {
-                if (
-                  r.track &&
-                  r.track.kind === 'video' &&
-                  (r.track.id === trackId || (streamId && r.track.id !== this.remoteCameraTrackIds.get(doc.senderId)))
-                ) {
-                  let screenStream = this.remoteScreenStreams.get(doc.senderId);
-                  if (!screenStream || !screenStream.getTracks().some((t) => t.id === r.track.id)) {
-                    screenStream = new MediaStream([r.track]);
-                    this.remoteScreenStreams.set(doc.senderId, screenStream);
-                  }
-                  this.opts.onRemoteScreenStream?.(doc.senderId, screenStream);
-
-                  // Purge from camera feed if previously added
-                  const camStream = this.remoteStreams.get(doc.senderId);
-                  if (camStream && camStream.getTracks().some((t) => t.id === r.track.id)) {
-                    camStream.removeTrack(r.track);
-                    this.opts.onRemoteTrackAdded(
-                      doc.senderId,
-                      new MediaStream(camStream.getTracks()),
-                      this.peerNames.get(doc.senderId)
-                    );
-                  }
-                  break;
-                }
+            // Reconcile if the screen track is already attached to the dedicated screen transceiver
+            const screenT = this.screenTransceivers.get(doc.senderId);
+            if (screenT && screenT.receiver.track && screenT.receiver.track.kind === 'video') {
+              const rTrack = screenT.receiver.track;
+              let screenStream = this.remoteScreenStreams.get(doc.senderId);
+              if (!screenStream || !screenStream.getTracks().some((t) => t.id === rTrack.id)) {
+                screenStream = new MediaStream([rTrack]);
+                this.remoteScreenStreams.set(doc.senderId, screenStream);
               }
+              this.opts.onRemoteScreenStream?.(doc.senderId, screenStream);
             }
           } else if (payload && payload.action === 'screen-cast-stopped') {
             this.remoteScreenStreams.delete(doc.senderId);
@@ -300,18 +296,18 @@ export class WebRTCEngine {
 
     pc.ontrack = (e) => {
       const track = e.track;
-      const streamId = e.streams[0]?.id;
+      const screenTransceiver = this.screenTransceivers.get(peerId);
+      const isScreenTransceiver = Boolean(
+        screenTransceiver && (e.transceiver === screenTransceiver || (e.transceiver?.mid && e.transceiver.mid === screenTransceiver.mid))
+      );
 
       // Check if this track is from a screen broadcast
       const isScreenTrack =
+        isScreenTransceiver ||
         (this.remoteScreenTrackIds.get(track.id) === peerId) ||
-        (streamId && this.remoteScreenStreamIds.get(streamId) === peerId) ||
-        (this.activeScreenSharerId === peerId &&
-          track.kind === 'video' &&
-          this.remoteCameraTrackIds.get(peerId) !== track.id &&
-          this.remoteCameraTrackIds.has(peerId));
+        (e.streams[0]?.id && this.remoteScreenStreamIds.get(e.streams[0].id) === peerId);
 
-      if (isScreenTrack) {
+      if (isScreenTrack && track.kind === 'video') {
         let screenStream = this.remoteScreenStreams.get(peerId);
         if (!screenStream || !screenStream.getTracks().some((t) => t.id === track.id)) {
           screenStream = new MediaStream([track]);
@@ -324,7 +320,7 @@ export class WebRTCEngine {
         });
 
         this.opts.onRemoteScreenStream?.(peerId, screenStream);
-        this.opts.onScreenShareChanged?.(peerId, streamId, true, track.id);
+        this.opts.onScreenShareChanged?.(peerId, e.streams[0]?.id, true, track.id);
         return;
       }
 
@@ -353,7 +349,6 @@ export class WebRTCEngine {
       if (pc.connectionState === 'connected') {
         this.opts.onPeerConnected?.(peerId);
       } else if (
-        pc.connectionState === 'disconnected' ||
         pc.connectionState === 'failed' ||
         pc.connectionState === 'closed'
       ) {
@@ -363,7 +358,6 @@ export class WebRTCEngine {
 
     pc.oniceconnectionstatechange = () => {
       if (
-        pc.iceConnectionState === 'disconnected' ||
         pc.iceConnectionState === 'failed' ||
         pc.iceConnectionState === 'closed'
       ) {
@@ -371,7 +365,7 @@ export class WebRTCEngine {
       }
     };
 
-    // Pre-allocate audio transceiver
+    // 1. Pre-allocate audio transceiver for mic
     const micTrack = this.localMicStream?.getAudioTracks()[0] || null;
     if (typeof pc.addTransceiver === 'function') {
       const audioT = pc.addTransceiver(micTrack || 'audio', {
@@ -383,7 +377,7 @@ export class WebRTCEngine {
       pc.addTrack(micTrack, this.localMicStream);
     }
 
-    // Pre-allocate video transceiver for camera
+    // 2. Pre-allocate video transceiver for camera
     const cameraTrack = this.localCameraStream?.getVideoTracks()[0] || null;
     if (typeof pc.addTransceiver === 'function') {
       const videoT = pc.addTransceiver(cameraTrack || 'video', {
@@ -396,17 +390,17 @@ export class WebRTCEngine {
       pc.addTrack(cameraTrack, this.localCameraStream);
     }
 
-    // Attach active local screen tracks if screen sharing is active
-    if (this.localScreenStream) {
-      this.localScreenStream.getTracks().forEach((track) => {
-        pc.addTrack(track, this.localScreenStream!);
-        if (track.kind === 'video' && typeof pc.getTransceivers === 'function') {
-          const screenT = pc.getTransceivers().find((t) => t.sender.track?.id === track.id);
-          if (screenT) {
-            this.prioritizeVp8Codec(screenT);
-          }
-        }
+    // 3. Pre-allocate video transceiver for screen share (guarantees symmetric m-lines for midway joiners)
+    const screenTrack = this.localScreenStream?.getVideoTracks()[0] || null;
+    if (typeof pc.addTransceiver === 'function') {
+      const screenT = pc.addTransceiver(screenTrack || 'video', {
+        direction: 'sendrecv',
+        streams: this.localScreenStream ? [this.localScreenStream] : []
       });
+      this.prioritizeVp8Codec(screenT);
+      this.screenTransceivers.set(peerId, screenT);
+    } else if (screenTrack && this.localScreenStream) {
+      pc.addTrack(screenTrack, this.localScreenStream);
     }
 
     this.peers.set(peerId, pc);
@@ -421,6 +415,7 @@ export class WebRTCEngine {
     }
     this.audioTransceivers.delete(peerId);
     this.cameraTransceivers.delete(peerId);
+    this.screenTransceivers.delete(peerId);
     this.remoteStreams.delete(peerId);
     this.remoteScreenStreams.delete(peerId);
     this.remoteCameraTrackIds.delete(peerId);
@@ -615,10 +610,7 @@ export class WebRTCEngine {
       if (cameraTransceiver) {
         cameraTransceiver.sender.replaceTrack(videoTrack).catch(console.warn);
       } else {
-        const screenTrackId = this.localScreenStream?.getVideoTracks()[0]?.id;
-        const sender = pc.getSenders().find(
-          (s) => s.track?.kind === 'video' && s.track?.id !== screenTrackId
-        );
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
         if (sender) {
           sender.replaceTrack(videoTrack).catch(console.warn);
         } else {
@@ -629,18 +621,10 @@ export class WebRTCEngine {
   }
 
   public removeCameraStream() {
-    this.peers.forEach((pc, peerId) => {
+    this.peers.forEach((_pc, peerId) => {
       const cameraTransceiver = this.cameraTransceivers.get(peerId);
       if (cameraTransceiver) {
         cameraTransceiver.sender.replaceTrack(null).catch(console.warn);
-      } else {
-        const screenTrackId = this.localScreenStream?.getVideoTracks()[0]?.id;
-        const sender = pc.getSenders().find(
-          (s) => s.track?.kind === 'video' && s.track?.id !== screenTrackId
-        );
-        if (sender) {
-          sender.replaceTrack(null).catch(console.warn);
-        }
       }
     });
     this.localCameraStream = undefined;
@@ -649,27 +633,21 @@ export class WebRTCEngine {
   public attachScreenStream(stream: MediaStream) {
     this.localScreenStream = stream;
     const screenTrack = stream.getVideoTracks()[0];
+    if (!screenTrack) return;
 
-    stream.getTracks().forEach((track) => {
-      this.peers.forEach((pc) => {
-        const senders = pc.getSenders();
-        const existing = senders.find((s) => s.track?.kind === track.kind && s.track?.id === track.id);
-        if (!existing) {
-          pc.addTrack(track, stream);
-          if (track.kind === 'video' && typeof pc.getTransceivers === 'function') {
-            const screenT = pc.getTransceivers().find((t) => t.sender.track?.id === track.id);
-            if (screenT) {
-              this.prioritizeVp8Codec(screenT);
-            }
-          }
-        }
-      });
+    this.peers.forEach((pc, peerId) => {
+      const screenTransceiver = this.screenTransceivers.get(peerId);
+      if (screenTransceiver) {
+        screenTransceiver.sender.replaceTrack(screenTrack).catch(console.warn);
+      } else {
+        pc.addTrack(screenTrack, stream);
+      }
     });
 
     this.sendSignal('all', 'candidate', {
       action: 'screen-cast-started',
       streamId: stream.id,
-      trackId: screenTrack?.id,
+      trackId: screenTrack.id,
       senderId: this.opts.currentUserId
     }).catch(console.warn);
   }
@@ -677,13 +655,11 @@ export class WebRTCEngine {
   public removeScreenStream() {
     if (!this.localScreenStream) return;
     const screenStreamId = this.localScreenStream.id;
-    const screenTracks = this.localScreenStream.getTracks();
-    this.peers.forEach((pc) => {
-      pc.getSenders().forEach((sender) => {
-        if (sender.track && screenTracks.some((t) => t.id === sender.track!.id)) {
-          pc.removeTrack(sender);
-        }
-      });
+    this.peers.forEach((_pc, peerId) => {
+      const screenTransceiver = this.screenTransceivers.get(peerId);
+      if (screenTransceiver) {
+        screenTransceiver.sender.replaceTrack(null).catch(console.warn);
+      }
     });
     this.localScreenStream.getTracks().forEach((t) => t.stop());
     this.localScreenStream = undefined;

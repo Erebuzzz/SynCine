@@ -137,31 +137,35 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
   onMount
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fallbackMutedRef = useRef<boolean>(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     if (stream) {
-      // For camera feeds, isolate video tracks to avoid audio track collision or stalling
-      let targetStream: MediaStream;
-      if (isCamera) {
-        const videoTracks = stream.getVideoTracks();
-        if (videoTracks.length === 0) {
-          video.srcObject = null;
-          return;
-        }
-        targetStream = new MediaStream(videoTracks);
-      } else {
-        targetStream = stream;
+      const newVideoTracks = stream.getVideoTracks();
+      if (isCamera && newVideoTracks.length === 0) {
+        video.srcObject = null;
+        return;
       }
 
-      if (video.srcObject !== targetStream) {
+      // Check whether srcObject actually needs re-assignment to avoid resetting decoder buffers
+      const currentSrcObject = video.srcObject as MediaStream | null;
+      const currentTracks = currentSrcObject?.getVideoTracks();
+      const needsNewStream =
+        !currentSrcObject ||
+        !currentTracks ||
+        currentTracks.length !== newVideoTracks.length ||
+        currentTracks[0]?.id !== newVideoTracks[0]?.id;
+
+      if (needsNewStream) {
+        const targetStream = isCamera ? new MediaStream(newVideoTracks) : stream;
         video.srcObject = targetStream;
       }
 
-      // Camera feeds must always be muted to guarantee instant autoplay without user gesture block
-      video.muted = isCamera ? true : isMuted;
+      // Camera feeds must always be muted for instant zero-gesture autoplay
+      video.muted = isCamera ? true : (fallbackMutedRef.current || isMuted);
 
       const attemptPlay = () => {
         const playPromise = video.play();
@@ -169,6 +173,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
           playPromise.catch((err) => {
             if (err.name === 'NotAllowedError' && !video.muted) {
               console.warn('Autoplay blocked with sound. Falling back to muted playback:', err);
+              fallbackMutedRef.current = true;
               video.muted = true;
               video.play().catch(() => {});
             } else if (err.name !== 'AbortError') {
@@ -181,14 +186,14 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
       attemptPlay();
 
       // Listen for unmute event on video track (fires when first RTP packet arrives)
-      const primaryVideoTrack = targetStream.getVideoTracks()[0];
+      const primaryVideoTrack = newVideoTracks[0];
       if (primaryVideoTrack) {
         primaryVideoTrack.addEventListener('unmute', attemptPlay);
       }
 
       const handleTrackChange = () => {
+        const freshTracks = stream.getVideoTracks();
         if (isCamera) {
-          const freshTracks = stream.getVideoTracks();
           if (freshTracks.length > 0) {
             video.srcObject = new MediaStream(freshTracks);
             attemptPlay();
@@ -196,9 +201,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
             video.srcObject = null;
           }
         } else {
-          if (video.srcObject !== stream) {
-            video.srcObject = stream;
-          }
+          video.srcObject = stream;
           attemptPlay();
         }
       };
@@ -225,7 +228,9 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = isCamera ? true : isMuted;
+    if (!fallbackMutedRef.current) {
+      video.muted = isCamera ? true : isMuted;
+    }
     video.volume = (isCamera || isMuted) ? 0 : Math.max(0, Math.min(1, volume));
   }, [isMuted, isCamera, volume]);
 
@@ -241,7 +246,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
       autoPlay
       playsInline
       controls={controls}
-      muted={isCamera ? true : isMuted}
+      muted={isCamera ? true : (fallbackMutedRef.current || isMuted)}
       className={`w-full h-full ${isMirrored ? 'scale-x-[-1]' : ''} ${className}`}
     />
   );
@@ -357,7 +362,7 @@ const TileActionControls: React.FC<TileActionControlsProps> = ({
             className={`${paddingClass} backdrop-blur-md border transition cursor-pointer ${
               isBlurMenuOpen || isBlurActive
                 ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
-                : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+                : 'bg-black/60 text-white/80 border-white/15 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:text-white hover:bg-black/80'
             }`}
             title="Background Blur & Portrait Bokeh"
           >
@@ -435,7 +440,7 @@ const TileActionControls: React.FC<TileActionControlsProps> = ({
         className={`${paddingClass} backdrop-blur-md border transition cursor-pointer ${
           isPinned
             ? 'bg-[var(--accent)] text-black border-[var(--accent)] opacity-100 shadow-md'
-            : 'bg-black/60 text-white/80 border-white/15 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/80'
+            : 'bg-black/60 text-white/80 border-white/15 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:text-white hover:bg-black/80'
         }`}
         title={isPinned ? 'Unpin Feed (P)' : 'Pin Feed to Stage (P)'}
       >
@@ -873,46 +878,46 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         }`}
       >
         {/* Room Info */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <SynLogo size={24} className="sm:w-7 sm:h-7 shrink-0" />
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          <SynLogo size={22} className="sm:w-7 sm:h-7 shrink-0" />
           <div className="h-4 w-px bg-black/10 dark:bg-white/10 hidden sm:block" />
 
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs sm:text-sm font-bold truncate max-w-[80px] min-[400px]:max-w-[120px] sm:max-w-[200px]" title={roomName}>
+            <span className="text-[#1D1D1F] dark:text-[#F5F5F7] text-xs sm:text-sm font-bold truncate max-w-[70px] min-[380px]:max-w-[100px] sm:max-w-[180px] md:max-w-[240px]" title={roomName}>
               {roomName}
             </span>
-            <span className="px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] shrink-0">
+            <span className="px-1.5 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] shrink-0">
               {isHost ? 'Host' : 'Viewer'}
             </span>
             <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-mono font-medium bg-black/[0.04] dark:bg-white/[0.06] text-black/65 dark:text-white/65 border border-black/[0.06] dark:border-white/[0.08] select-all shrink-0" title="Watchroom Code">
               {formatRoomCode(roomId)}
             </span>
-            <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-1 shrink-0">
+            <span className="px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-1 shrink-0">
               <MeshNetworkIcon size={11} className="text-black/55 dark:text-white/55" />
               <span>{totalUsersInRoom}/4</span>
             </span>
           </div>
         </div>
 
-        {/* Live Meeting Clock (12-Hour Format) */}
-        <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.08] text-xs font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] select-none shrink-0 shadow-2xs">
+        {/* Live Meeting Clock (12-Hour Format) - Hidden on mobile phones to prevent header collisions */}
+        <div className="hidden sm:flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.08] text-xs font-semibold text-[#1D1D1F] dark:text-[#F5F5F7] select-none shrink-0 shadow-2xs">
           <Clock size={12} className="text-[var(--accent)] shrink-0" />
           <span className="tabular-nums font-mono text-[11px] sm:text-xs tracking-tight">{currentTime}</span>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <button
             onClick={handleCopyInviteLink}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer"
             title="Copy watchroom link (I)"
           >
             {copiedLink ? <CheckCircle2 size={14} className="text-[#30D158]" /> : <Share2 size={14} />}
             <span className="hidden md:inline">{copiedLink ? 'Copied' : 'Invite'}</span>
           </button>
 
-          {/* Layout Mode Switcher */}
-          <div className="flex gap-0.5 sm:gap-1 bg-black/[0.03] dark:bg-white/[0.04] p-0.5 sm:p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
+          {/* Layout Mode Switcher - Desktop & Tablet only */}
+          <div className="hidden sm:flex gap-0.5 sm:gap-1 bg-black/[0.03] dark:bg-white/[0.04] p-0.5 sm:p-1 rounded-xl border border-black/[0.06] dark:border-white/[0.08]">
             <button
               onClick={() => setLayout('theater')}
               className={`p-1 sm:p-1.5 rounded-lg transition duration-150 cursor-pointer ${
@@ -948,11 +953,11 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             </button>
           </div>
 
-          {/* Shortcuts Quick Button */}
+          {/* Shortcuts Quick Button - Desktop only */}
           <button
             type="button"
             onClick={() => setIsShortcutsModalOpen(true)}
-            className="p-1.5 sm:p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
+            className="hidden md:flex p-1.5 sm:p-2 rounded-xl border bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border-black/[0.06] dark:border-white/[0.08] hover:text-[#1D1D1F] dark:hover:text-[#F5F5F7] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition cursor-pointer"
             title="Keyboard Shortcuts (?)"
           >
             <Command size={15} />
@@ -1157,12 +1162,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               </div>
             </div>
 
-            {/* Right: Participant Cameras (Compact 4:1 layout in fullscreen, anti-aliased to prevent corner dead pixels) */}
+            {/* Right: Participant Cameras (Responsive mobile bottom drawer, desktop vertical sidebar) */}
             {layout === 'theater' && participants.length > 0 && (
               <aside
                 className={`w-full ${
-                  isFullscreen ? 'md:w-52 lg:w-60' : 'md:w-76 lg:w-80 xl:w-96'
-                } h-36 sm:h-44 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2.5 sm:p-3 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2.5 sm:gap-3 shrink-0 z-20`}
+                  isFullscreen ? 'md:w-52 lg:w-60' : 'md:w-72 lg:w-80 xl:w-96'
+                } h-28 sm:h-36 md:h-full bg-white/95 dark:bg-black/95 backdrop-blur-xl md:border-l md:border-t-0 border-t border-black/[0.06] dark:border-white/[0.06] p-2 sm:p-3 overflow-x-auto md:overflow-y-auto flex md:flex-col flex-row gap-2 sm:gap-3 shrink-0 z-20`}
               >
                 <div className="hidden md:flex items-center justify-between text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1 px-1">
                   <span className="flex items-center gap-2 uppercase tracking-wide text-[11px] text-black/55 dark:text-white/55">
@@ -1180,7 +1185,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   return (
                     <div
                       key={p.id}
-                      className="group relative w-40 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shrink-0 shadow-sm"
+                      className="group relative w-32 min-[380px]:w-36 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shrink-0 shadow-sm"
                     >
                       {/* Video Layer */}
                       {hasVideo ? (
@@ -1564,7 +1569,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {onToggleCameraMirror && (
             <button
               onClick={() => onToggleCameraMirror(!isCameraMirrored)}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+              className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
                 isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
               } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isCameraMirrored
@@ -1686,7 +1691,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           <button
             type="button"
             onClick={togglePictureInPicture}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+            className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
               isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
             } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isPiPActive
@@ -1702,7 +1707,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           <button
             type="button"
             onClick={() => setIsAmbilightEnabled((prev) => !prev)}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
+            className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
               isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
             } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isAmbilightEnabled

@@ -199,4 +199,38 @@ describe('WebRTCEngine Test Suite', () => {
       { mimeType: 'video/VP9' }
     ]);
   });
+
+  it('pre-allocates 3 dedicated transceivers for audio, camera, and screen share', async () => {
+    const mockAddTransceiver = vi.fn().mockImplementation((_kind: any) => ({
+      sender: { track: null, replaceTrack: vi.fn().mockResolvedValue(undefined) },
+      receiver: { track: null },
+      setCodecPreferences: vi.fn()
+    }));
+
+    (global as any).RTCPeerConnection = vi.fn().mockImplementation(() => ({
+      createOffer: vi.fn().mockResolvedValue({ type: 'offer', sdp: 'mock-sdp' }),
+      setLocalDescription: vi.fn().mockResolvedValue(undefined),
+      addTransceiver: mockAddTransceiver,
+      getSenders: vi.fn().mockReturnValue([]),
+      getTransceivers: vi.fn().mockReturnValue([]),
+      close: vi.fn()
+    }));
+
+    const engine = new WebRTCEngine({
+      client: mockClient,
+      databaseId: 'syncine_db',
+      roomId: 'room-1',
+      currentUserId: 'user-self',
+      onRemoteTrackAdded: vi.fn(),
+      onPeerDisconnected: vi.fn()
+    });
+
+    await engine.initiateConnection('peer-2');
+
+    // Verify exactly 3 transceivers were added: audio, camera (video), and screen share (video)
+    expect(mockAddTransceiver).toHaveBeenCalledTimes(3);
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(1, 'audio', expect.objectContaining({ direction: 'sendrecv' }));
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(2, 'video', expect.objectContaining({ direction: 'sendrecv' }));
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(3, 'video', expect.objectContaining({ direction: 'sendrecv' }));
+  });
 });
