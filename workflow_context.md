@@ -253,15 +253,23 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
   - TypeScript & Vite Build: `npm run build` compiled cleanly in 5.15s.
   - Live API Verification: Verified primary rejection and instant fallback creation/cleanup against project `6a97c0ed000188adaed0` with HTTP 201 Created and HTTP 204 Deleted.
 
-## 21. Database Migration & Cleanup Confirmation
+## 21. Database Migration & Provisioning Complete
 - **Project 69e76bf4000773ccd6e1 Cleanup:**
   - Database `syncine_db` was permanently deleted from project `69e76bf4000773ccd6e1` via REST call (`DELETE /databases/syncine_db`, status: 204 No Content).
   - Verified via GET `/databases` that project `69e76bf4000773ccd6e1` now contains only `confluxa_db`.
-- **Project 6a97c0ed000188adaed0 Configuration:**
+- **Project 6a97c0ed000188adaed0 Full Native Provisioning:**
   - Active project ID confirmed as `6a97c0ed000188adaed0` across `.env`, `mcp_config.json`, and client configurations.
-  - Updated `mcp_config.json` and `.env` with the new project API key (`standard_11172...`).
-  - Tested API key against `6a97c0ed000188adaed0`: confirmed valid for database operations.
-  - Scope Note: The current key has `databases.read` and `databases.write` permissions. If the user wishes to run the schema bootstrap script (`setup-appwrite.ts`) to add native attributes, `collections.*` and `attributes.*` scopes should be enabled for this key in the Appwrite Console. Otherwise, the dual-path schema fallback handles all watchroom operations cleanly without requiring schema changes.
+  - Updated `mcp_config.json` and `.env` with the project API key (`standard_11172...`).
+  - Scopes enabled: `collections.*`, `attributes.*`, `documents.*`, `databases.*`.
+  - Schema attributes fully created and set to status `available`:
+    - `rooms`: `name`, `hostId`, `syncState`, `mediaMode` (`['screen', 'local_file', 'youtube']`), `participantCount`, `maxParticipants`, `isPermanent`, `expiresAt`, `youtubeVideoId`, `youtubeUrl`, `isLocked`.
+    - `signaling`: `roomId`, `senderId`, `receiverId`, `type` (`['offer', 'answer', 'candidate', 'knock', 'knock-admitted', 'knock-declined']`), `payload`.
+    - `messages`: `roomId`, `senderId`, `senderName`, `content`.
+  - Provisioning script `setup-appwrite.ts` executed and finished successfully.
+- **Verification:**
+  - Live Client API Verification: Created native YouTube watchroom on project `6a97c0ed000188adaed0` directly with client permissions: status 201 Created with native `mediaMode: 'youtube'`, `youtubeVideoId: 'dQw4w9WgXcQ'`. Cleaned up with status 204 Deleted.
+  - Vitest: 8/8 test files passed (36/36 unit tests).
+  - Production Build: `npm run build` compiled cleanly in 5.21s.
 
 
 
