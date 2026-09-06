@@ -17,6 +17,7 @@ import { PlaybackSynchronizer } from '../lib/sync-engine';
 import {
   captureDisplayMedia,
   captureUserMedia,
+  captureMediaElementStream,
   getAudioInputDevices,
   getAudioOutputDevices,
   getVideoInputDevices,
@@ -243,6 +244,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
   const localUserMediaRef = useRef<MediaStream | null>(null);
+  const localFileStreamRef = useRef<MediaStream | null>(null);
   const screenStreamIdRef = useRef<string | null>(null);
   const isHost = room?.hostId === currentUserId;
 
@@ -620,6 +622,10 @@ export const RoomView: React.FC<RoomViewProps> = ({
         localUserMediaRef.current.getTracks().forEach((t) => t.stop());
         localUserMediaRef.current = null;
       }
+      if (localFileStreamRef.current) {
+        localFileStreamRef.current.getTracks().forEach((t) => t.stop());
+        localFileStreamRef.current = null;
+      }
     };
   }, [hasEnteredStage, roomId, currentUserId]);
 
@@ -780,6 +786,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
     if (isSharingScreen) {
       webrtcRef.current?.removeScreenStream();
       setMediaStream(undefined);
+      if (localFileStreamRef.current) {
+        localFileStreamRef.current.getTracks().forEach((t) => t.stop());
+        localFileStreamRef.current = null;
+      }
+      if (localFileUrl) {
+        URL.revokeObjectURL(localFileUrl);
+        setLocalFileUrl(undefined);
+      }
       setIsSharingScreen(false);
     } else {
       try {
@@ -801,8 +815,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
   };
 
   const handleSelectLocalFile = (file: File) => {
+    if (localFileStreamRef.current) {
+      localFileStreamRef.current.getTracks().forEach((t) => t.stop());
+      localFileStreamRef.current = null;
+    }
+    if (localFileUrl) {
+      URL.revokeObjectURL(localFileUrl);
+    }
     const objectUrl = URL.createObjectURL(file);
     setLocalFileUrl(objectUrl);
+    setIsSharingScreen(true);
   };
 
   // Settings Change Handlers
@@ -888,7 +910,19 @@ export const RoomView: React.FC<RoomViewProps> = ({
     if (videoElement && synchronizerRef.current) {
       synchronizerRef.current.mount(videoElement);
     }
-  }, []);
+    if (videoElement && isHost && localFileUrl) {
+      try {
+        if (localFileStreamRef.current) {
+          localFileStreamRef.current.getTracks().forEach((t) => t.stop());
+        }
+        const stream = captureMediaElementStream(videoElement);
+        localFileStreamRef.current = stream;
+        webrtcRef.current?.attachScreenStream(stream);
+      } catch (err) {
+        console.warn('Failed to capture stream from local video element:', err);
+      }
+    }
+  }, [isHost, localFileUrl]);
 
   const handleToggleRoomLock = () => {
     setIsRoomLocked((prev) => !prev);
@@ -1096,6 +1130,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
       onEndSessionForAll={handleHostEndSession}
       activeReactions={activeReactions}
       onSendEmojiReaction={handleSendEmojiReaction}
+      audioInputDevices={audioInputDevices}
+      selectedAudioDeviceId={selectedAudioDeviceId}
+      onSelectAudioInputDevice={handleSelectAudioInputDevice}
+      videoInputDevices={videoInputDevices}
+      selectedVideoDeviceId={selectedVideoDeviceId}
+      onSelectVideoInputDevice={handleSelectVideoInputDevice}
       childrenChat={
         <ChatSidebar
           roomId={roomId}

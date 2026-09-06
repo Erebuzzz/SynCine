@@ -34,8 +34,11 @@ import {
   HelpCircle,
   FlipHorizontal,
   Sparkles,
-  Clock
+  Clock,
+  ChevronUp,
+  Check
 } from 'lucide-react';
+import { MediaDeviceInfoItem } from '../lib/media-capture';
 import { format12HourTime } from '../lib/time-cycle';
 import { EmojiReactions, type FloatingReaction } from './EmojiReactions';
 import { SynEmojiId } from './icons/SynEmojiIcons';
@@ -104,6 +107,14 @@ interface WatchStageProps {
   // Emoji Reactions
   activeReactions?: FloatingReaction[];
   onSendEmojiReaction?: (emojiId: SynEmojiId) => void;
+
+  // Direct Audio & Video Input Device Switchers
+  audioInputDevices?: MediaDeviceInfoItem[];
+  selectedAudioDeviceId?: string;
+  onSelectAudioInputDevice?: (deviceId: string) => void;
+  videoInputDevices?: MediaDeviceInfoItem[];
+  selectedVideoDeviceId?: string;
+  onSelectVideoInputDevice?: (deviceId: string) => void;
 }
 
 interface StreamVideoPlayerProps {
@@ -488,7 +499,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   onKickParticipant,
   onEndSessionForAll,
   activeReactions,
-  onSendEmojiReaction
+  onSendEmojiReaction,
+  audioInputDevices = [],
+  selectedAudioDeviceId,
+  onSelectAudioInputDevice,
+  videoInputDevices = [],
+  selectedVideoDeviceId,
+  onSelectVideoInputDevice
 }) => {
   const [layout, setLayout] = useState<DisplayLayout>('theater');
   const [volumes, setVolumes] = useState<Record<string, number>>({});
@@ -504,6 +521,23 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isDrmGuideOpen, setIsDrmGuideOpen] = useState(false);
   const [isBlurMenuOpen, setIsBlurMenuOpen] = useState(false);
+  const [isMicMenuOpen, setIsMicMenuOpen] = useState(false);
+  const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
+  const micMenuRef = useRef<HTMLDivElement>(null);
+  const cameraMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (micMenuRef.current && !micMenuRef.current.contains(e.target as Node)) {
+        setIsMicMenuOpen(false);
+      }
+      if (cameraMenuRef.current && !cameraMenuRef.current.contains(e.target as Node)) {
+        setIsCameraMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Picture-in-Picture State
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -1530,48 +1564,134 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             : 'h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 relative gap-2'
         }`}
       >
-        <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1">
-          {/* Studio Microphone Toggle */}
-          <button
-            onClick={onToggleMic}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
-              isMicActive
-                ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
-                : 'bg-[#FF453A]/15 text-[#FF453A] border border-[#FF453A]/20 hover:bg-[#FF453A]/25'
-            }`}
-            title={isMicActive ? 'Mute Microphone (M / Hold Space to talk)' : 'Unmute Microphone (M / Hold Space to talk)'}
-          >
-            {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
-            {!isFullscreen && <span className="hidden sm:inline">{isMicActive ? 'Mic Active' : 'Mic Muted'}</span>}
-          </button>
-
-          {/* Studio Camera Toggle */}
-          {onToggleCamera && (
-            <button
-              onClick={onToggleCamera}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
-                isCameraActive
-                  ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 hover:bg-[#30D158]/25'
-                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1">
+          {/* Studio Microphone Split Control */}
+          <div ref={micMenuRef} className="relative flex items-center shrink-0">
+            <div
+              className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
+                isMicActive
+                  ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25 hover:bg-[#30D158]/20'
+                  : 'bg-[#FF453A]/15 text-[#FF453A] border-[#FF453A]/25 hover:bg-[#FF453A]/20'
               }`}
-              title={isCameraActive ? 'Turn Off Camera (O)' : 'Turn On Camera (O)'}
             >
-              {isCameraActive ? <Video size={16} /> : <VideoOff size={16} />}
-              {!isFullscreen && <span className="hidden sm:inline">{isCameraActive ? 'Camera On' : 'Camera Off'}</span>}
-            </button>
+              <button
+                type="button"
+                onClick={onToggleMic}
+                className="p-2.5 sm:px-3 sm:py-2.5 flex items-center justify-center transition hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                title={isMicActive ? 'Mute Microphone (M / Hold Space to talk)' : 'Unmute Microphone (M / Hold Space to talk)'}
+              >
+                {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
+              </button>
+              {onSelectAudioInputDevice && audioInputDevices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsMicMenuOpen((prev) => !prev)}
+                  className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
+                  title="Select Microphone"
+                >
+                  <ChevronUp size={12} className={`transition-transform duration-200 ${isMicMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+
+            {/* Mic Device Selector Dropdown */}
+            {isMicMenuOpen && onSelectAudioInputDevice && (
+              <div
+                className="absolute bottom-full left-0 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
+                  Select Microphone
+                </div>
+                {audioInputDevices.map((device, idx) => (
+                  <button
+                    key={device.deviceId || idx}
+                    type="button"
+                    onClick={() => {
+                      onSelectAudioInputDevice(device.deviceId);
+                      setIsMicMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
+                      selectedAudioDeviceId === device.deviceId
+                        ? 'bg-[var(--accent)] text-black font-semibold'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{device.label || `Microphone ${idx + 1}`}</span>
+                    {selectedAudioDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Studio Camera Split Control */}
+          {onToggleCamera && (
+            <div ref={cameraMenuRef} className="relative flex items-center shrink-0">
+              <div
+                className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
+                  isCameraActive
+                    ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25 hover:bg-[#30D158]/20'
+                    : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={onToggleCamera}
+                  className="p-2.5 sm:px-3 sm:py-2.5 flex items-center justify-center transition hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                  title={isCameraActive ? 'Turn Off Camera (O)' : 'Turn On Camera (O)'}
+                >
+                  {isCameraActive ? <Video size={16} /> : <VideoOff size={16} />}
+                </button>
+                {onSelectVideoInputDevice && videoInputDevices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraMenuOpen((prev) => !prev)}
+                    className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
+                    title="Select Camera"
+                  >
+                    <ChevronUp size={12} className={`transition-transform duration-200 ${isCameraMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Camera Device Selector Dropdown */}
+              {isCameraMenuOpen && onSelectVideoInputDevice && (
+                <div
+                  className="absolute bottom-full left-0 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
+                    Select Camera
+                  </div>
+                  {videoInputDevices.map((device, idx) => (
+                    <button
+                      key={device.deviceId || idx}
+                      type="button"
+                      onClick={() => {
+                        onSelectVideoInputDevice(device.deviceId);
+                        setIsCameraMenuOpen(false);
+                      }}
+                      className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
+                        selectedVideoDeviceId === device.deviceId
+                          ? 'bg-[var(--accent)] text-black font-semibold'
+                          : 'text-white/80 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{device.label || `Camera ${idx + 1}`}</span>
+                      {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Mirror Camera Mode Toggle */}
           {onToggleCameraMirror && (
             <button
               onClick={() => onToggleCameraMirror(!isCameraMirrored)}
-              className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              className={`hidden sm:flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isCameraMirrored
                   ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25 hover:bg-[var(--accent)]/20'
                   : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
@@ -1579,19 +1699,16 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               title={isCameraMirrored ? 'Disable Mirror Mode (\\)' : 'Enable Mirror Mode (\\)'}
             >
               <FlipHorizontal size={16} />
-              {!isFullscreen && <span className="hidden sm:inline">Mirror {isCameraMirrored ? 'On' : 'Off'}</span>}
             </button>
           )}
 
           {/* Background Blur Toggle & Popover */}
           {onSetBlurRadius && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsBlurMenuOpen((prev) => !prev)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   bgBlurRadius > 0
                     ? 'bg-[var(--accent)] text-black font-semibold border border-[var(--accent)] shadow-sm'
                     : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
@@ -1599,11 +1716,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 title={bgBlurRadius > 0 ? `Background Blur Active (${bgBlurRadius}px)` : 'Background Blur (Off)'}
               >
                 <Sparkles size={16} />
-                {!isFullscreen && (
-                  <span className="hidden sm:inline">
-                    {bgBlurRadius === 0 ? 'Blur: Off' : `Blur: ${bgBlurRadius}px`}
-                  </span>
-                )}
               </button>
 
               {isBlurMenuOpen && (
@@ -1669,9 +1781,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           {mediaMode === 'screen' && isHost && (
             <button
               onClick={onToggleScreenShare}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+              className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                 isSharingScreen
                   ? 'bg-[#8B7355]/15 dark:bg-[#C8A97E]/15 text-[#8B7355] dark:text-[#C8A97E] border border-[#8B7355]/20 dark:border-[#C8A97E]/20 hover:bg-[#8B7355]/25 dark:hover:bg-[#C8A97E]/25'
                   : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
@@ -1679,11 +1789,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               title={isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
             >
               <ScreenCastIcon size={16} />
-              {!isFullscreen && (
-                <span className="hidden sm:inline">
-                  {isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
-                </span>
-              )}
             </button>
           )}
 
@@ -1691,9 +1796,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           <button
             type="button"
             onClick={togglePictureInPicture}
-            className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
-              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+            className={`hidden sm:flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isPiPActive
                 ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
                 : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
@@ -1701,15 +1804,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             title="Picture-in-Picture Floating Window (Shift+P)"
           >
             <PictureInPicture2 size={16} />
-            {!isFullscreen && <span className="hidden sm:inline">{isPiPActive ? 'PiP Active' : 'PiP'}</span>}
           </button>
+
           {/* Dynamic Ambilight Quick Toggle */}
           <button
             type="button"
             onClick={() => setIsAmbilightEnabled((prev) => !prev)}
-            className={`hidden sm:flex items-center justify-center gap-1.5 sm:gap-2 ${
-              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-            } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+            className={`hidden sm:flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
               isAmbilightEnabled
                 ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25 hover:bg-amber-500/25'
                 : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.1]'
@@ -1717,20 +1818,16 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             title="Dynamic Cinema Ambilight Glow (A)"
           >
             <Sparkles size={16} className={isAmbilightEnabled ? 'text-amber-400' : ''} />
-            {!isFullscreen && <span className="hidden sm:inline">Glow</span>}
           </button>
 
           {/* Select Video File (Local File Mode) */}
           {mediaMode === 'local_file' && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]`}
-              title="Select Video File"
+              className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]"
+              title="Select Video File to Broadcast"
             >
               <CinemaReelIcon size={16} />
-              {!isFullscreen && <span className="hidden sm:inline">Select Video File</span>}
             </button>
           )}
 
@@ -1739,13 +1836,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <button
               type="button"
               onClick={onOpenSettings}
-              className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-              } text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]`}
+              className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]"
               title="Pipeline Settings & Diagnostics (S)"
             >
               <Settings size={16} />
-              {!isFullscreen && <span className="hidden sm:inline">Settings</span>}
             </button>
           )}
 
@@ -1755,9 +1849,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <button
                 type="button"
                 onClick={() => setIsEmojiTrayOpen((prev) => !prev)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   isEmojiTrayOpen
                     ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
                     : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
@@ -1765,7 +1857,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 title="Cinema Emoji Reactions (R)"
               >
                 <Smile size={16} />
-                {!isFullscreen && <span className="hidden sm:inline">React</span>}
               </button>
 
               <EmojiReactions
@@ -1783,9 +1874,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <button
                 type="button"
                 onClick={() => setIsHostControlsOpen((prev) => !prev)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-                  isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-                } text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   isHostControlsOpen
                     ? 'bg-[#C8A97E] text-black border border-[#C8A97E]'
                     : 'bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08]'
@@ -1793,7 +1882,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 title="Room Host Controls (H)"
               >
                 <ShieldAlert size={16} />
-                {!isFullscreen && <span className="hidden sm:inline">Host Controls</span>}
               </button>
             </div>
           )}
@@ -1803,13 +1891,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onLeaveRoom}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 ${
-              isFullscreen ? 'p-2.5 sm:p-3 rounded-xl' : 'px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl'
-            } text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]`}
+            className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]"
             title="Leave Watchroom"
           >
             <LogOut size={16} />
-            {!isFullscreen && <span className="hidden sm:inline">Leave</span>}
           </button>
         </div>
       </footer>

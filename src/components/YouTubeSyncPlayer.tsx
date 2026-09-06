@@ -1,17 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Sparkles } from 'lucide-react';
-
-function formatTime(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const mins = Math.floor(s / 60);
-  const secs = s % 60;
-  const hrs = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  if (hrs > 0) {
-    return `${hrs}:${remMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
+import React, { useEffect, useRef, useState } from 'react';
+import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -41,11 +29,10 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
   const playerRef = useRef<any>(null);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
   const isSeekingRef = useRef(false);
+  const lastReportedTimeRef = useRef(0);
 
   // Initialize YouTube IFrame API
   useEffect(() => {
@@ -64,7 +51,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
         height: '100%',
         playerVars: {
           autoplay: 0,
-          controls: isHost ? 1 : 0, // Guest controls are synchronized via our cinema UI
+          controls: isHost ? 1 : 0, // Host uses native controls; guests are synchronized
           disablekb: isHost ? 0 : 1,
           fs: 0,
           modestbranding: 1,
@@ -73,27 +60,30 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
           enablejsapi: 1
         },
         events: {
-          onReady: (event: any) => {
+          onReady: () => {
             if (isCancelled) return;
             setIsReady(true);
-            setDuration(event.target.getDuration() || 0);
           },
           onStateChange: (event: any) => {
             if (isCancelled) return;
             const state = event.data;
             if (state === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
+              const curTime = event.target.getCurrentTime() || 0;
+              lastReportedTimeRef.current = curTime;
               if (isHost && onSyncAction && !isSeekingRef.current) {
                 onSyncAction({
-                  currentTime: event.target.getCurrentTime() || 0,
+                  currentTime: curTime,
                   isPlaying: true
                 });
               }
             } else if (state === window.YT.PlayerState.PAUSED) {
               setIsPlaying(false);
+              const curTime = event.target.getCurrentTime() || 0;
+              lastReportedTimeRef.current = curTime;
               if (isHost && onSyncAction && !isSeekingRef.current) {
                 onSyncAction({
-                  currentTime: event.target.getCurrentTime() || 0,
+                  currentTime: curTime,
                   isPlaying: false
                 });
               }
@@ -121,21 +111,32 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     };
   }, [videoId, isHost]);
 
-  // Update playback time ticker
+  // Update playback time ticker and detect host native seeks
   useEffect(() => {
     if (!isReady || !isPlaying) return;
 
     const interval = setInterval(() => {
       if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
-        setCurrentTime(playerRef.current.getCurrentTime() || 0);
-        if (!duration && typeof playerRef.current.getDuration === 'function') {
-          setDuration(playerRef.current.getDuration() || 0);
+        const now = playerRef.current.getCurrentTime() || 0;
+
+        // Detect if the host scrubbed using YouTube's native timeline controls
+        if (isHost && onSyncAction && !isSeekingRef.current) {
+          const expected = lastReportedTimeRef.current + 0.5;
+          if (Math.abs(now - expected) > 1.5) {
+            lastReportedTimeRef.current = now;
+            onSyncAction({
+              currentTime: now,
+              isPlaying: true
+            });
+          } else {
+            lastReportedTimeRef.current = now;
+          }
         }
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isReady, isPlaying, duration]);
+  }, [isReady, isPlaying, isHost, onSyncAction]);
 
   // Handle peer synchronization events (Guest side or non-originating peer)
   useEffect(() => {
@@ -161,38 +162,6 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     }
   }, [syncState, isReady]);
 
-  // Host playback toggle
-  const togglePlayPause = useCallback(() => {
-    if (!isReady || !playerRef.current) return;
-
-    if (isPlaying) {
-      playerRef.current.pauseVideo();
-      setIsPlaying(false);
-      onSyncAction?.({ currentTime, isPlaying: false });
-    } else {
-      playerRef.current.playVideo();
-      setIsPlaying(true);
-      onSyncAction?.({ currentTime, isPlaying: true });
-    }
-  }, [isReady, isPlaying, currentTime, onSyncAction]);
-
-  // Seek handler
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const seekTime = parseFloat(e.target.value);
-    setCurrentTime(seekTime);
-    if (!isReady || !playerRef.current) return;
-
-    isSeekingRef.current = true;
-    playerRef.current.seekTo(seekTime, true);
-
-    if (isHost) {
-      onSyncAction?.({ currentTime: seekTime, isPlaying });
-    }
-
-    setTimeout(() => {
-      isSeekingRef.current = false;
-    }, 200);
-  };
 
   // Volume handler
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,62 +200,28 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
         <span className="font-semibold text-[11px]">YouTube CDN Synchronized</span>
       </div>
 
-      {/* Custom Cinema Player Control Bar */}
-      <div className="absolute bottom-0 inset-x-0 p-3 sm:p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        {/* Scrubber Range Bar */}
-        <div className="w-full flex items-center gap-2 text-[11px] text-white/70 font-mono">
-          <span>{formatTime(currentTime)}</span>
+      {/* Guest Local Volume Pill (Host controls playback and timeline via YouTube native controls) */}
+      {!isHost && (
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-black/70 backdrop-blur-md border border-white/10 text-white/90 shadow-lg select-none">
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="p-1 rounded-lg hover:bg-white/10 text-white transition cursor-pointer"
+            title={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
           <input
             type="range"
             min={0}
-            max={duration || 100}
-            step={0.5}
-            value={currentTime}
-            onChange={handleSeek}
-            disabled={!isHost}
-            className="flex-1 h-1.5 bg-white/20 hover:bg-white/30 rounded-lg appearance-none cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed transition"
+            max={100}
+            value={isMuted ? 0 : volume}
+            onChange={handleVolumeChange}
+            className="w-16 sm:w-20 h-1 bg-white/20 rounded appearance-none cursor-pointer accent-[var(--accent)]"
+            title="Local Volume"
           />
-          <span>{formatTime(duration)}</span>
         </div>
-
-        {/* Dock Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {isHost && (
-              <button
-                type="button"
-                onClick={togglePlayPause}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                title={isPlaying ? 'Pause' : 'Play'}
-              >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={toggleMute}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1 bg-white/20 rounded appearance-none cursor-pointer accent-[var(--accent)]"
-            />
-          </div>
-
-          <div className="text-[11px] text-white/50">
-            {isHost ? 'Host Controls Active' : 'Synced with Host'}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -24,7 +24,8 @@ import {
   Trash2,
   X,
   Lock,
-  CalendarPlus
+  CalendarPlus,
+  Youtube
 } from 'lucide-react';
 
 export interface ScheduledMeeting {
@@ -150,7 +151,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('20:00');
   const [duration, setDuration] = useState(120);
-  const [mediaMode, setMediaMode] = useState<'screen' | 'local_file'>('screen');
+  const [mediaMode, setMediaMode] = useState<'screen' | 'local_file' | 'youtube'>('screen');
   const [description, setDescription] = useState('');
   const [inviteEmails, setInviteEmails] = useState('');
 
@@ -569,9 +570,9 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                   {/* Media Mode */}
                   <div>
                     <label className="block text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
-                      Stream Mode
+                      Screen Cast / Broadcast Source
                     </label>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-3 gap-2 text-xs">
                       <button
                         type="button"
                         onClick={() => setMediaMode('screen')}
@@ -582,7 +583,20 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                         }`}
                       >
                         <Tv size={13} />
-                        <span>Screen Share</span>
+                        <span>Screen</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMediaMode('youtube')}
+                        className={`p-2 rounded-xl flex items-center justify-center gap-1.5 font-medium transition cursor-pointer border ${
+                          mediaMode === 'youtube'
+                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] font-bold'
+                            : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06] text-black/60 dark:text-white/60'
+                        }`}
+                      >
+                        <Youtube size={13} />
+                        <span>YouTube</span>
                       </button>
 
                       <button
@@ -595,7 +609,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                         }`}
                       >
                         <Film size={13} />
-                        <span>Local Video</span>
+                        <span>Local File</span>
                       </button>
                     </div>
                   </div>

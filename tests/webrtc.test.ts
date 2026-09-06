@@ -200,7 +200,7 @@ describe('WebRTCEngine Test Suite', () => {
     ]);
   });
 
-  it('pre-allocates 3 dedicated transceivers for audio, camera, and screen share', async () => {
+  it('pre-allocates 4 dedicated transceivers for audio, camera, screen share, and broadcast audio', async () => {
     const mockAddTransceiver = vi.fn().mockImplementation((_kind: any) => ({
       sender: { track: null, replaceTrack: vi.fn().mockResolvedValue(undefined) },
       receiver: { track: null },
@@ -227,10 +227,11 @@ describe('WebRTCEngine Test Suite', () => {
 
     await engine.initiateConnection('peer-2');
 
-    // Verify exactly 3 transceivers were added: audio, camera (video), and screen share (video)
-    expect(mockAddTransceiver).toHaveBeenCalledTimes(3);
+    // Verify exactly 4 transceivers were added: audio, camera (video), screen share (video), and screen audio (audio)
+    expect(mockAddTransceiver).toHaveBeenCalledTimes(4);
     expect(mockAddTransceiver).toHaveBeenNthCalledWith(1, 'audio', expect.objectContaining({ direction: 'sendrecv' }));
     expect(mockAddTransceiver).toHaveBeenNthCalledWith(2, 'video', expect.objectContaining({ direction: 'sendrecv' }));
     expect(mockAddTransceiver).toHaveBeenNthCalledWith(3, 'video', expect.objectContaining({ direction: 'sendrecv' }));
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(4, 'audio', expect.objectContaining({ direction: 'sendrecv' }));
   });
 });

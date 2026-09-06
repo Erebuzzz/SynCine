@@ -527,11 +527,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 />
               </div>
 
-              {/* Streaming Pipeline Selection */}
+              {/* Screen Cast / Broadcast Source Selection */}
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
-                  Streaming Source
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-[var(--text-primary)]">
+                    Screen Cast / Broadcast
+                  </label>
+                  <span className="text-[11px] text-[var(--text-secondary)]">
+                    Choose broadcast media source
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div
                     onClick={() => setMediaMode('screen')}
@@ -552,40 +557,12 @@ export const Lobby: React.FC<LobbyProps> = ({
                         >
                           <ScreenCastIcon size={15} />
                         </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">Screen Cast</span>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">Screen</span>
                       </div>
                       <span className={`w-2 h-2 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Share your screen, Chrome tab, or media player.
-                    </span>
-                  </div>
-
-                  <div
-                    onClick={() => setMediaMode('local_file')}
-                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                      mediaMode === 'local_file'
-                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`p-1.5 rounded-xl transition ${
-                            mediaMode === 'local_file'
-                              ? 'bg-[var(--accent)] text-black'
-                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          <CinemaReelIcon size={15} />
-                        </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local Video</span>
-                      </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
-                    </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Sync playback of video files from your device.
+                      Share monitor display, window, or browser tab.
                     </span>
                   </div>
 
@@ -608,12 +585,40 @@ export const Lobby: React.FC<LobbyProps> = ({
                         >
                           <Youtube size={15} />
                         </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">YouTube Sync</span>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">YouTube Video</span>
                       </div>
                       <span className={`w-2 h-2 rounded-full ${mediaMode === 'youtube' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
                     </div>
                     <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Stream directly from YouTube CDN in 4K/1080p.
+                      Stream directly from YouTube CDN via URL or video ID.
+                    </span>
+                  </div>
+
+                  <div
+                    onClick={() => setMediaMode('local_file')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      mediaMode === 'local_file'
+                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
+                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`p-1.5 rounded-xl transition ${
+                            mediaMode === 'local_file'
+                              ? 'bg-[var(--accent)] text-black'
+                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          <CinemaReelIcon size={15} />
+                        </div>
+                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local File</span>
+                      </div>
+                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
+                    </div>
+                    <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                      Broadcast video files from your device to all peers.
                     </span>
                   </div>
                 </div>

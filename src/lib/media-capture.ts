@@ -312,3 +312,66 @@ export async function playAudioOutputTestChime(deviceId?: string): Promise<void>
     ctx.close().catch(() => {});
   }, 1000);
 }
+
+const mediaElementSourceCache = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
+let globalCaptureAudioContext: AudioContext | null = null;
+
+function getCaptureAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return null;
+
+  if (!globalCaptureAudioContext || globalCaptureAudioContext.state === 'closed') {
+    globalCaptureAudioContext = new AudioCtx();
+  }
+  if (globalCaptureAudioContext.state === 'suspended') {
+    globalCaptureAudioContext.resume().catch(() => {});
+  }
+  return globalCaptureAudioContext;
+}
+
+/**
+ * Captures both video and audio tracks from an HTMLVideoElement for WebRTC broadcast.
+ * Uses captureStream() with Web Audio API fallback to ensure the audio track is
+ * cleanly routed to local speakers for the host and transmitted via WebRTC for peers.
+ */
+export function captureMediaElementStream(videoElement: HTMLVideoElement): MediaStream {
+  let capturedStream: MediaStream;
+  if (typeof (videoElement as any).captureStream === 'function') {
+    capturedStream = (videoElement as any).captureStream();
+  } else if (typeof (videoElement as any).mozCaptureStream === 'function') {
+    capturedStream = (videoElement as any).mozCaptureStream();
+  } else {
+    throw new Error('captureStream is not supported on this browser.');
+  }
+
+  const videoTrack = capturedStream.getVideoTracks()[0];
+  let audioTrack: MediaStreamTrack | null = capturedStream.getAudioTracks()[0] || null;
+
+  // If captureStream did not supply an audio track, route via Web Audio API
+  if (!audioTrack) {
+    try {
+      const ctx = getCaptureAudioContext();
+      if (ctx) {
+        let source = mediaElementSourceCache.get(videoElement);
+        if (!source) {
+          source = ctx.createMediaElementSource(videoElement);
+          mediaElementSourceCache.set(videoElement, source);
+          // Connect to speaker destination so the host hears playback
+          source.connect(ctx.destination);
+        }
+        const streamDest = ctx.createMediaStreamDestination();
+        source.connect(streamDest);
+        audioTrack = streamDest.stream.getAudioTracks()[0] || null;
+      }
+    } catch (e) {
+      console.warn('Web Audio capture fallback notice:', e);
+    }
+  }
+
+  const tracks: MediaStreamTrack[] = [];
+  if (videoTrack) tracks.push(videoTrack);
+  if (audioTrack) tracks.push(audioTrack);
+
+  return new MediaStream(tracks);
+}
