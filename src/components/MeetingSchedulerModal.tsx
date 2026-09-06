@@ -19,13 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Tv,
-  Film,
   ExternalLink,
   Trash2,
   X,
   Lock,
-  CalendarPlus,
-  Youtube
+  CalendarPlus
 } from 'lucide-react';
 
 export interface ScheduledMeeting {
@@ -151,7 +149,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('20:00');
   const [duration, setDuration] = useState(120);
-  const [mediaMode, setMediaMode] = useState<'screen' | 'local_file' | 'youtube'>('screen');
+  const mediaMode: 'screen' | 'local_file' | 'youtube' = 'screen';
   const [description, setDescription] = useState('');
   const [inviteEmails, setInviteEmails] = useState('');
 
@@ -569,48 +567,23 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
 
                   {/* Media Mode */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7] mb-1">
-                      Screen Cast / Broadcast Source
-                    </label>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setMediaMode('screen')}
-                        className={`p-2 rounded-xl flex items-center justify-center gap-1.5 font-medium transition cursor-pointer border ${
-                          mediaMode === 'screen'
-                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] font-bold'
-                            : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06] text-black/60 dark:text-white/60'
-                        }`}
-                      >
-                        <Tv size={13} />
-                        <span>Screen</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setMediaMode('youtube')}
-                        className={`p-2 rounded-xl flex items-center justify-center gap-1.5 font-medium transition cursor-pointer border ${
-                          mediaMode === 'youtube'
-                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] font-bold'
-                            : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06] text-black/60 dark:text-white/60'
-                        }`}
-                      >
-                        <Youtube size={13} />
-                        <span>YouTube</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setMediaMode('local_file')}
-                        className={`p-2 rounded-xl flex items-center justify-center gap-1.5 font-medium transition cursor-pointer border ${
-                          mediaMode === 'local_file'
-                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] font-bold'
-                            : 'bg-black/[0.02] dark:bg-white/[0.03] border-black/[0.06] dark:border-white/[0.06] text-black/60 dark:text-white/60'
-                        }`}
-                      >
-                        <Film size={13} />
-                        <span>Local File</span>
-                      </button>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
+                        Screen Cast / Broadcast
+                      </label>
+                      <span className="text-[10px] text-black/50 dark:text-white/50">Unified media streaming</span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between select-none">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-xl bg-[var(--accent)] text-black">
+                          <Tv size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Screen Cast / Broadcast</span>
+                          <span className="text-[11px] text-black/50 dark:text-white/50">Share screen, YouTube, or local media inside room</span>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-black/40 dark:text-white/40" />
                     </div>
                   </div>
 

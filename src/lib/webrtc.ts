@@ -704,6 +704,30 @@ export class WebRTCEngine {
     }).catch(console.warn);
   }
 
+  public attachScreenAudioTrack(audioTrack: MediaStreamTrack) {
+    if (!this.localScreenStream) return;
+    if (!this.localScreenStream.getTracks().some((t) => t.id === audioTrack.id)) {
+      this.localScreenStream.addTrack(audioTrack);
+    }
+    this.peers.forEach((pc, peerId) => {
+      const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
+      if (screenAudioTransceiver) {
+        screenAudioTransceiver.sender.replaceTrack(audioTrack).catch(console.warn);
+      } else {
+        pc.addTrack(audioTrack, this.localScreenStream!);
+      }
+    });
+
+    const screenTrack = this.localScreenStream.getVideoTracks()[0];
+    this.sendSignal('all', 'candidate', {
+      action: 'screen-cast-started',
+      streamId: this.localScreenStream.id,
+      trackId: screenTrack?.id,
+      audioTrackId: audioTrack.id,
+      senderId: this.opts.currentUserId
+    }).catch(console.warn);
+  }
+
   public removeScreenStream() {
     if (!this.localScreenStream) return;
     const screenStreamId = this.localScreenStream.id;

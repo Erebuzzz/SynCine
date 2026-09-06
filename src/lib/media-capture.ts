@@ -335,7 +335,10 @@ function getCaptureAudioContext(): AudioContext | null {
  * Uses captureStream() with Web Audio API fallback to ensure the audio track is
  * cleanly routed to local speakers for the host and transmitted via WebRTC for peers.
  */
-export function captureMediaElementStream(videoElement: HTMLVideoElement): MediaStream {
+export function captureMediaElementStream(
+  videoElement: HTMLVideoElement,
+  onAudioTrackReady?: (audioTrack: MediaStreamTrack) => void
+): MediaStream {
   let capturedStream: MediaStream;
   if (typeof (videoElement as any).captureStream === 'function') {
     capturedStream = (videoElement as any).captureStream();
@@ -348,25 +351,54 @@ export function captureMediaElementStream(videoElement: HTMLVideoElement): Media
   const videoTrack = capturedStream.getVideoTracks()[0];
   let audioTrack: MediaStreamTrack | null = capturedStream.getAudioTracks()[0] || null;
 
-  // If captureStream did not supply an audio track, route via Web Audio API
-  if (!audioTrack) {
+  const tryAcquireWebAudioTrack = (): MediaStreamTrack | null => {
     try {
       const ctx = getCaptureAudioContext();
       if (ctx) {
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         let source = mediaElementSourceCache.get(videoElement);
         if (!source) {
           source = ctx.createMediaElementSource(videoElement);
           mediaElementSourceCache.set(videoElement, source);
-          // Connect to speaker destination so the host hears playback
           source.connect(ctx.destination);
         }
         const streamDest = ctx.createMediaStreamDestination();
         source.connect(streamDest);
-        audioTrack = streamDest.stream.getAudioTracks()[0] || null;
+        return streamDest.stream.getAudioTracks()[0] || null;
       }
     } catch (e) {
-      console.warn('Web Audio capture fallback notice:', e);
+      console.warn('Web Audio capture notice:', e);
     }
+    return null;
+  };
+
+  if (audioTrack) {
+    onAudioTrackReady?.(audioTrack);
+  } else {
+    // If not immediately available (metadata still loading or pre-play), listen for lifecycle events
+    const handleAddTrack = (e: any) => {
+      if (e.track && e.track.kind === 'audio') {
+        onAudioTrackReady?.(e.track);
+      }
+    };
+    capturedStream.addEventListener('addtrack', handleAddTrack);
+
+    const handlePlaybackStart = () => {
+      const existingTrack = capturedStream.getAudioTracks()[0];
+      if (existingTrack) {
+        onAudioTrackReady?.(existingTrack);
+      } else {
+        const fallbackTrack = tryAcquireWebAudioTrack();
+        if (fallbackTrack) {
+          onAudioTrackReady?.(fallbackTrack);
+        }
+      }
+    };
+
+    videoElement.addEventListener('play', handlePlaybackStart, { once: true });
+    videoElement.addEventListener('loadeddata', handlePlaybackStart, { once: true });
   }
 
   const tracks: MediaStreamTrack[] = [];

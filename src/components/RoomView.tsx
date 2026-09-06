@@ -241,6 +241,106 @@ export const RoomView: React.FC<RoomViewProps> = ({
     });
   }, [room, currentUserId, roomId]);
 
+  const handleStartYouTubeBroadcast = async (videoId: string, url: string) => {
+    if (!room || room.hostId !== currentUserId) return;
+    try {
+      if (isSharingScreen) {
+        webrtcRef.current?.removeScreenStream();
+        setMediaStream(undefined);
+        setIsSharingScreen(false);
+      }
+      if (localFileStreamRef.current) {
+        localFileStreamRef.current.getTracks().forEach((t) => t.stop());
+        localFileStreamRef.current = null;
+      }
+      if (localFileUrl) {
+        URL.revokeObjectURL(localFileUrl);
+        setLocalFileUrl(undefined);
+      }
+
+      const syncPacket = {
+        action: 'play',
+        currentTime: 0,
+        originTimestamp: Date.now(),
+        mode: 'youtube',
+        youtubeVideoId: videoId,
+        youtubeUrl: url
+      };
+
+      const updatePayload: Record<string, any> = {
+        mediaMode: 'youtube',
+        youtubeVideoId: videoId,
+        youtubeUrl: url,
+        syncState: JSON.stringify(syncPacket)
+      };
+
+      try {
+        await databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, updatePayload);
+      } catch (err: any) {
+        if (err?.code === 400 || (err?.message && err.message.includes('unknown attribute'))) {
+          await databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+            mediaMode: 'youtube',
+            syncState: JSON.stringify(syncPacket)
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      setRoom((prev) => prev ? {
+        ...prev,
+        mediaMode: 'youtube',
+        youtubeVideoId: videoId,
+        youtubeUrl: url
+      } : null);
+
+      setYoutubeSyncState({
+        currentTime: 0,
+        isPlaying: true,
+        timestamp: Date.now()
+      });
+    } catch (err) {
+      console.warn('Failed to start YouTube broadcast:', err);
+    }
+  };
+
+  const handleStopYouTubeBroadcast = async () => {
+    if (!room || room.hostId !== currentUserId) return;
+    try {
+      const stopPacket = {
+        action: 'pause',
+        currentTime: 0,
+        originTimestamp: Date.now(),
+        mode: 'screen'
+      };
+
+      try {
+        await databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+          mediaMode: 'screen',
+          youtubeVideoId: '',
+          youtubeUrl: '',
+          syncState: JSON.stringify(stopPacket)
+        });
+      } catch (err: any) {
+        await databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+          mediaMode: 'screen',
+          syncState: JSON.stringify(stopPacket)
+        });
+      }
+
+      setRoom((prev) => prev ? {
+        ...prev,
+        mediaMode: 'screen',
+        youtubeVideoId: undefined,
+        youtubeUrl: undefined
+      } : null);
+
+      setYoutubeSyncState(null);
+    } catch (err) {
+      console.warn('Failed to stop YouTube broadcast:', err);
+    }
+  };
+
   const webrtcRef = useRef<WebRTCEngine | null>(null);
   const synchronizerRef = useRef<PlaybackSynchronizer | null>(null);
   const localUserMediaRef = useRef<MediaStream | null>(null);
@@ -915,7 +1015,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
         if (localFileStreamRef.current) {
           localFileStreamRef.current.getTracks().forEach((t) => t.stop());
         }
-        const stream = captureMediaElementStream(videoElement);
+        const stream = captureMediaElementStream(videoElement, (audioTrack) => {
+          webrtcRef.current?.attachScreenAudioTrack(audioTrack);
+        });
         localFileStreamRef.current = stream;
         webrtcRef.current?.attachScreenStream(stream);
       } catch (err) {
@@ -1093,6 +1195,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
         youtubeVideoId={room.youtubeVideoId || (room.youtubeUrl ? (extractYouTubeId(room.youtubeUrl) ?? undefined) : undefined)}
         youtubeSyncState={youtubeSyncState}
         onYouTubeSyncAction={handleYouTubeSyncAction}
+        onStartYouTubeBroadcast={handleStartYouTubeBroadcast}
+        onStopYouTubeBroadcast={handleStopYouTubeBroadcast}
         isHost={isHost}
         currentUserId={currentUserId}
         currentUserName={effectiveUserName}

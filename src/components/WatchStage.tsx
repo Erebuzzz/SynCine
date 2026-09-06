@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DraggableTile } from './DraggableTile';
-import { formatRoomCode } from '../lib/appwrite';
+import { formatRoomCode, extractYouTubeId } from '../lib/appwrite';
 import {
   SynLogo,
   TheaterLayoutIcon,
@@ -36,7 +36,10 @@ import {
   Sparkles,
   Clock,
   ChevronUp,
-  Check
+  Check,
+  Youtube,
+  ArrowLeft,
+  AlertCircle
 } from 'lucide-react';
 import { MediaDeviceInfoItem } from '../lib/media-capture';
 import { format12HourTime } from '../lib/time-cycle';
@@ -86,6 +89,8 @@ interface WatchStageProps {
   onToggleCamera?: () => void;
   onToggleScreenShare: () => void;
   onSelectLocalFile: (file: File) => void;
+  onStartYouTubeBroadcast?: (videoId: string, url: string) => void;
+  onStopYouTubeBroadcast?: () => void;
   onLeaveRoom: () => void;
   videoRefCallback?: (el: HTMLVideoElement | null) => void;
   childrenChat?: React.ReactNode;
@@ -156,6 +161,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
 
     if (stream) {
       const newVideoTracks = stream.getVideoTracks();
+      const newAudioTracks = stream.getAudioTracks();
       if (isCamera && newVideoTracks.length === 0) {
         video.srcObject = null;
         return;
@@ -163,20 +169,23 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
 
       // Check whether srcObject actually needs re-assignment to avoid resetting decoder buffers
       const currentSrcObject = video.srcObject as MediaStream | null;
-      const currentTracks = currentSrcObject?.getVideoTracks();
+      const currentVideoTracks = currentSrcObject?.getVideoTracks() || [];
+      const currentAudioTracks = currentSrcObject?.getAudioTracks() || [];
       const needsNewStream =
         !currentSrcObject ||
-        !currentTracks ||
-        currentTracks.length !== newVideoTracks.length ||
-        currentTracks[0]?.id !== newVideoTracks[0]?.id;
+        currentVideoTracks.length !== newVideoTracks.length ||
+        currentVideoTracks[0]?.id !== newVideoTracks[0]?.id ||
+        currentAudioTracks.length !== newAudioTracks.length ||
+        currentAudioTracks[0]?.id !== newAudioTracks[0]?.id;
 
       if (needsNewStream) {
-        const targetStream = isCamera ? new MediaStream(newVideoTracks) : stream;
+        const targetStream = isCamera ? new MediaStream(newVideoTracks) : new MediaStream(stream.getTracks());
         video.srcObject = targetStream;
       }
 
       // Camera feeds must always be muted for instant zero-gesture autoplay
       video.muted = isCamera ? true : (fallbackMutedRef.current || isMuted);
+      video.volume = (isCamera || isMuted) ? 0 : Math.max(0, Math.min(1, volume));
 
       const attemptPlay = () => {
         const playPromise = video.play();
@@ -202,17 +211,22 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
         primaryVideoTrack.addEventListener('unmute', attemptPlay);
       }
 
+      const primaryAudioTrack = newAudioTracks[0];
+      if (primaryAudioTrack) {
+        primaryAudioTrack.addEventListener('unmute', attemptPlay);
+      }
+
       const handleTrackChange = () => {
-        const freshTracks = stream.getVideoTracks();
+        const freshVideoTracks = stream.getVideoTracks();
         if (isCamera) {
-          if (freshTracks.length > 0) {
-            video.srcObject = new MediaStream(freshTracks);
+          if (freshVideoTracks.length > 0) {
+            video.srcObject = new MediaStream(freshVideoTracks);
             attemptPlay();
           } else {
             video.srcObject = null;
           }
         } else {
-          video.srcObject = stream;
+          video.srcObject = new MediaStream(stream.getTracks());
           attemptPlay();
         }
       };
@@ -220,12 +234,29 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
       stream.addEventListener('addtrack', handleTrackChange);
       stream.addEventListener('removetrack', handleTrackChange);
 
+      const handleUserGestureUnmute = () => {
+        if (fallbackMutedRef.current && !isCamera && !isMuted) {
+          fallbackMutedRef.current = false;
+          video.muted = false;
+          video.volume = Math.max(0, Math.min(1, volume));
+          video.play().catch(() => {});
+        }
+      };
+
+      window.addEventListener('click', handleUserGestureUnmute);
+      window.addEventListener('keydown', handleUserGestureUnmute);
+
       return () => {
         if (primaryVideoTrack) {
           primaryVideoTrack.removeEventListener('unmute', attemptPlay);
         }
+        if (primaryAudioTrack) {
+          primaryAudioTrack.removeEventListener('unmute', attemptPlay);
+        }
         stream.removeEventListener('addtrack', handleTrackChange);
         stream.removeEventListener('removetrack', handleTrackChange);
+        window.removeEventListener('click', handleUserGestureUnmute);
+        window.removeEventListener('keydown', handleUserGestureUnmute);
       };
     } else if (src) {
       if (video.src !== src) {
@@ -234,7 +265,7 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     } else {
       video.srcObject = null;
     }
-  }, [stream, src, isMuted, isCamera]);
+  }, [stream, src, isMuted, isCamera, volume]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -483,6 +514,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   onToggleCamera,
   onToggleScreenShare,
   onSelectLocalFile,
+  onStartYouTubeBroadcast,
+  onStopYouTubeBroadcast,
   onLeaveRoom,
   videoRefCallback,
   childrenChat,
@@ -523,16 +556,30 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [isBlurMenuOpen, setIsBlurMenuOpen] = useState(false);
   const [isMicMenuOpen, setIsMicMenuOpen] = useState(false);
   const [isCameraMenuOpen, setIsCameraMenuOpen] = useState(false);
+  const [isBroadcastMenuOpen, setIsBroadcastMenuOpen] = useState(false);
+  const [broadcastView, setBroadcastView] = useState<'sources' | 'youtube_input' | 'active_manage'>('sources');
+  const [youtubeInputUrl, setYoutubeInputUrl] = useState('');
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
+
   const micMenuRef = useRef<HTMLDivElement>(null);
   const cameraMenuRef = useRef<HTMLDivElement>(null);
+  const blurMenuRef = useRef<HTMLDivElement>(null);
+  const broadcastMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (micMenuRef.current && !micMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (micMenuRef.current && !micMenuRef.current.contains(target)) {
         setIsMicMenuOpen(false);
       }
-      if (cameraMenuRef.current && !cameraMenuRef.current.contains(e.target as Node)) {
+      if (cameraMenuRef.current && !cameraMenuRef.current.contains(target)) {
         setIsCameraMenuOpen(false);
+      }
+      if (blurMenuRef.current && !blurMenuRef.current.contains(target)) {
+        setIsBlurMenuOpen(false);
+      }
+      if (broadcastMenuRef.current && !broadcastMenuRef.current.contains(target)) {
+        setIsBroadcastMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -627,6 +674,46 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const isBroadcastingActive = isSharingScreen || Boolean(localFileUrl) || (mediaMode === 'youtube' && Boolean(youtubeVideoId));
+  const activeBroadcastLabel = isSharingScreen
+    ? 'Screen Share'
+    : (localFileUrl ? 'Local Media' : (mediaMode === 'youtube' && youtubeVideoId ? 'YouTube CDN' : ''));
+
+  const handleStopBroadcast = () => {
+    if (isSharingScreen) {
+      onToggleScreenShare();
+    }
+    if (localFileUrl) {
+      onToggleScreenShare();
+    }
+    if (mediaMode === 'youtube' && onStopYouTubeBroadcast) {
+      onStopYouTubeBroadcast();
+    }
+    setIsBroadcastMenuOpen(false);
+  };
+
+  const handleStartYouTubeSubmit = () => {
+    const trimmed = youtubeInputUrl.trim();
+    if (!trimmed) {
+      setYoutubeError('Please enter a YouTube video URL or ID.');
+      return;
+    }
+    const extractedId = extractYouTubeId(trimmed);
+    if (!extractedId) {
+      setYoutubeError('Invalid YouTube video link or ID.');
+      return;
+    }
+    if (isSharingScreen || localFileUrl) {
+      onToggleScreenShare();
+    }
+    if (onStartYouTubeBroadcast) {
+      onStartYouTubeBroadcast(extractedId, trimmed);
+    }
+    setIsBroadcastMenuOpen(false);
+    setYoutubeInputUrl('');
+    setYoutubeError(null);
   };
 
   // Picture-in-Picture Toggle
@@ -1585,7 +1672,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               {onSelectAudioInputDevice && audioInputDevices.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setIsMicMenuOpen((prev) => !prev)}
+                  onClick={() => {
+                    setIsMicMenuOpen((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setIsCameraMenuOpen(false);
+                        setIsBlurMenuOpen(false);
+                        setIsBroadcastMenuOpen(false);
+                        setIsEmojiTrayOpen(false);
+                        setIsHostControlsOpen(false);
+                      }
+                      return next;
+                    });
+                  }}
                   className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
                   title="Select Microphone"
                 >
@@ -1597,7 +1696,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             {/* Mic Device Selector Dropdown */}
             {isMicMenuOpen && onSelectAudioInputDevice && (
               <div
-                className="absolute bottom-full left-0 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white"
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
@@ -1646,7 +1745,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 {onSelectVideoInputDevice && videoInputDevices.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setIsCameraMenuOpen((prev) => !prev)}
+                    onClick={() => {
+                      setIsCameraMenuOpen((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setIsMicMenuOpen(false);
+                          setIsBlurMenuOpen(false);
+                          setIsBroadcastMenuOpen(false);
+                          setIsEmojiTrayOpen(false);
+                          setIsHostControlsOpen(false);
+                        }
+                        return next;
+                      });
+                    }}
                     className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
                     title="Select Camera"
                   >
@@ -1658,7 +1769,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               {/* Camera Device Selector Dropdown */}
               {isCameraMenuOpen && onSelectVideoInputDevice && (
                 <div
-                  className="absolute bottom-full left-0 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
@@ -1704,10 +1815,22 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
           {/* Background Blur Toggle & Popover */}
           {onSetBlurRadius && (
-            <div className="relative shrink-0">
+            <div ref={blurMenuRef} className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setIsBlurMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsBlurMenuOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setIsMicMenuOpen(false);
+                      setIsCameraMenuOpen(false);
+                      setIsBroadcastMenuOpen(false);
+                      setIsEmojiTrayOpen(false);
+                      setIsHostControlsOpen(false);
+                    }
+                    return next;
+                  });
+                }}
                 className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   bgBlurRadius > 0
                     ? 'bg-[var(--accent)] text-black font-semibold border border-[var(--accent)] shadow-sm'
@@ -1720,7 +1843,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
               {isBlurMenuOpen && (
                 <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between">
@@ -1777,19 +1900,205 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             </div>
           )}
 
-          {/* Screen Share Action (Host) */}
-          {mediaMode === 'screen' && isHost && (
-            <button
-              onClick={onToggleScreenShare}
-              className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
-                isSharingScreen
-                  ? 'bg-[#8B7355]/15 dark:bg-[#C8A97E]/15 text-[#8B7355] dark:text-[#C8A97E] border border-[#8B7355]/20 dark:border-[#C8A97E]/20 hover:bg-[#8B7355]/25 dark:hover:bg-[#C8A97E]/25'
-                  : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
-              }`}
-              title={isSharingScreen ? 'Stop Screen Cast' : 'Start Screen Cast'}
-            >
-              <ScreenCastIcon size={16} />
-            </button>
+          {/* Unified Screen Cast / Broadcast Control */}
+          {isHost && (
+            <div ref={broadcastMenuRef} className="relative shrink-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*,audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    onSelectLocalFile(file);
+                    setIsBroadcastMenuOpen(false);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBroadcastMenuOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources');
+                      setYoutubeError(null);
+                      setIsMicMenuOpen(false);
+                      setIsCameraMenuOpen(false);
+                      setIsBlurMenuOpen(false);
+                      setIsEmojiTrayOpen(false);
+                      setIsHostControlsOpen(false);
+                    }
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2.5 sm:px-3.5 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
+                  isBroadcastingActive
+                    ? 'bg-[var(--accent)] text-black border border-[var(--accent)] shadow-[0_0_15px_rgba(200,169,126,0.35)]'
+                    : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
+                }`}
+                title={isBroadcastingActive ? `Active Broadcast: ${activeBroadcastLabel}` : 'Screen Cast / Broadcast Media'}
+              >
+                <ScreenCastIcon size={16} />
+                <span className="hidden sm:inline">
+                  {isBroadcastingActive ? activeBroadcastLabel : 'Broadcast'}
+                </span>
+              </button>
+
+              {/* Anchored Broadcast Popover */}
+              {isBroadcastMenuOpen && (
+                <div
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 p-3.5 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {broadcastView === 'sources' && (
+                    <div className="space-y-2">
+                      <div className="px-1 pb-1 border-b border-white/10">
+                        <div className="text-xs font-semibold text-white">Broadcast Source</div>
+                        <div className="text-[10px] text-white/50">Select media to stream to the room</div>
+                      </div>
+
+                      <div className="space-y-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsBroadcastMenuOpen(false);
+                            onToggleScreenShare();
+                          }}
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                            <ScreenCastIcon size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-white group-hover:text-[var(--accent)]">Screen Cast</div>
+                            <div className="text-[10px] text-white/50 truncate">Share display, app window, or tab</div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBroadcastView('youtube_input');
+                            setYoutubeError(null);
+                          }}
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[#FF0000] group-hover:bg-[#FF0000] group-hover:text-white transition shrink-0">
+                            <Youtube size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-white group-hover:text-[#FF0000]">YouTube Stream</div>
+                            <div className="text-[10px] text-white/50 truncate">Synchronized CDN video playback</div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsBroadcastMenuOpen(false);
+                            fileInputRef.current?.click();
+                          }}
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                            <CinemaReelIcon size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-white group-hover:text-[var(--accent)]">Local Media File</div>
+                            <div className="text-[10px] text-white/50 truncate">MP4, WebM, or MKV video file</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {broadcastView === 'youtube_input' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources')}
+                          className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition cursor-pointer"
+                        >
+                          <ArrowLeft size={14} />
+                        </button>
+                        <div className="text-xs font-semibold text-white">Broadcast YouTube</div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-white/60 block">YouTube Video URL or Video ID</label>
+                        <input
+                          type="text"
+                          value={youtubeInputUrl}
+                          onChange={(e) => {
+                            setYoutubeInputUrl(e.target.value);
+                            setYoutubeError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleStartYouTubeSubmit();
+                          }}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full px-3 py-2 text-xs rounded-xl bg-white/10 border border-white/15 text-white placeholder-white/30 focus:outline-none focus:border-[var(--accent)]"
+                          autoFocus
+                        />
+                        {youtubeError && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-[#FF453A]">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{youtubeError}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleStartYouTubeSubmit}
+                        className="w-full py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                      >
+                        Start Broadcast
+                      </button>
+                    </div>
+                  )}
+
+                  {broadcastView === 'active_manage' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#30D158] animate-pulse" />
+                          <span className="text-xs font-semibold text-white">Broadcasting</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-[var(--accent)]">
+                          {activeBroadcastLabel}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-white/70 leading-relaxed">
+                        Currently broadcasting live to room participants.
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleStopBroadcast}
+                          className="w-full py-2 rounded-xl bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30 text-xs font-semibold hover:bg-[#FF453A]/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <LogOut size={13} />
+                          <span>Stop Broadcast</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBroadcastView('sources')}
+                          className="w-full py-2 rounded-xl bg-white/10 text-white/80 hover:bg-white/15 hover:text-white text-xs font-semibold transition cursor-pointer"
+                        >
+                          Switch Source
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Picture-in-Picture (PiP) Multitasking */}
@@ -1820,17 +2129,6 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <Sparkles size={16} className={isAmbilightEnabled ? 'text-amber-400' : ''} />
           </button>
 
-          {/* Select Video File (Local File Mode) */}
-          {mediaMode === 'local_file' && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.08] text-[#1D1D1F] dark:text-[#F5F5F7] border border-black/[0.06] dark:border-white/[0.08] transition cursor-pointer shrink-0 min-h-[40px]"
-              title="Select Video File to Broadcast"
-            >
-              <CinemaReelIcon size={16} />
-            </button>
-          )}
-
           {/* Settings Trigger */}
           {onOpenSettings && (
             <button
@@ -1848,7 +2146,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setIsEmojiTrayOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsEmojiTrayOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setIsMicMenuOpen(false);
+                      setIsCameraMenuOpen(false);
+                      setIsBlurMenuOpen(false);
+                      setIsBroadcastMenuOpen(false);
+                      setIsHostControlsOpen(false);
+                    }
+                    return next;
+                  });
+                }}
                 className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   isEmojiTrayOpen
                     ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
@@ -1873,7 +2183,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setIsHostControlsOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsHostControlsOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setIsMicMenuOpen(false);
+                      setIsCameraMenuOpen(false);
+                      setIsBlurMenuOpen(false);
+                      setIsBroadcastMenuOpen(false);
+                      setIsEmojiTrayOpen(false);
+                    }
+                    return next;
+                  });
+                }}
                 className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold transition cursor-pointer shrink-0 min-h-[40px] ${
                   isHostControlsOpen
                     ? 'bg-[#C8A97E] text-black border border-[#C8A97E]'

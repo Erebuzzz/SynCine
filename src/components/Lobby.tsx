@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   SynLogo,
-  ScreenCastIcon,
-  CinemaReelIcon
+  ScreenCastIcon
 } from './icons/SynIcons';
 import {
   ArrowRight,
@@ -26,10 +25,10 @@ import {
   ExternalLink,
   Tv,
   Film,
-  Youtube
+  ChevronRight
 } from 'lucide-react';
 import type { Models } from 'appwrite';
-import { formatRoomCode, extractYouTubeId } from '../lib/appwrite';
+import { formatRoomCode } from '../lib/appwrite';
 import { getLocalPermanentRooms, PermanentRoomItem } from './PermanentLinksModal';
 import { ThemeMode } from '../lib/time-cycle';
 
@@ -81,8 +80,6 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [activeTab, setActiveTab] = useState<'create' | 'join'>(initialRoomId ? 'join' : 'create');
   const [roomName, setRoomName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState(initialRoomId);
-  const [mediaMode, setMediaMode] = useState<'screen' | 'local_file' | 'youtube'>('screen');
-  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isPermanent, setIsPermanent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -146,10 +143,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      if (mediaMode === 'youtube' && !extractYouTubeId(youtubeUrl)) {
-        throw new Error('Please enter a valid YouTube video URL or ID.');
-      }
-      await onCreateRoom(roomName.trim(), mediaMode, isPermanent, youtubeUrl.trim());
+      await onCreateRoom(roomName.trim(), 'screen', isPermanent);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to initialize watchroom.');
     } finally {
@@ -527,125 +521,29 @@ export const Lobby: React.FC<LobbyProps> = ({
                 />
               </div>
 
-              {/* Screen Cast / Broadcast Source Selection */}
+              {/* Screen Cast / Broadcast Option */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-xs font-semibold text-[var(--text-primary)]">
                     Screen Cast / Broadcast
                   </label>
                   <span className="text-[11px] text-[var(--text-secondary)]">
-                    Choose broadcast media source
+                    Choose what you want to broadcast
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div
-                    onClick={() => setMediaMode('screen')}
-                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                      mediaMode === 'screen'
-                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`p-1.5 rounded-xl transition ${
-                            mediaMode === 'screen'
-                              ? 'bg-[var(--accent)] text-black'
-                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          <ScreenCastIcon size={15} />
-                        </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">Screen</span>
-                      </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'screen' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
+                <div className="p-3.5 rounded-2xl border bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-[var(--accent)] text-black">
+                      <ScreenCastIcon size={16} />
                     </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Share monitor display, window, or browser tab.
-                    </span>
-                  </div>
-
-                  <div
-                    onClick={() => setMediaMode('youtube')}
-                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                      mediaMode === 'youtube'
-                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`p-1.5 rounded-xl transition ${
-                            mediaMode === 'youtube'
-                              ? 'bg-[#FF0000] text-white'
-                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          <Youtube size={15} />
-                        </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">YouTube Video</span>
-                      </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'youtube' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
+                    <div>
+                      <div className="text-xs font-bold text-[var(--text-primary)]">Screen Cast / Broadcast</div>
+                      <div className="text-[11px] text-[var(--text-secondary)]">Share your screen, YouTube, or local media inside the room</div>
                     </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Stream directly from YouTube CDN via URL or video ID.
-                    </span>
                   </div>
-
-                  <div
-                    onClick={() => setMediaMode('local_file')}
-                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                      mediaMode === 'local_file'
-                        ? 'bg-black/[0.05] dark:bg-white/[0.08] border-black/[0.15] dark:border-white/[0.18]'
-                        : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] hover:border-black/[0.1] dark:hover:border-white/[0.1]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`p-1.5 rounded-xl transition ${
-                            mediaMode === 'local_file'
-                              ? 'bg-[var(--accent)] text-black'
-                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-[var(--text-secondary)]'
-                          }`}
-                        >
-                          <CinemaReelIcon size={15} />
-                        </div>
-                        <span className="text-xs font-semibold text-[var(--text-primary)]">Local File</span>
-                      </div>
-                      <span className={`w-2 h-2 rounded-full ${mediaMode === 'local_file' ? 'bg-[var(--accent)]' : 'bg-transparent border border-black/20 dark:border-white/20'}`} />
-                    </div>
-                    <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                      Broadcast video files from your device to all peers.
-                    </span>
-                  </div>
+                  <ChevronRight size={16} className="text-[var(--text-secondary)]" />
                 </div>
               </div>
-
-              {/* YouTube URL Input Field */}
-              {mediaMode === 'youtube' && (
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
-                    YouTube Video URL or Video ID
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-xs rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition font-mono"
-                  />
-                  {youtubeUrl && extractYouTubeId(youtubeUrl) && (
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-[#30D158] font-medium">
-                      <Check size={14} />
-                      <span>YouTube Video ID detected: <strong className="font-mono">{extractYouTubeId(youtubeUrl)}</strong></span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Permanent Room Option */}
               <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
