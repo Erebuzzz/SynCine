@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  SynLogo,
-  ScreenCastIcon
+  SynLogo
 } from './icons/SynIcons';
 import {
   ArrowRight,
@@ -24,8 +23,7 @@ import {
   Check,
   ExternalLink,
   Tv,
-  Film,
-  ChevronRight
+  Film
 } from 'lucide-react';
 import type { Models } from 'appwrite';
 import { formatRoomCode } from '../lib/appwrite';
@@ -519,30 +517,6 @@ export const Lobby: React.FC<LobbyProps> = ({
                   maxLength={64}
                   className="w-full bg-black/[0.03] dark:bg-white/[0.04] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] text-sm rounded-xl px-4 py-3 border border-black/[0.08] dark:border-white/[0.08] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 transition"
                 />
-              </div>
-
-              {/* Screen Cast / Broadcast Option */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-semibold text-[var(--text-primary)]">
-                    Screen Cast / Broadcast
-                  </label>
-                  <span className="text-[11px] text-[var(--text-secondary)]">
-                    Choose what you want to broadcast
-                  </span>
-                </div>
-                <div className="p-3.5 rounded-2xl border bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between select-none">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-[var(--accent)] text-black">
-                      <ScreenCastIcon size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-[var(--text-primary)]">Screen Cast / Broadcast</div>
-                      <div className="text-[11px] text-[var(--text-secondary)]">Share your screen, YouTube, or local media inside the room</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-[var(--text-secondary)]" />
-                </div>
               </div>
 
               {/* Permanent Room Option */}

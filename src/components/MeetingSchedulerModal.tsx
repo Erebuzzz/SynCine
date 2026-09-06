@@ -18,7 +18,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Tv,
   ExternalLink,
   Trash2,
   X,
@@ -562,28 +561,6 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                         <option value={180}>3 hours</option>
                         <option value={240}>4 hours</option>
                       </select>
-                    </div>
-                  </div>
-
-                  {/* Media Mode */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-bold text-[#1D1D1F] dark:text-[#F5F5F7]">
-                        Screen Cast / Broadcast
-                      </label>
-                      <span className="text-[10px] text-black/50 dark:text-white/50">Unified media streaming</span>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between select-none">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-xl bg-[var(--accent)] text-black">
-                          <Tv size={14} />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-[#1D1D1F] dark:text-[#F5F5F7]">Screen Cast / Broadcast</span>
-                          <span className="text-[11px] text-black/50 dark:text-white/50">Share screen, YouTube, or local media inside room</span>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-black/40 dark:text-white/40" />
                     </div>
                   </div>
 

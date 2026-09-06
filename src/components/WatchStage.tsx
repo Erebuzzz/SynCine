@@ -1397,13 +1397,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               <div className="pointer-events-auto px-4 py-1.5 rounded-full bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.1] text-xs text-black/65 dark:text-white/65 flex items-center gap-2 shadow-sm">
                 <ScreenCastIcon size={14} className="text-[var(--accent)]" />
                 <span>
-                  {mediaMode === 'screen'
-                    ? isHost
-                      ? 'Screen Cast Standby • Click "Start Screen Cast" below to broadcast'
-                      : 'Screen Cast Standby • Awaiting host broadcast'
-                    : isHost
-                    ? 'Local Video Standby • Choose a video file below to synchronize'
-                    : 'Local Video Standby • Awaiting host video selection'}
+                  {isHost
+                    ? 'Standby • Click "Broadcast" below to stream media'
+                    : 'Standby • Awaiting host broadcast'}
                 </span>
               </div>
             </div>
@@ -1651,54 +1647,63 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             : 'h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 relative gap-2'
         }`}
       >
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1">
-          {/* Studio Microphone Split Control */}
-          <div ref={micMenuRef} className="relative flex items-center shrink-0">
-            <div
-              className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
-                isMicActive
-                  ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25 hover:bg-[#30D158]/20'
-                  : 'bg-[#FF453A]/15 text-[#FF453A] border-[#FF453A]/25 hover:bg-[#FF453A]/20'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={onToggleMic}
-                className="p-2.5 sm:px-3 sm:py-2.5 flex items-center justify-center transition hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                title={isMicActive ? 'Mute Microphone (M / Hold Space to talk)' : 'Unmute Microphone (M / Hold Space to talk)'}
+        {/* Left Side: Room Identity / Balanced Spacer */}
+        <div className="hidden md:flex items-center gap-2 min-w-0 w-36 shrink-0">
+          <span className="text-xs font-semibold text-black/60 dark:text-white/60 truncate" title={roomName}>
+            {roomName}
+          </span>
+        </div>
+
+        {/* Center: Compact Floating Controls Dock */}
+        <div className="flex-1 flex items-center justify-center min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 py-1 overflow-visible">
+            {/* Studio Microphone Split Control */}
+            <div ref={micMenuRef} className="relative flex items-center shrink-0">
+              <div
+                className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
+                  isMicActive
+                    ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25 hover:bg-[#30D158]/20'
+                    : 'bg-[#FF453A]/15 text-[#FF453A] border-[#FF453A]/25 hover:bg-[#FF453A]/20'
+                }`}
               >
-                {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
-              </button>
-              {onSelectAudioInputDevice && audioInputDevices.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsMicMenuOpen((prev) => {
-                      const next = !prev;
-                      if (next) {
-                        setIsCameraMenuOpen(false);
-                        setIsBlurMenuOpen(false);
-                        setIsBroadcastMenuOpen(false);
-                        setIsEmojiTrayOpen(false);
-                        setIsHostControlsOpen(false);
-                      }
-                      return next;
-                    });
-                  }}
-                  className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
-                  title="Select Microphone"
+                  onClick={onToggleMic}
+                  className="p-2.5 sm:px-3 sm:py-2.5 flex items-center justify-center transition hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                  title={isMicActive ? 'Mute Microphone (M / Hold Space to talk)' : 'Unmute Microphone (M / Hold Space to talk)'}
                 >
-                  <ChevronUp size={12} className={`transition-transform duration-200 ${isMicMenuOpen ? 'rotate-180' : ''}`} />
+                  {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
                 </button>
-              )}
-            </div>
+                {onSelectAudioInputDevice && audioInputDevices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMicMenuOpen((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setIsCameraMenuOpen(false);
+                          setIsBlurMenuOpen(false);
+                          setIsBroadcastMenuOpen(false);
+                          setIsEmojiTrayOpen(false);
+                          setIsHostControlsOpen(false);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center transition hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-current"
+                    title="Select Microphone"
+                  >
+                    <ChevronUp size={12} className={`transition-transform duration-200 ${isMicMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
 
-            {/* Mic Device Selector Dropdown */}
-            {isMicMenuOpen && onSelectAudioInputDevice && (
-              <div
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
-                onClick={(e) => e.stopPropagation()}
-              >
+              {/* Mic Device Selector Dropdown */}
+              {isMicMenuOpen && onSelectAudioInputDevice && (
+                <div
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
+                  onClick={(e) => e.stopPropagation()}
+                >
                 <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
                   Select Microphone
                 </div>
@@ -1769,7 +1774,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               {/* Camera Device Selector Dropdown */}
               {isCameraMenuOpen && onSelectVideoInputDevice && (
                 <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
@@ -1843,7 +1848,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
               {isBlurMenuOpen && (
                 <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between">
@@ -1949,7 +1954,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               {/* Anchored Broadcast Popover */}
               {isBroadcastMenuOpen && (
                 <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 p-3.5 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[6px] after:border-transparent after:border-t-black/95"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 p-3.5 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {broadcastView === 'sources' && (
@@ -2207,10 +2212,11 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               </button>
             </div>
           )}
+          </div>
         </div>
 
         {/* Right Dock Controls: Leave Room */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-end gap-2 w-36 shrink-0">
           <button
             onClick={onLeaveRoom}
             className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]"
