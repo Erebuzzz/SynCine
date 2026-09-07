@@ -14,13 +14,13 @@ interface PopupPortalProps {
   className?: string;
   /** Width class override (default: 'w-64') */
   widthClass?: string;
-  /** Background styling class (default: 'bg-black/95') */
+  /** Background styling class (default: 'bg-white/80 dark:bg-[#121216]/80') */
   bgClass?: string;
-  /** Border styling class (default: 'border-white/15') */
+  /** Border styling class (default: 'border-black/[0.08] dark:border-white/15') */
   borderClass?: string;
-  /** Text styling class (default: 'text-white') */
+  /** Text styling class (default: 'text-[#111113] dark:text-[#F7F7F8]') */
   textClass?: string;
-  /** Caret border color class (default: 'border-t-black/95' or 'border-b-black/95') */
+  /** Caret border color class */
   caretClass?: string;
   /** Stop click propagation inside the popup */
   stopPropagation?: boolean;
@@ -28,7 +28,7 @@ interface PopupPortalProps {
 }
 
 /**
- * Renders popup content into document.body via a React portal.
+ * Renders popup content into document.body via a React portal with liquid glass styling.
  * This escapes all parent stacking context, overflow:hidden, and
  * transform issues that break CSS absolute positioning.
  */
@@ -41,9 +41,9 @@ const PopupPortal = forwardRef<HTMLDivElement, PopupPortalProps>(
       isFlipped = false,
       className = '',
       widthClass = 'w-64',
-      bgClass = 'bg-black/95',
-      borderClass = 'border-white/15',
-      textClass = 'text-white',
+      bgClass = 'bg-white/80 dark:bg-[#121216]/80',
+      borderClass = 'border-black/[0.08] dark:border-white/15',
+      textClass = 'text-[#111113] dark:text-[#F7F7F8]',
       caretClass,
       stopPropagation = true,
       children,
@@ -52,19 +52,28 @@ const PopupPortal = forwardRef<HTMLDivElement, PopupPortalProps>(
   ) => {
     if (!isOpen) return null;
 
-    const defaultCaretClass = isFlipped ? 'border-b-black/95' : 'border-t-black/95';
+    const defaultCaretClass = isFlipped
+      ? 'border-b-white/90 dark:border-b-[#121216]/90'
+      : 'border-t-white/90 dark:border-t-[#121216]/90';
 
     const popup = (
       <div
         ref={ref}
         style={style}
-        className={`${widthClass} p-2 rounded-2xl ${bgClass} backdrop-blur-2xl border ${borderClass} shadow-2xl animate-enter-smooth select-none ${textClass} ${className}`}
+        className={`realistic-glass ${widthClass} p-2 rounded-2xl ${bgClass} backdrop-blur-2xl border ${borderClass} shadow-2xl animate-enter-smooth select-none ${textClass} ${className}`}
         onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
       >
-        {children}
+        {/* Specular Edge Highlight */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 dark:via-white/20 to-transparent pointer-events-none z-10" />
+
+        {/* Content layer */}
+        <div className="relative z-10">
+          {children}
+        </div>
+
         {/* Caret arrow pointing toward the trigger */}
         <div
-          className={`absolute pointer-events-none ${isFlipped ? 'bottom-full' : 'top-full'}`}
+          className={`absolute pointer-events-none z-10 ${isFlipped ? 'bottom-full' : 'top-full'}`}
           style={{ left: caretLeft }}
         >
           <div

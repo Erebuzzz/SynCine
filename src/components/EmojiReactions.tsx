@@ -261,13 +261,13 @@ export const EmojiReactions: React.FC<EmojiReactionsProps> = ({
           isFlipped={isFlipped}
           widthClass="w-auto max-w-[calc(100vw-32px)]"
           className="p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl"
-          bgClass="bg-white/95 dark:bg-black/95"
-          borderClass="border-black/[0.08] dark:border-white/[0.12]"
+          bgClass="bg-white/80 dark:bg-[#121216]/80"
+          borderClass="border-black/[0.08] dark:border-white/15"
           textClass="text-[#1D1D1F] dark:text-[#F5F5F7]"
           caretClass={
             isFlipped
-              ? 'border-b-white/95 dark:border-b-black/95'
-              : 'border-t-white/95 dark:border-t-black/95'
+              ? 'border-b-white/90 dark:border-b-[#121216]/90'
+              : 'border-t-white/90 dark:border-t-[#121216]/90'
           }
         >
           {trayContent}
@@ -275,7 +275,7 @@ export const EmojiReactions: React.FC<EmojiReactionsProps> = ({
       ) : isOpen ? (
         <div
           ref={effectiveTrayRef}
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 w-auto max-w-[calc(100vw-32px)] p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-2xl animate-enter-smooth select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-white/95 dark:after:border-t-black/95 after:pointer-events-none"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 w-auto max-w-[calc(100vw-32px)] p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl realistic-glass bg-white/80 dark:bg-[#121216]/80 backdrop-blur-2xl border border-black/[0.08] dark:border-white/15 shadow-2xl animate-enter-smooth select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-white/90 dark:after:border-t-[#121216]/90 after:pointer-events-none"
         >
           {trayContent}
         </div>

@@ -1723,9 +1723,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isOpen={isMicMenuOpen && !!onSelectAudioInputDevice}
                 style={micPopup.popupStyle}
                 caretLeft={micPopup.caretLeft}
+                isFlipped={micPopup.isFlipped}
                 className="max-h-72 overflow-y-auto space-y-1"
               >
-                <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
+                <div className="px-3 py-1 text-[10px] font-semibold text-black/50 dark:text-white/50 tracking-wider uppercase">
                   Select Microphone
                 </div>
                 {audioInputDevices.map((device, idx) => (
@@ -1738,12 +1739,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     }}
                     className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
                       selectedAudioDeviceId === device.deviceId
-                        ? 'bg-[var(--accent)] text-black font-semibold'
-                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        ? 'bg-[var(--accent)] text-black font-semibold shadow-xs'
+                        : 'text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     <span className="truncate pr-2">{device.label || `Microphone ${idx + 1}`}</span>
-                    {selectedAudioDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
+                    {selectedAudioDeviceId === device.deviceId && <Check size={14} className="shrink-0 text-black" />}
                   </button>
                 ))}
               </PopupPortal>
@@ -1797,9 +1798,10 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isOpen={isCameraMenuOpen && !!onSelectVideoInputDevice}
                 style={cameraPopup.popupStyle}
                 caretLeft={cameraPopup.caretLeft}
+                isFlipped={cameraPopup.isFlipped}
                 className="max-h-72 overflow-y-auto space-y-1"
               >
-                <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
+                <div className="px-3 py-1 text-[10px] font-semibold text-black/50 dark:text-white/50 tracking-wider uppercase">
                   Select Camera
                 </div>
                 {videoInputDevices.map((device, idx) => (
@@ -1812,12 +1814,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     }}
                     className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
                       selectedVideoDeviceId === device.deviceId
-                        ? 'bg-[var(--accent)] text-black font-semibold'
-                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        ? 'bg-[var(--accent)] text-black font-semibold shadow-xs'
+                        : 'text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     <span className="truncate pr-2">{device.label || `Camera ${idx + 1}`}</span>
-                    {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
+                    {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0 text-black" />}
                   </button>
                 ))}
               </PopupPortal>
@@ -1873,11 +1875,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isOpen={isBlurMenuOpen}
                 style={blurPopup.popupStyle}
                 caretLeft={blurPopup.caretLeft}
+                isFlipped={blurPopup.isFlipped}
                 className="space-y-3 p-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white">Background Blur</span>
-                  <span className="text-[11px] font-mono text-[var(--accent)]">
+                  <span className="text-xs font-semibold text-black dark:text-white">Background Blur</span>
+                  <span className="text-[11px] font-mono text-[var(--accent)] font-semibold">
                     {bgBlurRadius === 0 ? 'Off' : `${bgBlurRadius}px`}
                   </span>
                 </div>
@@ -1896,8 +1899,8 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       onClick={() => onSetBlurRadius(preset.val)}
                       className={`py-1.5 text-[10px] font-medium rounded-lg transition cursor-pointer text-center ${
                         bgBlurRadius === preset.val
-                          ? 'bg-[var(--accent)] text-black font-bold'
-                          : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                          ? 'bg-[var(--accent)] text-black font-bold shadow-xs'
+                          : 'bg-black/5 dark:bg-white/10 text-black/70 dark:text-white/70 hover:bg-black/10 dark:hover:bg-white/15 hover:text-black dark:hover:text-white'
                       }`}
                     >
                       {preset.label}
@@ -1907,7 +1910,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
                 {/* Continuous Slider */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-white/50">
+                  <div className="flex items-center justify-between text-[10px] text-black/50 dark:text-white/50">
                     <span>Intensity</span>
                     <span>{Math.round((bgBlurRadius / 32) * 100)}%</span>
                   </div>
@@ -1917,11 +1920,11 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     max={32}
                     value={bgBlurRadius}
                     onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                    className="w-full h-1.5 bg-black/15 dark:bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
                   />
                 </div>
 
-                <div className="text-[10px] text-white/50 leading-snug">
+                <div className="text-[10px] text-black/50 dark:text-white/50 leading-snug">
                   Edge-refined portrait bokeh with sub-pixel feathering
                 </div>
               </PopupPortal>
@@ -1980,14 +1983,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 isOpen={isBroadcastMenuOpen}
                 style={broadcastPopup.popupStyle}
                 caretLeft={broadcastPopup.caretLeft}
+                isFlipped={broadcastPopup.isFlipped}
                 widthClass="w-72"
                 className="p-3.5"
               >
                   {broadcastView === 'sources' && (
                     <div className="space-y-2">
-                      <div className="px-1 pb-1 border-b border-white/10">
-                        <div className="text-xs font-semibold text-white">Broadcast Source</div>
-                        <div className="text-[10px] text-white/50">Select media to stream to the room</div>
+                      <div className="px-1 pb-1 border-b border-black/[0.08] dark:border-white/10">
+                        <div className="text-xs font-semibold text-black dark:text-white">Broadcast Source</div>
+                        <div className="text-[10px] text-black/50 dark:text-white/50">Select media to stream to the room</div>
                       </div>
 
                       <div className="space-y-1 pt-1">
@@ -1997,14 +2001,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                             setIsBroadcastMenuOpen(false);
                             onToggleScreenShare();
                           }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
                             <ScreenCastIcon size={16} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-white group-hover:text-[var(--accent)]">Screen Cast</div>
-                            <div className="text-[10px] text-white/50 truncate">Share display, app window, or tab</div>
+                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Screen Cast</div>
+                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Share display, app window, or tab</div>
                           </div>
                         </button>
 
@@ -2014,14 +2018,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                             setBroadcastView('youtube_input');
                             setYoutubeError(null);
                           }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[#FF0000] group-hover:bg-[#FF0000] group-hover:text-white transition shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[#FF0000] group-hover:bg-[#FF0000] group-hover:text-white transition shrink-0">
                             <Youtube size={16} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-white group-hover:text-[#FF0000]">YouTube Stream</div>
-                            <div className="text-[10px] text-white/50 truncate">Synchronized CDN video playback</div>
+                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[#FF0000]">YouTube Stream</div>
+                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Synchronized CDN video playback</div>
                           </div>
                         </button>
 
@@ -2031,14 +2035,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                             setIsBroadcastMenuOpen(false);
                             fileInputRef.current?.click();
                           }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-white/10 transition cursor-pointer group"
+                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
                             <CinemaReelIcon size={16} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-white group-hover:text-[var(--accent)]">Local Media File</div>
-                            <div className="text-[10px] text-white/50 truncate">MP4, WebM, or MKV video file</div>
+                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Local Media File</div>
+                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">MP4, WebM, or MKV video file</div>
                           </div>
                         </button>
                       </div>
@@ -2047,19 +2051,19 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
                   {broadcastView === 'youtube_input' && (
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2 pb-2 border-b border-black/[0.08] dark:border-white/10">
                         <button
                           type="button"
                           onClick={() => setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources')}
-                          className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition cursor-pointer"
+                          className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white transition cursor-pointer"
                         >
                           <ArrowLeft size={14} />
                         </button>
-                        <div className="text-xs font-semibold text-white">Broadcast YouTube</div>
+                        <div className="text-xs font-semibold text-black dark:text-white">Broadcast YouTube</div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-white/60 block">YouTube Video URL or Video ID</label>
+                        <label className="text-[10px] text-black/60 dark:text-white/60 block">YouTube Video URL or Video ID</label>
                         <input
                           type="text"
                           value={youtubeInputUrl}
@@ -2071,7 +2075,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                             if (e.key === 'Enter') handleStartYouTubeSubmit();
                           }}
                           placeholder="https://youtube.com/watch?v=..."
-                          className="w-full px-3 py-2 text-xs rounded-xl bg-white/10 border border-white/15 text-white placeholder-white/30 focus:outline-none focus:border-[var(--accent)]"
+                          className="w-full px-3 py-2 text-xs rounded-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35 focus:outline-none focus:border-[var(--accent)]"
                           autoFocus
                         />
                         {youtubeError && (
@@ -2085,7 +2089,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       <button
                         type="button"
                         onClick={handleStartYouTubeSubmit}
-                        className="w-full py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                        className="w-full py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-xs"
                       >
                         Start Broadcast
                       </button>
@@ -2094,17 +2098,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
                   {broadcastView === 'active_manage' && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <div className="flex items-center justify-between pb-2 border-b border-black/[0.08] dark:border-white/10">
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-[#30D158] animate-pulse" />
-                          <span className="text-xs font-semibold text-white">Broadcasting</span>
+                          <span className="text-xs font-semibold text-black dark:text-white">Broadcasting</span>
                         </div>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-[var(--accent)]">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[var(--accent)] font-semibold">
                           {activeBroadcastLabel}
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-white/70 leading-relaxed">
+                      <div className="text-[11px] text-black/70 dark:text-white/70 leading-relaxed">
                         Currently broadcasting live to room participants.
                       </div>
 
@@ -2120,7 +2124,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                         <button
                           type="button"
                           onClick={() => setBroadcastView('sources')}
-                          className="w-full py-2 rounded-xl bg-white/10 text-white/80 hover:bg-white/15 hover:text-white text-xs font-semibold transition cursor-pointer"
+                          className="w-full py-2 rounded-xl bg-black/5 dark:bg-white/10 text-black/80 dark:text-white/80 hover:bg-black/10 dark:hover:bg-white/15 hover:text-black dark:hover:text-white text-xs font-semibold transition cursor-pointer"
                         >
                           Switch Source
                         </button>
