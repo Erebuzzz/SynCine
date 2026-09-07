@@ -16,6 +16,7 @@ import {
 } from '../lib/appwrite';
 import { WebRTCEngine } from '../lib/webrtc';
 import { PlaybackSynchronizer } from '../lib/sync-engine';
+import { deleteRoomData, deleteRoomCompletely, scheduleRoomExpiration } from '../lib/cleanup';
 import {
   captureDisplayMedia,
   captureUserMedia,
@@ -481,7 +482,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
           APPWRITE_DATABASE_ID,
           COLLECTIONS.ROOMS,
           roomId,
-          { participantCount: 1 }
+          { participantCount: 1, expiresAt: '' }
         ).catch((err) => console.warn('Failed to initialize stage participant count:', err));
       }
 
@@ -671,10 +672,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
     const handleBeforeUnload = () => {
       webrtcRef.current?.announceLeave();
 
-      // If this user was the only person on stage, reliably reset participantCount to 0 via keepalive
+      // If this user was the only person on stage, reliably reset participantCount to 0 and schedule expiration via keepalive
       if (participantsRef.current.length === 0) {
         try {
           const url = `${APPWRITE_ENDPOINT}/databases/${APPWRITE_DATABASE_ID}/collections/${COLLECTIONS.ROOMS}/documents/${roomId}`;
+          const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
           fetch(url, {
             method: 'PATCH',
             headers: {
@@ -682,7 +684,10 @@ export const RoomView: React.FC<RoomViewProps> = ({
               'X-Appwrite-Project': APPWRITE_PROJECT_ID
             },
             body: JSON.stringify({
-              data: { participantCount: 0 }
+              data: {
+                participantCount: 0,
+                ...(room?.isPermanent ? {} : { expiresAt })
+              }
             }),
             keepalive: true
           }).catch(() => {});
@@ -771,11 +776,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
       unsubscribeSignaling();
 
       if (room) {
-        // If this user was the last one in the room, authoritatively reset participantCount to 0
+        // If this user was the last one in the room, authoritatively reset participantCount to 0 and wipe messages
         if (participantsRef.current.length === 0) {
-          databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
-            participantCount: 0
-          }).catch(() => {});
+          deleteRoomData(roomId).catch(console.warn);
+          if (!room.isPermanent) {
+            scheduleRoomExpiration(roomId, 3).catch(console.warn);
+          } else {
+            databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+              participantCount: 0
+            }).catch(() => {});
+          }
         } else {
           databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
             .then((d) => {
@@ -1125,6 +1135,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   const handleHostEndSession = () => {
     webrtcRef.current?.broadcastHostCommand('end-room');
+    if (!room?.isPermanent) {
+      deleteRoomCompletely(roomId).catch(console.warn);
+    } else {
+      deleteRoomData(roomId).catch(console.warn);
+      databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, { participantCount: 0 }).catch(console.warn);
+    }
     onLeave();
   };
 

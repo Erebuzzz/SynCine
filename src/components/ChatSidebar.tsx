@@ -6,6 +6,8 @@ import {
   COLLECTIONS,
   ID,
   Query,
+  Permission,
+  Role,
   MessageDocument,
   RealtimeResponseEvent
 } from '../lib/appwrite';
@@ -103,7 +105,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           senderId: currentUserId,
           senderName: currentUserName,
           content: text
-        }
+        },
+        [
+          Permission.read(Role.any()),
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
+        ]
       );
       setInputText('');
     } catch (err) {

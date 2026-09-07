@@ -23,6 +23,7 @@ import {
   resolveThemeIsDark
 } from './lib/time-cycle';
 import { applyPerformanceMode } from './lib/performance-detect';
+import { sweepExpiredRooms, deleteRoomCompletely } from './lib/cleanup';
 import { Lobby } from './components/Lobby';
 import { RoomView } from './components/RoomView';
 import { AuthModal } from './components/AuthModal';
@@ -186,6 +187,9 @@ export const App: React.FC = () => {
         if (user.prefs?.avatar) {
           setAvatarUrl(user.prefs.avatar);
         }
+
+        // Clean up expired rooms in background
+        sweepExpiredRooms().catch((err) => console.warn('Background room sweep error:', err));
 
         // Extract room from query (?room=... or ?id=...) or clean path (/e89-ag8-zm5)
         const params = new URLSearchParams(window.location.search);
@@ -432,6 +436,7 @@ export const App: React.FC = () => {
       if (!doc.isPermanent && doc.expiresAt) {
         const expirationTime = new Date(doc.expiresAt).getTime();
         if (Date.now() > expirationTime) {
+          deleteRoomCompletely(cleanRoomId).catch(console.warn);
           throw new Error('This watchroom has expired (3-hour guest buffer exceeded).');
         }
       }
