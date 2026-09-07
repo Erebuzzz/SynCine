@@ -14,9 +14,9 @@ interface PopupPortalProps {
   className?: string;
   /** Width class override (default: 'w-64') */
   widthClass?: string;
-  /** Background styling class (default: 'bg-white/80 dark:bg-[#121216]/80') */
+  /** Background styling class (default: 'bg-white/55 dark:bg-[#0c0c10]/45') */
   bgClass?: string;
-  /** Border styling class (default: 'border-black/[0.08] dark:border-white/15') */
+  /** Border styling class (default: 'border-black/[0.08] dark:border-white/12') */
   borderClass?: string;
   /** Text styling class (default: 'text-[#111113] dark:text-[#F7F7F8]') */
   textClass?: string;
@@ -28,7 +28,7 @@ interface PopupPortalProps {
 }
 
 /**
- * Renders popup content into document.body via a React portal with liquid glass styling.
+ * Renders popup content into document.body via a React portal with translucent liquid glass styling.
  * This escapes all parent stacking context, overflow:hidden, and
  * transform issues that break CSS absolute positioning.
  */
@@ -41,8 +41,8 @@ const PopupPortal = forwardRef<HTMLDivElement, PopupPortalProps>(
       isFlipped = false,
       className = '',
       widthClass = 'w-64',
-      bgClass = 'bg-white/80 dark:bg-[#121216]/80',
-      borderClass = 'border-black/[0.08] dark:border-white/15',
+      bgClass = 'bg-white/55 dark:bg-[#0c0c10]/45',
+      borderClass = 'border-black/[0.08] dark:border-white/12',
       textClass = 'text-[#111113] dark:text-[#F7F7F8]',
       caretClass,
       stopPropagation = true,
@@ -53,18 +53,18 @@ const PopupPortal = forwardRef<HTMLDivElement, PopupPortalProps>(
     if (!isOpen) return null;
 
     const defaultCaretClass = isFlipped
-      ? 'border-b-white/90 dark:border-b-[#121216]/90'
-      : 'border-t-white/90 dark:border-t-[#121216]/90';
+      ? 'border-b-white/65 dark:border-b-[#0c0c10]/55'
+      : 'border-t-white/65 dark:border-t-[#0c0c10]/55';
 
     const popup = (
       <div
         ref={ref}
         style={style}
-        className={`realistic-glass ${widthClass} p-2 rounded-2xl ${bgClass} backdrop-blur-2xl border ${borderClass} shadow-2xl animate-enter-smooth select-none ${textClass} ${className}`}
+        className={`realistic-glass ${widthClass} p-2 rounded-2xl ${bgClass} backdrop-blur-2xl border ${borderClass} shadow-[0_16px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.45)] animate-enter-smooth select-none ${textClass} ${className}`}
         onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
       >
         {/* Specular Edge Highlight */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 dark:via-white/20 to-transparent pointer-events-none z-10" />
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/40 dark:via-white/20 to-transparent pointer-events-none z-10" />
 
         {/* Content layer */}
         <div className="relative z-10">
