@@ -98,4 +98,18 @@ describe('Cinema Audio Processing Engine Suite', () => {
 
     processor.destroy();
   });
+
+  it('reuses existing MediaElementAudioSourceNode for same media element across attachments without calling createMediaElementSource again', () => {
+    const processor = new CinemaAudioProcessor();
+    const mockVideo = document.createElement('video');
+
+    processor.attachMediaElement(mockVideo, { dialogueBoost: 'off', nightMode: false });
+    expect(mockAudioContext.createMediaElementSource).toHaveBeenCalledTimes(1);
+
+    // Attach again to the same element (e.g. after stream swap or re-render)
+    processor.attachMediaElement(mockVideo, { dialogueBoost: 'medium', nightMode: true });
+    expect(mockAudioContext.createMediaElementSource).toHaveBeenCalledTimes(1);
+
+    processor.destroy();
+  });
 });

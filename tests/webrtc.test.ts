@@ -112,6 +112,8 @@ describe('WebRTCEngine Test Suite', () => {
     await engine.initiateConnection('user-peer');
 
     expect(global.RTCPeerConnection).toHaveBeenCalled();
+    const pcInstance = (global.RTCPeerConnection as any).mock.results[0].value;
+    expect(pcInstance.createOffer).toHaveBeenCalledWith();
     expect(mockCreateDocument).toHaveBeenCalledWith(
       'syncine_db',
       'signaling',
@@ -137,6 +139,7 @@ describe('WebRTCEngine Test Suite', () => {
     });
 
     await engine.initiateConnection('user-peer');
+    const pcInstance = (global.RTCPeerConnection as any).mock.results[0].value;
 
     const mockVideoTrack = { kind: 'video', id: 'video-track-1' };
     const mockCameraStream = {
@@ -146,6 +149,7 @@ describe('WebRTCEngine Test Suite', () => {
     } as any;
 
     engine.attachCameraStream(mockCameraStream);
+    expect(pcInstance.addTrack).not.toHaveBeenCalled();
     engine.removeCameraStream();
 
     expect(mockCameraStream.getVideoTracks).toHaveBeenCalled();

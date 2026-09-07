@@ -524,11 +524,9 @@ export class WebRTCEngine {
   public async initiateConnection(peerId: string) {
     const pc = this.getOrCreatePeer(peerId);
     try {
+      if (pc.signalingState !== 'stable') return;
       this.makingOffer.set(peerId, true);
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
+      const offer = await pc.createOffer();
       if (pc.signalingState !== 'stable') return;
       await pc.setLocalDescription(offer);
       await this.sendSignal(peerId, 'offer', pc.localDescription || offer);
@@ -540,57 +538,32 @@ export class WebRTCEngine {
   }
 
   private async handleOffer(peerId: string, offer: RTCSessionDescriptionInit) {
-    const pc = this.getOrCreatePeer(peerId);
-    const isPolite = this.opts.currentUserId < peerId;
-    const isMakingOffer = this.makingOffer.get(peerId) || false;
-    const offerCollision = offer.type === 'offer' && (isMakingOffer || pc.signalingState !== 'stable');
+    try {
+      const pc = this.getOrCreatePeer(peerId);
+      const isPolite = this.opts.currentUserId < peerId;
+      const isMakingOffer = this.makingOffer.get(peerId) || false;
+      const offerCollision = offer.type === 'offer' && (isMakingOffer || pc.signalingState !== 'stable');
 
-    this.ignoreOffer.set(peerId, !isPolite && offerCollision);
-    if (this.ignoreOffer.get(peerId)) {
-      console.warn(`WebRTC glare collision detected with peer ${peerId}. Impolite peer ignoring offer.`);
-      return;
-    }
+      this.ignoreOffer.set(peerId, !isPolite && offerCollision);
+      if (this.ignoreOffer.get(peerId)) {
+        console.warn(`WebRTC glare collision detected with peer ${peerId}. Impolite peer ignoring offer.`);
+        return;
+      }
 
-    if (offerCollision && isPolite) {
-      if (pc.signalingState === 'have-local-offer') {
-        try {
-          console.log(`WebRTC glare collision detected with peer ${peerId}. Polite peer rolling back.`);
-          await pc.setLocalDescription({ type: 'rollback' });
-        } catch (err) {
-          console.warn(`Rollback failed for peer ${peerId}:`, err);
+      if (offerCollision && isPolite) {
+        if (pc.signalingState === 'have-local-offer') {
+          try {
+            console.log(`WebRTC glare collision detected with peer ${peerId}. Polite peer rolling back.`);
+            await pc.setLocalDescription({ type: 'rollback' });
+          } catch (err) {
+            console.warn(`Rollback failed for peer ${peerId}:`, err);
+          }
         }
       }
-    }
 
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-    // Drain queued ICE candidates
-    const queued = this.pendingCandidates.get(peerId);
-    if (queued && queued.length > 0) {
-      for (const candidate of queued) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.warn('Error applying queued ICE candidate:', e);
-        }
-      }
-      this.pendingCandidates.delete(peerId);
-    }
-
-    if (offer.type === 'offer') {
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await this.sendSignal(peerId, 'answer', pc.localDescription);
-    }
-  }
-
-  private async handleAnswer(peerId: string, answer: RTCSessionDescriptionInit) {
-    const pc = this.peers.get(peerId);
-    if (!pc) return;
-
-    if (pc.signalingState === 'have-local-offer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-
+      // Drain queued ICE candidates
       const queued = this.pendingCandidates.get(peerId);
       if (queued && queued.length > 0) {
         for (const candidate of queued) {
@@ -602,23 +575,60 @@ export class WebRTCEngine {
         }
         this.pendingCandidates.delete(peerId);
       }
+
+      if (offer.type === 'offer') {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await this.sendSignal(peerId, 'answer', pc.localDescription);
+      }
+    } catch (err) {
+      console.warn(`Error handling offer from peer ${peerId}:`, err);
+    }
+  }
+
+  private async handleAnswer(peerId: string, answer: RTCSessionDescriptionInit) {
+    try {
+      const pc = this.peers.get(peerId);
+      if (!pc) return;
+
+      if (pc.signalingState === 'have-local-offer') {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        const queued = this.pendingCandidates.get(peerId);
+        if (queued && queued.length > 0) {
+          for (const candidate of queued) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+              console.warn('Error applying queued ICE candidate:', e);
+            }
+          }
+          this.pendingCandidates.delete(peerId);
+        }
+      }
+    } catch (err) {
+      console.warn(`Error handling answer from peer ${peerId}:`, err);
     }
   }
 
   private async handleCandidate(peerId: string, candidate: RTCIceCandidateInit) {
-    const pc = this.peers.get(peerId);
-    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        if (!this.ignoreOffer.get(peerId)) {
-          console.warn(`Failed to add ICE candidate for peer ${peerId}:`, err);
+    try {
+      const pc = this.peers.get(peerId);
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          if (!this.ignoreOffer.get(peerId)) {
+            console.warn(`Failed to add ICE candidate for peer ${peerId}:`, err);
+          }
         }
+      } else {
+        const list = this.pendingCandidates.get(peerId) || [];
+        list.push(candidate);
+        this.pendingCandidates.set(peerId, list);
       }
-    } else {
-      const list = this.pendingCandidates.get(peerId) || [];
-      list.push(candidate);
-      this.pendingCandidates.set(peerId, list);
+    } catch (err) {
+      console.warn(`Error handling ICE candidate from peer ${peerId}:`, err);
     }
   }
 
@@ -684,8 +694,6 @@ export class WebRTCEngine {
         const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
         if (sender) {
           sender.replaceTrack(track).catch(console.warn);
-        } else {
-          pc.addTrack(track, stream);
         }
       }
     });
@@ -704,8 +712,6 @@ export class WebRTCEngine {
         const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
         if (sender) {
           sender.replaceTrack(videoTrack).catch(console.warn);
-        } else {
-          pc.addTrack(videoTrack, stream);
         }
       }
     });
@@ -727,21 +733,17 @@ export class WebRTCEngine {
     const screenAudioTrack = stream.getAudioTracks()[0] || null;
     if (!screenTrack) return;
 
-    this.peers.forEach((pc, peerId) => {
+    this.peers.forEach((_pc, peerId) => {
       const screenTransceiver = this.screenTransceivers.get(peerId);
       if (screenTransceiver) {
         screenTransceiver.direction = 'sendrecv';
         screenTransceiver.sender.replaceTrack(screenTrack).catch(console.warn);
-      } else {
-        pc.addTrack(screenTrack, stream);
       }
 
       const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
       if (screenAudioTransceiver) {
         screenAudioTransceiver.direction = screenAudioTrack ? 'sendrecv' : 'recvonly';
         screenAudioTransceiver.sender.replaceTrack(screenAudioTrack).catch(console.warn);
-      } else if (screenAudioTrack) {
-        pc.addTrack(screenAudioTrack, stream);
       }
     });
 
@@ -759,13 +761,11 @@ export class WebRTCEngine {
     if (!this.localScreenStream.getTracks().some((t) => t.id === audioTrack.id)) {
       this.localScreenStream.addTrack(audioTrack);
     }
-    this.peers.forEach((pc, peerId) => {
+    this.peers.forEach((_pc, peerId) => {
       const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
       if (screenAudioTransceiver) {
         screenAudioTransceiver.direction = 'sendrecv';
         screenAudioTransceiver.sender.replaceTrack(audioTrack).catch(console.warn);
-      } else {
-        pc.addTrack(audioTrack, this.localScreenStream!);
       }
     });
 
