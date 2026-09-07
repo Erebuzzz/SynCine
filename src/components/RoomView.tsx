@@ -498,7 +498,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
             setNetworkStatus(status);
           }
         },
-        onPeerDiscovered: (peerId, remoteUserName) => {
+        onPeerDiscovered: (peerId, remoteUserName, initialCameraActive, initialMicActive) => {
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
             let updated: Participant[];
@@ -506,7 +506,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
               updated = [...prev];
               updated[existingIndex] = {
                 ...updated[existingIndex],
-                name: remoteUserName || updated[existingIndex].name
+                name: remoteUserName || updated[existingIndex].name,
+                isCameraActive: initialCameraActive !== undefined ? initialCameraActive : updated[existingIndex].isCameraActive,
+                isMicActive: initialMicActive !== undefined ? initialMicActive : updated[existingIndex].isMicActive
               };
             } else {
               updated = [
@@ -515,8 +517,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
                   id: peerId,
                   name: remoteUserName,
                   stream: undefined,
-                  isMicActive: false,
-                  isCameraActive: false
+                  isMicActive: initialMicActive ?? false,
+                  isCameraActive: initialCameraActive ?? false
                 }
               ];
             }
@@ -544,8 +546,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onRemoteTrackAdded: (peerId, stream, peerName) => {
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
-            const hasAudio = stream.getAudioTracks().length > 0;
-            const hasVideo = stream.getVideoTracks().length > 0;
+            const hasAudio = stream.getAudioTracks().some((t) => t.enabled);
+            const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
             const displayName =
               peerName ||
               (existingIndex >= 0 ? prev[existingIndex].name : undefined) ||
@@ -558,8 +560,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
                 ...updated[existingIndex],
                 name: displayName,
                 stream,
-                isMicActive: hasAudio,
-                isCameraActive: hasVideo
+                isMicActive: hasAudio ? true : (prev[existingIndex].isMicActive ?? false),
+                isCameraActive: hasVideo ? true : (prev[existingIndex].isCameraActive ?? false)
               };
               return updated;
             }
@@ -574,6 +576,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
               }
             ];
           });
+        },
+        onCameraStateChanged: (peerId, isCamActive) => {
+          setParticipants((prev) =>
+            prev.map((p) => (p.id === peerId ? { ...p, isCameraActive: isCamActive } : p))
+          );
+        },
+        onMicStateChanged: (peerId, isMic) => {
+          setParticipants((prev) =>
+            prev.map((p) => (p.id === peerId ? { ...p, isMicActive: isMic } : p))
+          );
         },
         onScreenShareChanged: (_peerId, streamId, active) => {
           if (active && streamId) {
@@ -655,7 +667,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       }
 
       // Announce presence to entire room so existing peers connect
-      await engine.announceJoin(effectiveUserName);
+      await engine.announceJoin(effectiveUserName, isCameraActive, isMicActive);
 
       // Initialize Playback Synchronizer
       const sync = new PlaybackSynchronizer(
@@ -901,6 +913,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         });
       }
       setIsMicActive(false);
+      webrtcRef.current?.broadcastMicState(false);
     } else {
       try {
         let stream = localUserMediaRef.current;
@@ -915,6 +928,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         }
         webrtcRef.current?.attachMicStream(stream);
         setIsMicActive(true);
+        webrtcRef.current?.broadcastMicState(true);
       } catch (err) {
         console.error('Failed to enable microphone:', err);
       }
@@ -931,6 +945,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       }
       webrtcRef.current?.removeCameraStream();
       setIsCameraActive(false);
+      webrtcRef.current?.broadcastCameraState(false);
     } else {
       try {
         let stream = localUserMediaRef.current;
@@ -965,6 +980,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
           }
         }
         setIsCameraActive(true);
+        webrtcRef.current?.broadcastCameraState(true);
       } catch (err) {
         console.error('Failed to enable camera:', err);
       }

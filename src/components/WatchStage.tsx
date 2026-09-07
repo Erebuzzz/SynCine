@@ -1317,9 +1317,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 </div>
 
                 {participants.map((p) => {
+                  const isCamActive = p.isCameraActive ?? true;
                   const hasVideo = Boolean(
+                    isCamActive &&
                     p.stream &&
-                    p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                    (p.isSelf
+                      ? p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                      : p.stream.getVideoTracks().length > 0)
                   );
 
                   return (
@@ -1434,9 +1438,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               }`}
             >
               {(pinnedParticipant ? [pinnedParticipant] : participants).map((p) => {
+                const isCamActive = p.isCameraActive ?? true;
                 const hasVideo = Boolean(
+                  isCamActive &&
                   p.stream &&
-                  p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                  (p.isSelf
+                    ? p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                    : p.stream.getVideoTracks().length > 0)
                 );
 
                 return (
@@ -1558,9 +1566,13 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         {layout === 'grid' && participants.length > 0 && (
           <div className="absolute inset-x-3 sm:inset-x-6 bottom-20 sm:bottom-24 grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 z-30 pointer-events-none">
             {participants.map((p) => {
+              const isCamActive = p.isCameraActive ?? true;
               const hasVideo = Boolean(
+                isCamActive &&
                 p.stream &&
-                p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                (p.isSelf
+                  ? p.stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+                  : p.stream.getVideoTracks().length > 0)
               );
 
               return (

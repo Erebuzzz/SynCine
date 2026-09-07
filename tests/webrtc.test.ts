@@ -227,11 +227,60 @@ describe('WebRTCEngine Test Suite', () => {
 
     await engine.initiateConnection('peer-2');
 
-    // Verify exactly 4 transceivers were added: audio, camera (video), screen share (video), and screen audio (audio)
+    // Verify exactly 4 transceivers were added: audio (sendrecv), camera (sendrecv), screen share (recvonly), and screen audio (recvonly)
     expect(mockAddTransceiver).toHaveBeenCalledTimes(4);
     expect(mockAddTransceiver).toHaveBeenNthCalledWith(1, 'audio', expect.objectContaining({ direction: 'sendrecv' }));
     expect(mockAddTransceiver).toHaveBeenNthCalledWith(2, 'video', expect.objectContaining({ direction: 'sendrecv' }));
-    expect(mockAddTransceiver).toHaveBeenNthCalledWith(3, 'video', expect.objectContaining({ direction: 'sendrecv' }));
-    expect(mockAddTransceiver).toHaveBeenNthCalledWith(4, 'audio', expect.objectContaining({ direction: 'sendrecv' }));
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(3, 'video', expect.objectContaining({ direction: 'recvonly' }));
+    expect(mockAddTransceiver).toHaveBeenNthCalledWith(4, 'audio', expect.objectContaining({ direction: 'recvonly' }));
+  });
+
+  it('broadcasts camera and mic state updates via signaling documents', async () => {
+    const engine = new WebRTCEngine({
+      client: mockClient,
+      databaseId: 'syncine_db',
+      roomId: 'room-1',
+      currentUserId: 'user-self',
+      onRemoteTrackAdded: vi.fn(),
+      onPeerDisconnected: vi.fn()
+    });
+
+    await engine.broadcastCameraState(true);
+    expect(mockCreateDocument).toHaveBeenCalledWith(
+      'syncine_db',
+      'signaling',
+      'mock-unique-id',
+      expect.objectContaining({
+        roomId: 'room-1',
+        senderId: 'user-self',
+        receiverId: 'all',
+        type: 'candidate',
+        payload: JSON.stringify({
+          action: 'camera-state-changed',
+          isCameraActive: true,
+          senderId: 'user-self'
+        })
+      }),
+      expect.any(Array)
+    );
+
+    await engine.broadcastMicState(false);
+    expect(mockCreateDocument).toHaveBeenCalledWith(
+      'syncine_db',
+      'signaling',
+      'mock-unique-id',
+      expect.objectContaining({
+        roomId: 'room-1',
+        senderId: 'user-self',
+        receiverId: 'all',
+        type: 'candidate',
+        payload: JSON.stringify({
+          action: 'mic-state-changed',
+          isMicActive: false,
+          senderId: 'user-self'
+        })
+      }),
+      expect.any(Array)
+    );
   });
 });

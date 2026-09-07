@@ -10,11 +10,13 @@ export interface WebRTCEngineOptions {
   onRemoteScreenStream?: (peerId: string, stream: MediaStream | undefined) => void;
   onPeerDisconnected: (peerId: string) => void;
   onPeerConnected?: (peerId: string) => void;
-  onPeerDiscovered?: (peerId: string, userName: string) => void;
+  onPeerDiscovered?: (peerId: string, userName: string, initialCameraActive?: boolean, initialMicActive?: boolean) => void;
   onScreenShareChanged?: (peerId: string, streamId: string | undefined, active: boolean, trackId?: string) => void;
   onHostCommandReceived?: (command: string, targetId?: string) => void;
   onEmojiReactionReceived?: (emojiId: string, senderName?: string) => void;
   onCameraMirrorChanged?: (peerId: string, isMirrored: boolean) => void;
+  onCameraStateChanged?: (peerId: string, isCameraActive: boolean) => void;
+  onMicStateChanged?: (peerId: string, isMicActive: boolean) => void;
   onConnectionStatusChange?: (status: 'connected' | 'reconnecting' | 'offline') => void;
 }
 
@@ -153,15 +155,25 @@ export class WebRTCEngine {
               this.pendingCandidates.delete(doc.senderId);
             }
 
-            this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
+            this.opts.onPeerDiscovered?.(
+              doc.senderId,
+              remoteName,
+              payload.isCameraActive,
+              payload.isMicActive
+            );
 
-            // Respond with announce-ack including current screen cast state
+            // Respond with announce-ack including current camera, mic, and screen cast state
             const screenTrack = this.localScreenStream?.getVideoTracks()[0];
             const screenAudioTrack = this.localScreenStream?.getAudioTracks()[0];
+            const cameraLive = Boolean(this.localCameraStream?.getVideoTracks().some((t) => t.enabled && t.readyState === 'live'));
+            const micLive = Boolean(this.localMicStream?.getAudioTracks().some((t) => t.enabled && t.readyState === 'live'));
+
             await this.sendSignal(doc.senderId, 'candidate', {
               action: 'announce-ack',
               userId: this.opts.currentUserId,
               userName: this.opts.currentUserName || 'Participant',
+              isCameraActive: cameraLive,
+              isMicActive: micLive,
               hasScreenCast: Boolean(this.localScreenStream),
               screenStreamId: this.localScreenStream?.id,
               screenTrackId: screenTrack?.id,
@@ -203,7 +215,12 @@ export class WebRTCEngine {
               this.opts.onScreenShareChanged?.(doc.senderId, payload.screenStreamId, true, payload.screenTrackId);
             }
 
-            this.opts.onPeerDiscovered?.(doc.senderId, remoteName);
+            this.opts.onPeerDiscovered?.(
+              doc.senderId,
+              remoteName,
+              payload.isCameraActive,
+              payload.isMicActive
+            );
 
             // Initialize peer connection
             this.getOrCreatePeer(doc.senderId);
@@ -215,6 +232,10 @@ export class WebRTCEngine {
           } else if (payload && payload.action === 'announce-leave') {
             // Cleanly remove departing peer
             this.handlePeerLeave(doc.senderId);
+          } else if (payload && payload.action === 'camera-state-changed') {
+            this.opts.onCameraStateChanged?.(doc.senderId, Boolean(payload.isCameraActive));
+          } else if (payload && payload.action === 'mic-state-changed') {
+            this.opts.onMicStateChanged?.(doc.senderId, Boolean(payload.isMicActive));
           } else if (payload && payload.action === 'host-command') {
             this.opts.onHostCommandReceived?.(payload.command, payload.targetId);
           } else if (payload && payload.action === 'emoji-reaction') {
@@ -292,6 +313,11 @@ export class WebRTCEngine {
     // Perfect Negotiation pattern: onnegotiationneeded triggers offer generation
     pc.onnegotiationneeded = async () => {
       try {
+        // Prevent glare: callee does not fire offer before receiving initial remote offer
+        if (pc.signalingState !== 'stable') return;
+        if (pc.remoteDescription === null && this.opts.currentUserId < peerId) {
+          return;
+        }
         this.makingOffer.set(peerId, true);
         const offer = await pc.createOffer();
         if (pc.signalingState !== 'stable') return;
@@ -322,15 +348,16 @@ export class WebRTCEngine {
         screenAudioTransceiver && (e.transceiver === screenAudioTransceiver || (e.transceiver?.mid && e.transceiver.mid === screenAudioTransceiver.mid))
       );
 
-      // Check if this track is from a screen broadcast (video or audio)
-      const isScreenTrack =
-        isScreenTransceiver ||
-        isScreenAudioTransceiver ||
+      // Check if this track is from an active screen broadcast
+      const hasActiveScreenShare = this.activeScreenSharerId === peerId || Boolean(this.remoteScreenTrackIds.get(track.id));
+      const isExplicitScreenTrack =
+        (isScreenTransceiver && hasActiveScreenShare) ||
+        (isScreenAudioTransceiver && hasActiveScreenShare) ||
         (this.remoteScreenTrackIds.get(track.id) === peerId) ||
         (this.remoteScreenAudioTrackIds.get(track.id) === peerId) ||
         (e.streams[0]?.id && this.remoteScreenStreamIds.get(e.streams[0].id) === peerId);
 
-      if (isScreenTrack && (track.kind === 'video' || isScreenAudioTransceiver || this.remoteScreenAudioTrackIds.get(track.id) === peerId)) {
+      if (isExplicitScreenTrack && (track.kind === 'video' || isScreenAudioTransceiver || this.remoteScreenAudioTrackIds.get(track.id) === peerId)) {
         let screenStream = this.remoteScreenStreams.get(peerId);
         if (!screenStream) {
           screenStream = new MediaStream([track]);
@@ -357,12 +384,30 @@ export class WebRTCEngine {
       // Handle participant camera and mic tracks
       if (track.kind === 'video') {
         this.remoteCameraTrackIds.set(peerId, track.id);
+        track.addEventListener('unmute', () => {
+          this.opts.onCameraStateChanged?.(peerId, true);
+        });
+        track.addEventListener('ended', () => {
+          this.opts.onCameraStateChanged?.(peerId, false);
+        });
+        this.opts.onCameraStateChanged?.(peerId, track.enabled && track.readyState === 'live');
+      } else if (track.kind === 'audio') {
+        track.addEventListener('unmute', () => {
+          this.opts.onMicStateChanged?.(peerId, true);
+        });
+        this.opts.onMicStateChanged?.(peerId, track.enabled && track.readyState === 'live');
       }
 
       let stream = this.remoteStreams.get(peerId);
       if (!stream) {
         stream = new MediaStream();
         this.remoteStreams.set(peerId, stream);
+      }
+
+      // If an existing track of the same kind is present and replaced, remove old one
+      const existingSameKind = stream.getTracks().find((t) => t.kind === track.kind);
+      if (existingSameKind && existingSameKind.id !== track.id) {
+        stream.removeTrack(existingSameKind);
       }
 
       if (!stream.getTracks().some((t) => t.id === track.id)) {
@@ -424,7 +469,7 @@ export class WebRTCEngine {
     const screenTrack = this.localScreenStream?.getVideoTracks()[0] || null;
     if (typeof pc.addTransceiver === 'function') {
       const screenT = pc.addTransceiver(screenTrack || 'video', {
-        direction: 'sendrecv',
+        direction: screenTrack ? 'sendrecv' : 'recvonly',
         streams: this.localScreenStream ? [this.localScreenStream] : []
       });
       this.prioritizeVp8Codec(screenT);
@@ -437,7 +482,7 @@ export class WebRTCEngine {
     const screenAudioTrack = this.localScreenStream?.getAudioTracks()[0] || null;
     if (typeof pc.addTransceiver === 'function') {
       const screenAudioT = pc.addTransceiver(screenAudioTrack || 'audio', {
-        direction: 'sendrecv',
+        direction: screenAudioTrack ? 'sendrecv' : 'recvonly',
         streams: this.localScreenStream ? [this.localScreenStream] : []
       });
       this.screenAudioTransceivers.set(peerId, screenAudioT);
@@ -682,6 +727,7 @@ export class WebRTCEngine {
     this.peers.forEach((pc, peerId) => {
       const screenTransceiver = this.screenTransceivers.get(peerId);
       if (screenTransceiver) {
+        screenTransceiver.direction = 'sendrecv';
         screenTransceiver.sender.replaceTrack(screenTrack).catch(console.warn);
       } else {
         pc.addTrack(screenTrack, stream);
@@ -689,6 +735,7 @@ export class WebRTCEngine {
 
       const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
       if (screenAudioTransceiver) {
+        screenAudioTransceiver.direction = screenAudioTrack ? 'sendrecv' : 'recvonly';
         screenAudioTransceiver.sender.replaceTrack(screenAudioTrack).catch(console.warn);
       } else if (screenAudioTrack) {
         pc.addTrack(screenAudioTrack, stream);
@@ -712,6 +759,7 @@ export class WebRTCEngine {
     this.peers.forEach((pc, peerId) => {
       const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
       if (screenAudioTransceiver) {
+        screenAudioTransceiver.direction = 'sendrecv';
         screenAudioTransceiver.sender.replaceTrack(audioTrack).catch(console.warn);
       } else {
         pc.addTrack(audioTrack, this.localScreenStream!);
@@ -734,10 +782,12 @@ export class WebRTCEngine {
     this.peers.forEach((_pc, peerId) => {
       const screenTransceiver = this.screenTransceivers.get(peerId);
       if (screenTransceiver) {
+        screenTransceiver.direction = 'recvonly';
         screenTransceiver.sender.replaceTrack(null).catch(console.warn);
       }
       const screenAudioTransceiver = this.screenAudioTransceivers.get(peerId);
       if (screenAudioTransceiver) {
+        screenAudioTransceiver.direction = 'recvonly';
         screenAudioTransceiver.sender.replaceTrack(null).catch(console.warn);
       }
     });
@@ -793,7 +843,7 @@ export class WebRTCEngine {
     }
   }
 
-  public async announceJoin(userName: string) {
+  public async announceJoin(userName: string, isCameraActive = true, isMicActive = true) {
     try {
       this.opts.currentUserName = userName;
       const screenTrack = this.localScreenStream?.getVideoTracks()[0];
@@ -802,6 +852,8 @@ export class WebRTCEngine {
         action: 'announce-join',
         userId: this.opts.currentUserId,
         userName,
+        isCameraActive,
+        isMicActive,
         hasScreenCast: Boolean(this.localScreenStream),
         screenStreamId: this.localScreenStream?.id,
         screenTrackId: screenTrack?.id,
@@ -809,6 +861,30 @@ export class WebRTCEngine {
       });
     } catch (err) {
       console.warn('Failed to announce join:', err);
+    }
+  }
+
+  public async broadcastCameraState(isCameraActive: boolean): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'camera-state-changed',
+        isCameraActive,
+        senderId: this.opts.currentUserId
+      });
+    } catch (err) {
+      console.warn('Failed to broadcast camera state:', err);
+    }
+  }
+
+  public async broadcastMicState(isMicActive: boolean): Promise<void> {
+    try {
+      await this.sendSignal('all', 'candidate', {
+        action: 'mic-state-changed',
+        isMicActive,
+        senderId: this.opts.currentUserId
+      });
+    } catch (err) {
+      console.warn('Failed to broadcast mic state:', err);
     }
   }
 
