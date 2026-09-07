@@ -40,12 +40,14 @@ import {
   Check,
   Youtube,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  MoreHorizontal,
+  X
 } from 'lucide-react';
 import { MediaDeviceInfoItem } from '../lib/media-capture';
 import { format12HourTime } from '../lib/time-cycle';
 import { EmojiReactions, type FloatingReaction } from './EmojiReactions';
-import { SynEmojiId } from './icons/SynEmojiIcons';
+import { SynEmojiId, SYN_ALL_EMOJIS, SYN_DEFAULT_PRESET_IDS } from './icons/SynEmojiIcons';
 import { HostControlsModal } from './HostControlsModal';
 import { ShortcutsModal } from './ShortcutsModal';
 import { DrmGuideModal } from './DrmGuideModal';
@@ -163,103 +165,140 @@ const StreamVideoPlayer: React.FC<StreamVideoPlayerProps> = React.memo(({
     if (!video) return;
 
     if (stream) {
-      const newVideoTracks = stream.getVideoTracks();
-      const newAudioTracks = stream.getAudioTracks();
-      if (isCamera && newVideoTracks.length === 0) {
-        video.srcObject = null;
+      const videoTracks = stream.getVideoTracks();
+      if (isCamera && videoTracks.length === 0) {
+        if (video.srcObject) {
+          video.srcObject = null;
+        }
         return;
       }
 
-      // Check whether srcObject actually needs re-assignment to avoid resetting decoder buffers
-      const currentSrcObject = video.srcObject as MediaStream | null;
-      const currentVideoTracks = currentSrcObject?.getVideoTracks() || [];
-      const currentAudioTracks = currentSrcObject?.getAudioTracks() || [];
-      const needsNewStream =
-        !currentSrcObject ||
-        currentVideoTracks.length !== newVideoTracks.length ||
-        currentVideoTracks[0]?.id !== newVideoTracks[0]?.id ||
-        currentAudioTracks.length !== newAudioTracks.length ||
-        currentAudioTracks[0]?.id !== newAudioTracks[0]?.id;
-
-      if (needsNewStream) {
-        const targetStream = isCamera ? new MediaStream(newVideoTracks) : new MediaStream(stream.getTracks());
-        video.srcObject = targetStream;
-      }
-
-      // Camera feeds must always be muted for instant zero-gesture autoplay
+      // Ensure proper DOM attributes for mobile browsers before binding stream
+      video.defaultMuted = true;
       video.muted = isCamera ? true : (fallbackMutedRef.current || isMuted);
       video.volume = (isCamera || isMuted) ? 0 : Math.max(0, Math.min(1, volume));
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      if (isCamera || fallbackMutedRef.current || isMuted) {
+        video.setAttribute('muted', '');
+      }
 
-      const attemptPlay = () => {
+      // Bind MediaStream directly without synthetic wrapper to preserve native WebRTC decoder pipeline
+      if (video.srcObject !== stream) {
+        console.log(`[StreamVideoPlayer] Attaching stream id=${stream.id} (tracks: ${stream.getTracks().map(t => `${t.kind}:${t.id}:${t.readyState}`).join(', ')})`);
+        video.srcObject = stream;
+      }
+
+      const attemptPlay = (reason = 'auto') => {
+        if (!video) return;
+        if (isCamera) {
+          video.defaultMuted = true;
+          video.muted = true;
+        }
         const playPromise = video.play();
         if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            if (err.name === 'NotAllowedError' && !video.muted) {
-              console.warn('Autoplay blocked with sound. Falling back to muted playback:', err);
-              fallbackMutedRef.current = true;
-              video.muted = true;
-              video.play().catch(() => {});
-            } else if (err.name !== 'AbortError') {
-              console.warn('Playback error encountered:', err);
-            }
-          });
+          playPromise
+            .then(() => {
+              console.log(`[StreamVideoPlayer] Play succeeded (${reason}): readyState=${video.readyState}, paused=${video.paused}, dimensions=${video.videoWidth}x${video.videoHeight}`);
+            })
+            .catch((err) => {
+              console.warn(`[StreamVideoPlayer] Play failed (${reason}):`, err);
+              if (err.name === 'NotAllowedError' && !video.muted) {
+                fallbackMutedRef.current = true;
+                video.muted = true;
+                video.play().catch(() => {});
+              }
+            });
         }
       };
 
-      attemptPlay();
+      attemptPlay('initial-mount');
 
-      // Listen for unmute event on video track (fires when first RTP packet arrives)
-      const primaryVideoTrack = newVideoTracks[0];
-      if (primaryVideoTrack) {
-        primaryVideoTrack.addEventListener('unmute', attemptPlay);
-      }
-
-      const primaryAudioTrack = newAudioTracks[0];
-      if (primaryAudioTrack) {
-        primaryAudioTrack.addEventListener('unmute', attemptPlay);
-      }
-
-      const handleTrackChange = () => {
-        const freshVideoTracks = stream.getVideoTracks();
-        if (isCamera) {
-          if (freshVideoTracks.length > 0) {
-            video.srcObject = new MediaStream(freshVideoTracks);
-            attemptPlay();
-          } else {
-            video.srcObject = null;
-          }
-        } else {
-          video.srcObject = new MediaStream(stream.getTracks());
-          attemptPlay();
+      const handleLoadedMetadata = () => {
+        console.log(`[StreamVideoPlayer] loadedmetadata: readyState=${video.readyState}, paused=${video.paused}, dimensions=${video.videoWidth}x${video.videoHeight}`);
+        if (video.paused) {
+          attemptPlay('loadedmetadata');
         }
       };
 
-      stream.addEventListener('addtrack', handleTrackChange);
-      stream.addEventListener('removetrack', handleTrackChange);
-
-      const handleUserGestureUnmute = () => {
-        if (fallbackMutedRef.current && !isCamera && !isMuted) {
-          fallbackMutedRef.current = false;
-          video.muted = false;
-          video.volume = Math.max(0, Math.min(1, volume));
-          video.play().catch(() => {});
+      const handleCanPlay = () => {
+        if (video.paused) {
+          attemptPlay('canplay');
         }
       };
 
-      window.addEventListener('click', handleUserGestureUnmute);
-      window.addEventListener('keydown', handleUserGestureUnmute);
+      const handleResize = () => {
+        console.log(`[StreamVideoPlayer] resize: ${video.videoWidth}x${video.videoHeight}`);
+      };
+
+      const handlePlaying = () => {
+        console.log(`[StreamVideoPlayer] playing: ${video.videoWidth}x${video.videoHeight}`);
+      };
+
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('resize', handleResize);
+      video.addEventListener('playing', handlePlaying);
+
+      // Listen for unmute event on all available tracks
+      const handleTrackUnmute = () => {
+        console.log('[StreamVideoPlayer] Track unmute event received');
+        attemptPlay('track-unmute');
+      };
+      stream.getTracks().forEach((track) => {
+        track.addEventListener('unmute', handleTrackUnmute);
+      });
+
+      // User gesture recovery for mobile autoplay policy restrictions
+      const handleUserGesture = () => {
+        if (video.paused) {
+          console.log('[StreamVideoPlayer] User gesture resuming paused video');
+          attemptPlay('user-gesture');
+        }
+      };
+      window.addEventListener('touchstart', handleUserGesture, { passive: true });
+      window.addEventListener('pointerdown', handleUserGesture, { passive: true });
+      window.addEventListener('click', handleUserGesture, { passive: true });
+      window.addEventListener('keydown', handleUserGesture, { passive: true });
+
+      // Tab visibility change recovery
+      const handleVisibilityChange = () => {
+        if (!document.hidden && video.paused) {
+          attemptPlay('visibility-change');
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // 500ms and 1500ms recovery checks for frames arriving post-connection
+      const timer1 = setTimeout(() => {
+        if (video.paused) {
+          console.log('[StreamVideoPlayer] 500ms recovery check: video was paused, retrying play()');
+          attemptPlay('timer-500ms');
+        }
+      }, 500);
+      const timer2 = setTimeout(() => {
+        if (video.paused) {
+          console.log('[StreamVideoPlayer] 1500ms recovery check: video was paused, retrying play()');
+          attemptPlay('timer-1500ms');
+        }
+      }, 1500);
 
       return () => {
-        if (primaryVideoTrack) {
-          primaryVideoTrack.removeEventListener('unmute', attemptPlay);
-        }
-        if (primaryAudioTrack) {
-          primaryAudioTrack.removeEventListener('unmute', attemptPlay);
-        }
-        stream.removeEventListener('addtrack', handleTrackChange);
-        stream.removeEventListener('removetrack', handleTrackChange);
-        window.removeEventListener('click', handleUserGestureUnmute);
-        window.removeEventListener('keydown', handleUserGestureUnmute);
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('resize', handleResize);
+        video.removeEventListener('playing', handlePlaying);
+        stream.getTracks().forEach((track) => {
+          track.removeEventListener('unmute', handleTrackUnmute);
+        });
+        window.removeEventListener('touchstart', handleUserGesture);
+        window.removeEventListener('pointerdown', handleUserGesture);
+        window.removeEventListener('click', handleUserGesture);
+        window.removeEventListener('keydown', handleUserGesture);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     } else if (src) {
       if (video.src !== src) {
@@ -564,9 +603,17 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [youtubeInputUrl, setYoutubeInputUrl] = useState('');
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
 
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
+  const [isMobileMicMenuOpen, setIsMobileMicMenuOpen] = useState(false);
+  const [isMobileCameraMenuOpen, setIsMobileCameraMenuOpen] = useState(false);
+  const [isMobileBroadcastMenuOpen, setIsMobileBroadcastMenuOpen] = useState(false);
+
   // Portal-based popup positioning hooks
   const micPopup = useAnchoredPopup(isMicMenuOpen);
   const cameraPopup = useAnchoredPopup(isCameraMenuOpen);
+  const mobileMicPopup = useAnchoredPopup(isMobileMicMenuOpen);
+  const mobileCameraPopup = useAnchoredPopup(isMobileCameraMenuOpen);
+  const mobileBroadcastPopup = useAnchoredPopup(isMobileBroadcastMenuOpen);
   const blurPopup = useAnchoredPopup(isBlurMenuOpen);
   const broadcastPopup = useAnchoredPopup(isBroadcastMenuOpen);
   const reactionsPopup = useAnchoredPopup(isEmojiTrayOpen);
@@ -584,6 +631,21 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         const inTrigger = cameraPopup.triggerRef.current?.contains(target);
         const inPopup = cameraPopup.popupRef.current?.contains(target);
         if (!inTrigger && !inPopup) setIsCameraMenuOpen(false);
+      }
+      if (isMobileMicMenuOpen) {
+        const inTrigger = mobileMicPopup.triggerRef.current?.contains(target);
+        const inPopup = mobileMicPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsMobileMicMenuOpen(false);
+      }
+      if (isMobileCameraMenuOpen) {
+        const inTrigger = mobileCameraPopup.triggerRef.current?.contains(target);
+        const inPopup = mobileCameraPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsMobileCameraMenuOpen(false);
+      }
+      if (isMobileBroadcastMenuOpen) {
+        const inTrigger = mobileBroadcastPopup.triggerRef.current?.contains(target);
+        const inPopup = mobileBroadcastPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsMobileBroadcastMenuOpen(false);
       }
       if (isBlurMenuOpen) {
         const inTrigger = blurPopup.triggerRef.current?.contains(target);
@@ -603,7 +665,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMicMenuOpen, isCameraMenuOpen, isBlurMenuOpen, isBroadcastMenuOpen, isEmojiTrayOpen]);
+  }, [isMicMenuOpen, isCameraMenuOpen, isMobileMicMenuOpen, isMobileCameraMenuOpen, isMobileBroadcastMenuOpen, isBlurMenuOpen, isBroadcastMenuOpen, isEmojiTrayOpen]);
 
   // Picture-in-Picture State
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -711,6 +773,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       onStopYouTubeBroadcast();
     }
     setIsBroadcastMenuOpen(false);
+    setIsMobileBroadcastMenuOpen(false);
   };
 
   const handleStartYouTubeSubmit = () => {
@@ -731,6 +794,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
       onStartYouTubeBroadcast(extractedId, trimmed);
     }
     setIsBroadcastMenuOpen(false);
+    setIsMobileBroadcastMenuOpen(false);
     setYoutubeInputUrl('');
     setYoutubeError(null);
   };
@@ -1001,6 +1065,163 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const pinnedParticipant = pinnedFeedId && pinnedFeedId !== 'screen'
     ? participants.find((p) => p.id === pinnedFeedId)
     : null;
+
+  // Order participants so local participant is first for clean 2-participant mobile stacking
+  const orderedParticipants = React.useMemo(() => {
+    if (pinnedParticipant) return [pinnedParticipant];
+    return [...participants].sort((a, b) => (b.isSelf ? 1 : 0) - (a.isSelf ? 1 : 0));
+  }, [pinnedParticipant, participants]);
+
+  const renderBroadcastContent = () => (
+    <>
+      {broadcastView === 'sources' && (
+        <div className="space-y-2">
+          <div className="px-1 pb-1 border-b border-black/[0.08] dark:border-white/10">
+            <div className="text-xs font-semibold text-black dark:text-white">Broadcast Source</div>
+            <div className="text-[10px] text-black/50 dark:text-white/50">Select media to stream to the room</div>
+          </div>
+
+          <div className="space-y-1 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsBroadcastMenuOpen(false);
+                setIsMobileBroadcastMenuOpen(false);
+                onToggleScreenShare();
+              }}
+              className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                <ScreenCastIcon size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Screen Cast</div>
+                <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Share display, app window, or tab</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setBroadcastView('youtube_input');
+                setYoutubeError(null);
+              }}
+              className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[#FF0000] group-hover:bg-[#FF0000] group-hover:text-white transition shrink-0">
+                <Youtube size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[#FF0000]">YouTube Stream</div>
+                <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Synchronized CDN video playback</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsBroadcastMenuOpen(false);
+                setIsMobileBroadcastMenuOpen(false);
+                fileInputRef.current?.click();
+              }}
+              className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
+                <CinemaReelIcon size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Local Media File</div>
+                <div className="text-[10px] text-black/50 dark:text-white/50 truncate">MP4, WebM, or MKV video file</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {broadcastView === 'youtube_input' && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-black/[0.08] dark:border-white/10">
+            <button
+              type="button"
+              onClick={() => setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources')}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white transition cursor-pointer"
+            >
+              <ArrowLeft size={14} />
+            </button>
+            <div className="text-xs font-semibold text-black dark:text-white">Broadcast YouTube</div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-black/60 dark:text-white/60 block">YouTube Video URL or Video ID</label>
+            <input
+              type="text"
+              value={youtubeInputUrl}
+              onChange={(e) => {
+                setYoutubeInputUrl(e.target.value);
+                setYoutubeError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleStartYouTubeSubmit();
+              }}
+              placeholder="https://youtube.com/watch?v=..."
+              className="w-full px-3 py-2 text-xs rounded-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35 focus:outline-none focus:border-[var(--accent)]"
+              autoFocus
+            />
+            {youtubeError && (
+              <div className="flex items-center gap-1.5 text-[11px] text-[#FF453A]">
+                <AlertCircle size={12} className="shrink-0" />
+                <span>{youtubeError}</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleStartYouTubeSubmit}
+            className="w-full py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-xs"
+          >
+            Start Broadcast
+          </button>
+        </div>
+      )}
+
+      {broadcastView === 'active_manage' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-black/[0.08] dark:border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#30D158] animate-pulse" />
+              <span className="text-xs font-semibold text-black dark:text-white">Broadcasting</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[var(--accent)] font-semibold">
+              {activeBroadcastLabel}
+            </span>
+          </div>
+
+          <div className="text-[11px] text-black/70 dark:text-white/70 leading-relaxed">
+            Currently broadcasting live to room participants.
+          </div>
+
+          <div className="space-y-1.5 pt-1">
+            <button
+              type="button"
+              onClick={handleStopBroadcast}
+              className="w-full py-2 rounded-xl bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30 text-xs font-semibold hover:bg-[#FF453A]/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <LogOut size={13} />
+              <span>Stop Broadcast</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBroadcastView('sources')}
+              className="w-full py-2 rounded-xl bg-black/5 dark:bg-white/10 text-black/80 dark:text-white/80 hover:bg-black/10 dark:hover:bg-white/15 hover:text-black dark:hover:text-white text-xs font-semibold transition cursor-pointer"
+            >
+              Switch Source
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div
@@ -1329,7 +1550,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   return (
                     <div
                       key={p.id}
-                      className="group relative w-32 min-[380px]:w-36 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shrink-0 shadow-sm"
+                      className="group relative w-32 min-[380px]:w-36 sm:w-48 md:w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] shrink-0 shadow-sm"
                     >
                       {/* Video Layer */}
                       {hasVideo ? (
@@ -1437,7 +1658,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                   : 'grid-cols-2 max-w-6xl'
               }`}
             >
-              {(pinnedParticipant ? [pinnedParticipant] : participants).map((p) => {
+              {orderedParticipants.map((p) => {
                 const isCamActive = p.isCameraActive ?? true;
                 const hasVideo = Boolean(
                   isCamActive &&
@@ -1450,7 +1671,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 return (
                   <div
                     key={p.id}
-                    className="group relative w-full h-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] shadow-2xl flex items-center justify-center"
+                    className="group relative w-full aspect-video max-h-[38vh] sm:max-h-none rounded-2xl sm:rounded-3xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] shadow-2xl flex items-center justify-center"
                   >
                     {hasVideo ? (
                       <StreamVideoPlayer
@@ -1578,7 +1799,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="group pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)] relative shadow-md"
+                  className="group pointer-events-auto aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-black dark:bg-black border border-black/10 dark:border-white/10 [isolation:isolate] [transform:translateZ(0)] relative shadow-md"
                 >
                   {hasVideo ? (
                     <StreamVideoPlayer
@@ -1678,7 +1899,9 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             : 'h-16 sm:h-18 px-3 sm:px-6 md:px-8 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0 relative gap-2'
         }`}
       >
-        {/* Left Side: Room Identity / Balanced Spacer */}
+        {/* Desktop Controls Dock (Screens >= 640px) */}
+        <div className="hidden sm:flex items-center justify-between w-full">
+          {/* Left Side: Room Identity / Balanced Spacer */}
         <div className="hidden md:flex items-center gap-2 min-w-0 w-36 shrink-0">
           <span className="text-xs font-semibold text-black/60 dark:text-white/60 truncate" title={roomName}>
             {roomName}
@@ -1999,150 +2222,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 widthClass="w-72"
                 className="p-3.5"
               >
-                  {broadcastView === 'sources' && (
-                    <div className="space-y-2">
-                      <div className="px-1 pb-1 border-b border-black/[0.08] dark:border-white/10">
-                        <div className="text-xs font-semibold text-black dark:text-white">Broadcast Source</div>
-                        <div className="text-[10px] text-black/50 dark:text-white/50">Select media to stream to the room</div>
-                      </div>
-
-                      <div className="space-y-1 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsBroadcastMenuOpen(false);
-                            onToggleScreenShare();
-                          }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
-                            <ScreenCastIcon size={16} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Screen Cast</div>
-                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Share display, app window, or tab</div>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBroadcastView('youtube_input');
-                            setYoutubeError(null);
-                          }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[#FF0000] group-hover:bg-[#FF0000] group-hover:text-white transition shrink-0">
-                            <Youtube size={16} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[#FF0000]">YouTube Stream</div>
-                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">Synchronized CDN video playback</div>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsBroadcastMenuOpen(false);
-                            fileInputRef.current?.click();
-                          }}
-                          className="w-full p-2 rounded-xl flex items-center gap-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-black transition shrink-0">
-                            <CinemaReelIcon size={16} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-black dark:text-white group-hover:text-[var(--accent)]">Local Media File</div>
-                            <div className="text-[10px] text-black/50 dark:text-white/50 truncate">MP4, WebM, or MKV video file</div>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {broadcastView === 'youtube_input' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 pb-2 border-b border-black/[0.08] dark:border-white/10">
-                        <button
-                          type="button"
-                          onClick={() => setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources')}
-                          className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white transition cursor-pointer"
-                        >
-                          <ArrowLeft size={14} />
-                        </button>
-                        <div className="text-xs font-semibold text-black dark:text-white">Broadcast YouTube</div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-black/60 dark:text-white/60 block">YouTube Video URL or Video ID</label>
-                        <input
-                          type="text"
-                          value={youtubeInputUrl}
-                          onChange={(e) => {
-                            setYoutubeInputUrl(e.target.value);
-                            setYoutubeError(null);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleStartYouTubeSubmit();
-                          }}
-                          placeholder="https://youtube.com/watch?v=..."
-                          className="w-full px-3 py-2 text-xs rounded-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35 focus:outline-none focus:border-[var(--accent)]"
-                          autoFocus
-                        />
-                        {youtubeError && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-[#FF453A]">
-                            <AlertCircle size={12} className="shrink-0" />
-                            <span>{youtubeError}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleStartYouTubeSubmit}
-                        className="w-full py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-xs"
-                      >
-                        Start Broadcast
-                      </button>
-                    </div>
-                  )}
-
-                  {broadcastView === 'active_manage' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-black/[0.08] dark:border-white/10">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-[#30D158] animate-pulse" />
-                          <span className="text-xs font-semibold text-black dark:text-white">Broadcasting</span>
-                        </div>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[var(--accent)] font-semibold">
-                          {activeBroadcastLabel}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] text-black/70 dark:text-white/70 leading-relaxed">
-                        Currently broadcasting live to room participants.
-                      </div>
-
-                      <div className="space-y-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={handleStopBroadcast}
-                          className="w-full py-2 rounded-xl bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/30 text-xs font-semibold hover:bg-[#FF453A]/30 transition cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <LogOut size={13} />
-                          <span>Stop Broadcast</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setBroadcastView('sources')}
-                          className="w-full py-2 rounded-xl bg-black/5 dark:bg-white/10 text-black/80 dark:text-white/80 hover:bg-black/10 dark:hover:bg-white/15 hover:text-black dark:hover:text-white text-xs font-semibold transition cursor-pointer"
-                        >
-                          Switch Source
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                {renderBroadcastContent()}
               </PopupPortal>
             </div>
           )}
@@ -2261,17 +2341,438 @@ export const WatchStage: React.FC<WatchStageProps> = ({
           </div>
         </div>
 
-        {/* Right Dock Controls: Leave Room */}
-        <div className="flex items-center justify-end gap-2 w-36 shrink-0">
+          {/* Right Dock Controls: Leave Room */}
+          <div className="flex items-center justify-end gap-2 w-36 shrink-0">
+            <button
+              onClick={onLeaveRoom}
+              className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]"
+              title="Leave Watchroom"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dedicated Toolbar (Screens < 640px) */}
+        <div className="flex sm:hidden items-center justify-between w-full gap-1.5 px-0.5">
+          {/* Mobile Microphone Split Control */}
+          <div ref={mobileMicPopup.triggerRef} className="relative flex items-center shrink-0">
+            <div
+              className={`flex items-center rounded-xl border transition min-h-[40px] overflow-hidden ${
+                isMicActive
+                  ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25'
+                  : 'bg-[#FF453A]/15 text-[#FF453A] border-[#FF453A]/25'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={onToggleMic}
+                className="p-2.5 flex items-center justify-center transition active:bg-black/10 dark:active:bg-white/10 cursor-pointer"
+                title={isMicActive ? 'Mute Microphone' : 'Unmute Microphone'}
+              >
+                {isMicActive ? <LiquidMicIcon size={16} /> : <LiquidMicOffIcon size={16} />}
+              </button>
+              {onSelectAudioInputDevice && audioInputDevices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMicMenuOpen((prev) => !prev);
+                    setIsMobileCameraMenuOpen(false);
+                    setIsMobileBroadcastMenuOpen(false);
+                  }}
+                  className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center text-current cursor-pointer"
+                  title="Select Microphone"
+                >
+                  <ChevronUp size={12} className={`transition-transform duration-200 ${isMobileMicMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Mic Device Selector Dropdown (Portal) */}
+            <PopupPortal
+              ref={mobileMicPopup.popupRef}
+              isOpen={isMobileMicMenuOpen && !!onSelectAudioInputDevice}
+              style={mobileMicPopup.popupStyle}
+              caretLeft={mobileMicPopup.caretLeft}
+              isFlipped={mobileMicPopup.isFlipped}
+              className="max-h-72 overflow-y-auto space-y-1 w-64 max-w-[calc(100vw-24px)]"
+            >
+              <div className="px-3 py-1 text-[10px] font-semibold text-black/50 dark:text-white/50 tracking-wider uppercase">
+                Select Microphone
+              </div>
+              {audioInputDevices.map((device, idx) => (
+                <button
+                  key={device.deviceId || idx}
+                  type="button"
+                  onClick={() => {
+                    onSelectAudioInputDevice!(device.deviceId);
+                    setIsMobileMicMenuOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
+                    selectedAudioDeviceId === device.deviceId
+                      ? 'bg-[var(--accent)] text-black font-semibold shadow-xs'
+                      : 'text-black/80 dark:text-white/80 active:bg-black/10'
+                  }`}
+                >
+                  <span className="truncate pr-2">{device.label || `Microphone ${idx + 1}`}</span>
+                  {selectedAudioDeviceId === device.deviceId && <Check size={14} className="shrink-0 text-black" />}
+                </button>
+              ))}
+            </PopupPortal>
+          </div>
+
+          {/* Mobile Camera Split Control */}
+          {onToggleCamera && (
+            <div ref={mobileCameraPopup.triggerRef} className="relative flex items-center shrink-0">
+              <div
+                className={`flex items-center rounded-xl border transition min-h-[40px] overflow-hidden ${
+                  isCameraActive
+                    ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/25'
+                    : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/55 dark:text-white/55 border border-black/[0.06] dark:border-white/[0.08]'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={onToggleCamera}
+                  className="p-2.5 flex items-center justify-center transition active:bg-black/10 dark:active:bg-white/10 cursor-pointer"
+                  title={isCameraActive ? 'Turn Off Camera' : 'Turn On Camera'}
+                >
+                  {isCameraActive ? <Video size={16} /> : <VideoOff size={16} />}
+                </button>
+                {onSelectVideoInputDevice && videoInputDevices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileCameraMenuOpen((prev) => !prev);
+                      setIsMobileMicMenuOpen(false);
+                      setIsMobileBroadcastMenuOpen(false);
+                    }}
+                    className="px-1.5 py-2.5 border-l border-current/20 flex items-center justify-center text-current cursor-pointer"
+                    title="Select Camera"
+                  >
+                    <ChevronUp size={12} className={`transition-transform duration-200 ${isMobileCameraMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Mobile Camera Device Selector Dropdown (Portal) */}
+              <PopupPortal
+                ref={mobileCameraPopup.popupRef}
+                isOpen={isMobileCameraMenuOpen && !!onSelectVideoInputDevice}
+                style={mobileCameraPopup.popupStyle}
+                caretLeft={mobileCameraPopup.caretLeft}
+                isFlipped={mobileCameraPopup.isFlipped}
+                className="max-h-72 overflow-y-auto space-y-1 w-64 max-w-[calc(100vw-24px)]"
+              >
+                <div className="px-3 py-1 text-[10px] font-semibold text-black/50 dark:text-white/50 tracking-wider uppercase">
+                  Select Camera
+                </div>
+                {videoInputDevices.map((device, idx) => (
+                  <button
+                    key={device.deviceId || idx}
+                    type="button"
+                    onClick={() => {
+                      onSelectVideoInputDevice!(device.deviceId);
+                      setIsMobileCameraMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
+                      selectedVideoDeviceId === device.deviceId
+                        ? 'bg-[var(--accent)] text-black font-semibold shadow-xs'
+                        : 'text-black/80 dark:text-white/80 active:bg-black/10'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{device.label || `Camera ${idx + 1}`}</span>
+                    {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0 text-black" />}
+                  </button>
+                ))}
+              </PopupPortal>
+            </div>
+          )}
+
+          {/* Mobile Screen Cast / Broadcast Control (Host Only) */}
+          {isHost && (
+            <div ref={mobileBroadcastPopup.triggerRef} className="relative flex items-center shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileBroadcastMenuOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setBroadcastView(isBroadcastingActive ? 'active_manage' : 'sources');
+                      setYoutubeError(null);
+                      setIsMobileMicMenuOpen(false);
+                      setIsMobileCameraMenuOpen(false);
+                    }
+                    return next;
+                  });
+                }}
+                className={`flex items-center justify-center p-2.5 rounded-xl text-xs font-bold transition shrink-0 min-h-[40px] cursor-pointer ${
+                  isBroadcastingActive
+                    ? 'bg-[var(--accent)] text-black border border-[var(--accent)] shadow-xs'
+                    : 'bg-[#8B7355] dark:bg-[#C8A97E] text-white dark:text-black hover:opacity-90'
+                }`}
+                title={isBroadcastingActive ? `Active Broadcast: ${activeBroadcastLabel}` : 'Broadcast Media'}
+              >
+                <ScreenCastIcon size={16} />
+              </button>
+
+              {/* Mobile Anchored Broadcast Popover */}
+              <PopupPortal
+                ref={mobileBroadcastPopup.popupRef}
+                isOpen={isMobileBroadcastMenuOpen}
+                style={mobileBroadcastPopup.popupStyle}
+                caretLeft={mobileBroadcastPopup.caretLeft}
+                isFlipped={mobileBroadcastPopup.isFlipped}
+                widthClass="w-72 max-w-[calc(100vw-24px)]"
+                className="p-3.5"
+              >
+                {renderBroadcastContent()}
+              </PopupPortal>
+            </div>
+          )}
+
+          {/* Mobile More Overflow Button */}
           <button
+            type="button"
+            onClick={() => {
+              setIsMobileMoreOpen(true);
+              setIsMobileMicMenuOpen(false);
+              setIsMobileCameraMenuOpen(false);
+              setIsMobileBroadcastMenuOpen(false);
+            }}
+            className={`flex items-center justify-center p-2.5 rounded-xl text-xs font-bold transition shrink-0 min-h-[40px] cursor-pointer ${
+              isMobileMoreOpen
+                ? 'bg-[var(--accent)] text-black border border-[var(--accent)]'
+                : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/70 dark:text-white/70 border border-black/[0.06] dark:border-white/[0.08]'
+            }`}
+            title="More Stage Options"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+
+          {/* Mobile Leave Room Button */}
+          <button
+            type="button"
             onClick={onLeaveRoom}
-            className="flex items-center justify-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition cursor-pointer shrink-0 min-h-[40px]"
+            className="flex items-center justify-center p-2.5 rounded-xl text-xs font-bold bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] border border-[#FF453A]/20 transition shrink-0 min-h-[40px] cursor-pointer"
             title="Leave Watchroom"
           >
             <LogOut size={16} />
           </button>
         </div>
       </footer>
+
+      {/* Mobile More Overflow Bottom Sheet */}
+      {isMobileMoreOpen && (
+        <div className="fixed inset-0 z-50 sm:hidden flex flex-col justify-end">
+          {/* Translucent Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileMoreOpen(false)}
+          />
+
+          {/* Liquid Glass Bottom Sheet */}
+          <div className="relative z-10 w-full max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white/95 dark:bg-[#141416]/95 backdrop-blur-2xl border-t border-black/10 dark:border-white/10 p-5 shadow-2xl space-y-5 animate-in slide-in-from-bottom duration-200">
+            {/* Header bar */}
+            <div className="flex items-center justify-between pb-2 border-b border-black/[0.08] dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-black dark:text-white">Room Controls</span>
+                <span className="text-[11px] font-semibold text-black/50 dark:text-white/50 truncate max-w-[160px]">
+                  {roomName}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileMoreOpen(false)}
+                className="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-black/60 dark:text-white/60 transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Quick Actions Grid */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Mirror Camera */}
+              {onToggleCameraMirror && (
+                <button
+                  type="button"
+                  onClick={() => onToggleCameraMirror(!isCameraMirrored)}
+                  className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold transition text-left cursor-pointer ${
+                    isCameraMirrored
+                      ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30'
+                      : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/80 dark:text-white/80 border border-black/[0.06] dark:border-white/[0.08]'
+                  }`}
+                >
+                  <FlipHorizontal size={18} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div>Mirror Camera</div>
+                    <div className="text-[10px] opacity-60">{isCameraMirrored ? 'Active' : 'Off'}</div>
+                  </div>
+                </button>
+              )}
+
+              {/* Picture-in-Picture */}
+              <button
+                type="button"
+                onClick={togglePictureInPicture}
+                className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold transition text-left cursor-pointer ${
+                  isPiPActive
+                    ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30'
+                    : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/80 dark:text-white/80 border border-black/[0.06] dark:border-white/[0.08]'
+                }`}
+              >
+                <PictureInPicture2 size={18} className="shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div>Picture in Picture</div>
+                  <div className="text-[10px] opacity-60">{isPiPActive ? 'Active' : 'Floating'}</div>
+                </div>
+              </button>
+
+              {/* Dynamic Cinema Glow */}
+              <button
+                type="button"
+                onClick={() => setIsAmbilightEnabled((prev) => !prev)}
+                className={`p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold transition text-left cursor-pointer ${
+                  isAmbilightEnabled
+                    ? 'bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/30'
+                    : 'bg-black/[0.04] dark:bg-white/[0.06] text-black/80 dark:text-white/80 border border-black/[0.06] dark:border-white/[0.08]'
+                }`}
+              >
+                <SunMedium size={18} className={`shrink-0 ${isAmbilightEnabled ? 'text-amber-400' : ''}`} />
+                <div className="min-w-0 flex-1">
+                  <div>Cinema Ambilight</div>
+                  <div className="text-[10px] opacity-60">{isAmbilightEnabled ? 'Enabled' : 'Disabled'}</div>
+                </div>
+              </button>
+
+              {/* Pipeline Settings */}
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMoreOpen(false);
+                    onOpenSettings();
+                  }}
+                  className="p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold transition text-left bg-black/[0.04] dark:bg-white/[0.06] text-black/80 dark:text-white/80 border border-black/[0.06] dark:border-white/[0.08] cursor-pointer"
+                >
+                  <Settings size={18} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div>Settings</div>
+                    <div className="text-[10px] opacity-60">Diagnostics & Audio</div>
+                  </div>
+                </button>
+              )}
+
+              {/* Host Controls (If Host) */}
+              {isHost && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMoreOpen(false);
+                    setIsHostControlsOpen(true);
+                  }}
+                  className="col-span-2 p-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold transition text-left bg-[#C8A97E]/15 text-[#C8A97E] border border-[#C8A97E]/30 cursor-pointer"
+                >
+                  <ShieldAlert size={18} className="shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div>Host Room Controls</div>
+                    <div className="text-[10px] opacity-70">Lock room, mute viewers, manage session</div>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Background Blur Section */}
+            {onSetBlurRadius && (
+              <div className="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Aperture size={16} className="text-[var(--accent)]" />
+                    <span className="text-xs font-semibold text-black dark:text-white">Background Blur</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-[var(--accent)]">
+                    {bgBlurRadius > 0 ? `${bgBlurRadius}px` : 'Off'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { label: 'Off', val: 0 },
+                    { label: 'Subtle', val: 8 },
+                    { label: 'Portrait', val: 16 },
+                    { label: 'Deep', val: 24 }
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => onSetBlurRadius(preset.val)}
+                      className={`py-1.5 text-[10px] font-medium rounded-xl transition text-center cursor-pointer ${
+                        bgBlurRadius === preset.val
+                          ? 'bg-[var(--accent)] text-black font-bold shadow-xs'
+                          : 'bg-black/5 dark:bg-white/10 text-black/70 dark:text-white/70'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={32}
+                  value={bgBlurRadius}
+                  onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
+                  className="w-full h-1.5 bg-black/15 dark:bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                />
+              </div>
+            )}
+
+            {/* Emoji Reactions Section */}
+            {onSendEmojiReaction && (
+              <div className="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.08] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Smile size={16} className="text-[var(--accent)]" />
+                    <span className="text-xs font-semibold text-black dark:text-white">Send Reaction</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMoreOpen(false);
+                      setIsEmojiTrayOpen(true);
+                    }}
+                    className="text-[10px] text-[var(--accent)] font-semibold hover:underline cursor-pointer"
+                  >
+                    More Emojis
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                  {SYN_DEFAULT_PRESET_IDS.map((id) => {
+                    const meta = SYN_ALL_EMOJIS.find((e) => e.id === id);
+                    if (!meta) return null;
+                    const Component = meta.component;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          onSendEmojiReaction(id);
+                        }}
+                        className="p-2 rounded-xl bg-black/5 dark:bg-white/10 hover:scale-125 active:scale-95 transition shrink-0 cursor-pointer"
+                        title={meta.name}
+                      >
+                        <Component size={24} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Host Controls Modal */}
       {isHost && (

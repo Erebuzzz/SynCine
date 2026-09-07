@@ -381,18 +381,22 @@ export class WebRTCEngine {
         return;
       }
 
-      // Handle participant camera and mic tracks
+      console.log(`[WebRTC:ontrack] Peer: ${peerId}, Track: kind=${track.kind}, id=${track.id}, readyState=${track.readyState}, muted=${track.muted}, enabled=${track.enabled}, streams=${e.streams?.length || 0}`);
+
       if (track.kind === 'video') {
         this.remoteCameraTrackIds.set(peerId, track.id);
         track.addEventListener('unmute', () => {
+          console.log(`[WebRTC:unmute] Peer: ${peerId}, Track: kind=video, id=${track.id}`);
           this.opts.onCameraStateChanged?.(peerId, true);
         });
         track.addEventListener('ended', () => {
+          console.log(`[WebRTC:ended] Peer: ${peerId}, Track: kind=video, id=${track.id}`);
           this.opts.onCameraStateChanged?.(peerId, false);
         });
         this.opts.onCameraStateChanged?.(peerId, track.enabled && track.readyState === 'live');
       } else if (track.kind === 'audio') {
         track.addEventListener('unmute', () => {
+          console.log(`[WebRTC:unmute] Peer: ${peerId}, Track: kind=audio, id=${track.id}`);
           this.opts.onMicStateChanged?.(peerId, true);
         });
         this.opts.onMicStateChanged?.(peerId, track.enabled && track.readyState === 'live');
@@ -400,7 +404,7 @@ export class WebRTCEngine {
 
       let stream = this.remoteStreams.get(peerId);
       if (!stream) {
-        stream = new MediaStream();
+        stream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream();
         this.remoteStreams.set(peerId, stream);
       }
 
@@ -414,10 +418,9 @@ export class WebRTCEngine {
         stream.addTrack(track);
       }
 
-      // Emit clean media stream wrapper and pass peerName so display names are never lost
-      const streamWrapper = new MediaStream(stream.getTracks());
+      // Pass persistent stream reference so video element decoder state machine is preserved
       const peerName = this.peerNames.get(peerId);
-      this.opts.onRemoteTrackAdded(peerId, streamWrapper, peerName);
+      this.opts.onRemoteTrackAdded(peerId, stream, peerName);
     };
 
     pc.onconnectionstatechange = () => {
