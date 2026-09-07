@@ -312,7 +312,7 @@ export const App: React.FC = () => {
       name,
       hostId: user.$id,
       mediaMode,
-      participantCount: 1,
+      participantCount: 0,
       maxParticipants: MAX_PARTICIPANTS,
       syncState: '',
       isPermanent,
@@ -350,7 +350,7 @@ export const App: React.FC = () => {
           name,
           hostId: user.$id,
           mediaMode: 'screen',
-          participantCount: 1,
+          participantCount: 0,
           maxParticipants: MAX_PARTICIPANTS,
           syncState: JSON.stringify({
             mode: 'youtube',

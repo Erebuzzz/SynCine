@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SynLogo, LiquidMicIcon, LiquidMicOffIcon, ScreenCastIcon } from './icons/SynIcons';
-import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X, Lock, Bell, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Video, VideoOff, Copy, CheckCircle2, ArrowRight, Users, X, Lock, Bell, AlertCircle, Aperture, Loader2 } from 'lucide-react';
 import { ID } from 'appwrite';
 import {
   formatRoomCode,
@@ -67,9 +67,18 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
     databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
       .then((doc) => {
         if (!isMounted) return;
-        if (typeof doc.participantCount === 'number') {
+
+        // If current user is host of a non-permanent room and still in Green Room,
+        // any positive participant count is stale from an earlier disconnected session.
+        if (doc.hostId === currentUserId && !doc.isPermanent && (doc.participantCount || 0) > 0) {
+          databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+            participantCount: 0
+          }).catch(() => {});
+          setLiveOccupancy(0);
+        } else if (typeof doc.participantCount === 'number') {
           setLiveOccupancy(doc.participantCount);
         }
+
         if (doc.isLocked) {
           setIsLocked(true);
         }
@@ -538,7 +547,7 @@ export const GreenRoom: React.FC<GreenRoomProps> = ({
                     {isBlurLoading ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
-                      <Sparkles size={16} />
+                      <Aperture size={16} />
                     )}
                     <span className="text-[11px] font-medium hidden sm:inline">
                       {bgBlurRadius === 0 ? 'Blur' : `${bgBlurRadius}px`}

@@ -33,7 +33,8 @@ import {
   Command,
   HelpCircle,
   FlipHorizontal,
-  Sparkles,
+  Aperture,
+  SunMedium,
   Clock,
   ChevronUp,
   Check,
@@ -52,6 +53,8 @@ import { YouTubeSyncPlayer } from './YouTubeSyncPlayer';
 import { AmbilightGlow } from './AmbilightGlow';
 import { CinemaAudioProcessor, DialogueBoostLevel } from '../lib/audio-processing';
 import { BLUR_PRESETS, MAX_BLUR_RADIUS } from '../lib/background-blur';
+import { useAnchoredPopup } from '../hooks/useAnchoredPopup';
+import PopupPortal from './PopupPortal';
 
 export type DisplayLayout = 'theater' | 'grid' | 'floating';
 
@@ -408,7 +411,7 @@ const TileActionControls: React.FC<TileActionControlsProps> = ({
             }`}
             title="Background Blur & Portrait Bokeh"
           >
-            <Sparkles size={iconSize} />
+            <Aperture size={iconSize} />
           </button>
 
           {isBlurMenuOpen && (
@@ -418,7 +421,7 @@ const TileActionControls: React.FC<TileActionControlsProps> = ({
             >
               <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-white/10 font-bold">
                 <span className="flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-[var(--accent)]" />
+                  <Aperture size={13} className="text-[var(--accent)]" />
                   <span>Portrait Blur</span>
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-[var(--accent)]">
@@ -561,30 +564,46 @@ export const WatchStage: React.FC<WatchStageProps> = ({
   const [youtubeInputUrl, setYoutubeInputUrl] = useState('');
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
 
-  const micMenuRef = useRef<HTMLDivElement>(null);
-  const cameraMenuRef = useRef<HTMLDivElement>(null);
-  const blurMenuRef = useRef<HTMLDivElement>(null);
-  const broadcastMenuRef = useRef<HTMLDivElement>(null);
+  // Portal-based popup positioning hooks
+  const micPopup = useAnchoredPopup(isMicMenuOpen);
+  const cameraPopup = useAnchoredPopup(isCameraMenuOpen);
+  const blurPopup = useAnchoredPopup(isBlurMenuOpen);
+  const broadcastPopup = useAnchoredPopup(isBroadcastMenuOpen);
+  const reactionsPopup = useAnchoredPopup(isEmojiTrayOpen);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (micMenuRef.current && !micMenuRef.current.contains(target)) {
-        setIsMicMenuOpen(false);
+      // For each menu, check both the trigger element and the portal popup
+      if (isMicMenuOpen) {
+        const inTrigger = micPopup.triggerRef.current?.contains(target);
+        const inPopup = micPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsMicMenuOpen(false);
       }
-      if (cameraMenuRef.current && !cameraMenuRef.current.contains(target)) {
-        setIsCameraMenuOpen(false);
+      if (isCameraMenuOpen) {
+        const inTrigger = cameraPopup.triggerRef.current?.contains(target);
+        const inPopup = cameraPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsCameraMenuOpen(false);
       }
-      if (blurMenuRef.current && !blurMenuRef.current.contains(target)) {
-        setIsBlurMenuOpen(false);
+      if (isBlurMenuOpen) {
+        const inTrigger = blurPopup.triggerRef.current?.contains(target);
+        const inPopup = blurPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsBlurMenuOpen(false);
       }
-      if (broadcastMenuRef.current && !broadcastMenuRef.current.contains(target)) {
-        setIsBroadcastMenuOpen(false);
+      if (isBroadcastMenuOpen) {
+        const inTrigger = broadcastPopup.triggerRef.current?.contains(target);
+        const inPopup = broadcastPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsBroadcastMenuOpen(false);
+      }
+      if (isEmojiTrayOpen) {
+        const inTrigger = reactionsPopup.triggerRef.current?.contains(target);
+        const inPopup = reactionsPopup.popupRef.current?.contains(target);
+        if (!inTrigger && !inPopup) setIsEmojiTrayOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isMicMenuOpen, isCameraMenuOpen, isBlurMenuOpen, isBroadcastMenuOpen, isEmojiTrayOpen]);
 
   // Picture-in-Picture State
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -1658,7 +1677,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
         <div className="flex-1 flex items-center justify-center min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 py-1 overflow-visible">
             {/* Studio Microphone Split Control */}
-            <div ref={micMenuRef} className="relative flex items-center shrink-0">
+            <div ref={micPopup.triggerRef} className="relative flex items-center shrink-0">
               <div
                 className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
                   isMicActive
@@ -1698,12 +1717,14 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 )}
               </div>
 
-              {/* Mic Device Selector Dropdown */}
-              {isMicMenuOpen && onSelectAudioInputDevice && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
+              {/* Mic Device Selector Dropdown (Portal) */}
+              <PopupPortal
+                ref={micPopup.popupRef}
+                isOpen={isMicMenuOpen && !!onSelectAudioInputDevice}
+                style={micPopup.popupStyle}
+                caretLeft={micPopup.caretLeft}
+                className="max-h-72 overflow-y-auto space-y-1"
+              >
                 <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
                   Select Microphone
                 </div>
@@ -1712,7 +1733,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     key={device.deviceId || idx}
                     type="button"
                     onClick={() => {
-                      onSelectAudioInputDevice(device.deviceId);
+                      onSelectAudioInputDevice!(device.deviceId);
                       setIsMicMenuOpen(false);
                     }}
                     className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
@@ -1725,13 +1746,12 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                     {selectedAudioDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
                   </button>
                 ))}
-              </div>
-            )}
-          </div>
+              </PopupPortal>
+            </div>
 
           {/* Studio Camera Split Control */}
           {onToggleCamera && (
-            <div ref={cameraMenuRef} className="relative flex items-center shrink-0">
+            <div ref={cameraPopup.triggerRef} className="relative flex items-center shrink-0">
               <div
                 className={`flex items-center rounded-xl sm:rounded-2xl border transition min-h-[40px] overflow-hidden ${
                   isCameraActive
@@ -1771,35 +1791,36 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 )}
               </div>
 
-              {/* Camera Device Selector Dropdown */}
-              {isCameraMenuOpen && onSelectVideoInputDevice && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 max-h-72 p-2 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth overflow-y-auto space-y-1 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
-                    Select Camera
-                  </div>
-                  {videoInputDevices.map((device, idx) => (
-                    <button
-                      key={device.deviceId || idx}
-                      type="button"
-                      onClick={() => {
-                        onSelectVideoInputDevice(device.deviceId);
-                        setIsCameraMenuOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
-                        selectedVideoDeviceId === device.deviceId
-                          ? 'bg-[var(--accent)] text-black font-semibold'
-                          : 'text-white/80 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{device.label || `Camera ${idx + 1}`}</span>
-                      {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
-                    </button>
-                  ))}
+              {/* Camera Device Selector Dropdown (Portal) */}
+              <PopupPortal
+                ref={cameraPopup.popupRef}
+                isOpen={isCameraMenuOpen && !!onSelectVideoInputDevice}
+                style={cameraPopup.popupStyle}
+                caretLeft={cameraPopup.caretLeft}
+                className="max-h-72 overflow-y-auto space-y-1"
+              >
+                <div className="px-3 py-1 text-[10px] font-semibold text-white/50 tracking-wider uppercase">
+                  Select Camera
                 </div>
-              )}
+                {videoInputDevices.map((device, idx) => (
+                  <button
+                    key={device.deviceId || idx}
+                    type="button"
+                    onClick={() => {
+                      onSelectVideoInputDevice!(device.deviceId);
+                      setIsCameraMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between text-left transition cursor-pointer ${
+                      selectedVideoDeviceId === device.deviceId
+                        ? 'bg-[var(--accent)] text-black font-semibold'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{device.label || `Camera ${idx + 1}`}</span>
+                    {selectedVideoDeviceId === device.deviceId && <Check size={14} className="shrink-0" />}
+                  </button>
+                ))}
+              </PopupPortal>
             </div>
           )}
 
@@ -1820,7 +1841,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
           {/* Background Blur Toggle & Popover */}
           {onSetBlurRadius && (
-            <div ref={blurMenuRef} className="relative shrink-0">
+            <div ref={blurPopup.triggerRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1843,71 +1864,73 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 }`}
                 title={bgBlurRadius > 0 ? `Background Blur Active (${bgBlurRadius}px)` : 'Background Blur (Off)'}
               >
-                <Sparkles size={16} />
+                <Aperture size={16} />
               </button>
 
-              {isBlurMenuOpen && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 p-4 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth space-y-3 select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Background Blur</span>
-                    <span className="text-[11px] font-mono text-[var(--accent)]">
-                      {bgBlurRadius === 0 ? 'Off' : `${bgBlurRadius}px`}
-                    </span>
-                  </div>
-
-                  {/* Preset Chips */}
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { label: 'Off', val: 0 },
-                      { label: 'Subtle', val: 8 },
-                      { label: 'Portrait', val: 16 },
-                      { label: 'Deep', val: 24 }
-                    ].map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => onSetBlurRadius(preset.val)}
-                        className={`py-1.5 text-[10px] font-medium rounded-lg transition cursor-pointer text-center ${
-                          bgBlurRadius === preset.val
-                            ? 'bg-[var(--accent)] text-black font-bold'
-                            : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Continuous Slider */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-white/50">
-                      <span>Intensity</span>
-                      <span>{Math.round((bgBlurRadius / 32) * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={32}
-                      value={bgBlurRadius}
-                      onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
-                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
-                    />
-                  </div>
-
-                  <div className="text-[10px] text-white/50 leading-snug">
-                    Edge-refined portrait bokeh with sub-pixel feathering
-                  </div>
+              {/* Blur Popover (Portal) */}
+              <PopupPortal
+                ref={blurPopup.popupRef}
+                isOpen={isBlurMenuOpen}
+                style={blurPopup.popupStyle}
+                caretLeft={blurPopup.caretLeft}
+                className="space-y-3 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white">Background Blur</span>
+                  <span className="text-[11px] font-mono text-[var(--accent)]">
+                    {bgBlurRadius === 0 ? 'Off' : `${bgBlurRadius}px`}
+                  </span>
                 </div>
-              )}
+
+                {/* Preset Chips */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { label: 'Off', val: 0 },
+                    { label: 'Subtle', val: 8 },
+                    { label: 'Portrait', val: 16 },
+                    { label: 'Deep', val: 24 }
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => onSetBlurRadius(preset.val)}
+                      className={`py-1.5 text-[10px] font-medium rounded-lg transition cursor-pointer text-center ${
+                        bgBlurRadius === preset.val
+                          ? 'bg-[var(--accent)] text-black font-bold'
+                          : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Continuous Slider */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-white/50">
+                    <span>Intensity</span>
+                    <span>{Math.round((bgBlurRadius / 32) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={32}
+                    value={bgBlurRadius}
+                    onChange={(e) => onSetBlurRadius(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
+                  />
+                </div>
+
+                <div className="text-[10px] text-white/50 leading-snug">
+                  Edge-refined portrait bokeh with sub-pixel feathering
+                </div>
+              </PopupPortal>
             </div>
           )}
 
           {/* Unified Screen Cast / Broadcast Control */}
           {isHost && (
-            <div ref={broadcastMenuRef} className="relative shrink-0">
+            <div ref={broadcastPopup.triggerRef} className="relative shrink-0">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1951,12 +1974,15 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 </span>
               </button>
 
-              {/* Anchored Broadcast Popover */}
-              {isBroadcastMenuOpen && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 p-3.5 rounded-2xl realistic-glass bg-black/95 border border-white/15 shadow-2xl z-50 animate-enter-smooth select-none text-white after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-solid after:border-[6px] after:border-transparent after:border-t-black/95 after:pointer-events-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
+              {/* Anchored Broadcast Popover (Portal) */}
+              <PopupPortal
+                ref={broadcastPopup.popupRef}
+                isOpen={isBroadcastMenuOpen}
+                style={broadcastPopup.popupStyle}
+                caretLeft={broadcastPopup.caretLeft}
+                widthClass="w-72"
+                className="p-3.5"
+              >
                   {broadcastView === 'sources' && (
                     <div className="space-y-2">
                       <div className="px-1 pb-1 border-b border-white/10">
@@ -2101,8 +2127,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                       </div>
                     </div>
                   )}
-                </div>
-              )}
+              </PopupPortal>
             </div>
           )}
 
@@ -2131,7 +2156,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
             }`}
             title="Dynamic Cinema Ambilight Glow (A)"
           >
-            <Sparkles size={16} className={isAmbilightEnabled ? 'text-amber-400' : ''} />
+            <SunMedium size={16} className={isAmbilightEnabled ? 'text-amber-400' : ''} />
           </button>
 
           {/* Settings Trigger */}
@@ -2148,7 +2173,7 @@ export const WatchStage: React.FC<WatchStageProps> = ({
 
           {/* Emoji Reactions Trigger */}
           {onSendEmojiReaction && (
-            <div className="relative shrink-0">
+            <div ref={reactionsPopup.triggerRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -2179,6 +2204,11 @@ export const WatchStage: React.FC<WatchStageProps> = ({
                 onClose={() => setIsEmojiTrayOpen(false)}
                 onSendReaction={onSendEmojiReaction}
                 activeReactions={activeReactions || []}
+                triggerRef={reactionsPopup.triggerRef}
+                popupRef={reactionsPopup.popupRef}
+                popupStyle={reactionsPopup.popupStyle}
+                caretLeft={reactionsPopup.caretLeft}
+                isFlipped={reactionsPopup.isFlipped}
               />
             </div>
           )}

@@ -5,6 +5,8 @@ import {
   databases,
   realtime,
   APPWRITE_DATABASE_ID,
+  APPWRITE_ENDPOINT,
+  APPWRITE_PROJECT_ID,
   COLLECTIONS,
   RoomDocument,
   MAX_PARTICIPANTS,
@@ -106,6 +108,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
   });
   const [latencyHistory, setLatencyHistory] = useState<LatencyDataPoint[]>([]);
   const systemMonitorRef = useRef<SystemLoadMonitor | null>(null);
+  const participantsRef = useRef<Participant[]>([]);
+  participantsRef.current = participants;
 
   // Google Meet Green Room preview state
   const [hasEnteredStage, setHasEnteredStage] = useState(false);
@@ -470,22 +474,15 @@ export const RoomView: React.FC<RoomViewProps> = ({
     async function initStage() {
       if (!isMounted || !room) return;
 
-      // Increment participant count when entering stage
-      try {
-        const freshDoc = await databases.getDocument<RoomDocument>(
-          APPWRITE_DATABASE_ID,
-          COLLECTIONS.ROOMS,
-          roomId
-        );
-        const currentCount = typeof freshDoc.participantCount === 'number' ? freshDoc.participantCount : 0;
-        await databases.updateDocument(
+      // Authoritative presence: host entering first initializes count to 1
+      const isRoomHost = room.hostId === currentUserId;
+      if (isRoomHost) {
+        databases.updateDocument(
           APPWRITE_DATABASE_ID,
           COLLECTIONS.ROOMS,
           roomId,
-          { participantCount: Math.min(MAX_PARTICIPANTS, currentCount + 1) }
-        );
-      } catch (err) {
-        console.warn('Failed to update participant count on join:', err);
+          { participantCount: 1 }
+        ).catch((err) => console.warn('Failed to initialize stage participant count:', err));
       }
 
       // Initialize WebRTC Engine
@@ -503,24 +500,41 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onPeerDiscovered: (peerId, remoteUserName) => {
           setParticipants((prev) => {
             const existingIndex = prev.findIndex((p) => p.id === peerId);
+            let updated: Participant[];
             if (existingIndex >= 0) {
-              const updated = [...prev];
+              updated = [...prev];
               updated[existingIndex] = {
                 ...updated[existingIndex],
                 name: remoteUserName || updated[existingIndex].name
               };
-              return updated;
+            } else {
+              updated = [
+                ...prev,
+                {
+                  id: peerId,
+                  name: remoteUserName,
+                  stream: undefined,
+                  isMicActive: false,
+                  isCameraActive: false
+                }
+              ];
             }
-            return [
-              ...prev,
-              {
-                id: peerId,
-                name: remoteUserName,
-                stream: undefined,
-                isMicActive: false,
-                isCameraActive: false
-              }
-            ];
+
+            // Sync authoritative mesh count to Appwrite if host or lowest userId
+            const isCoordinator =
+              room.hostId === currentUserId ||
+              (!updated.some((p) => p.id === room.hostId) && updated.every((p) => currentUserId <= p.id));
+            if (isCoordinator) {
+              const liveCount = Math.min(MAX_PARTICIPANTS, Math.max(1, updated.length + 1));
+              databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                COLLECTIONS.ROOMS,
+                roomId,
+                { participantCount: liveCount }
+              ).catch((err) => console.warn('Failed to sync mesh participant count on join:', err));
+            }
+
+            return updated;
           });
         },
         onRemoteScreenStream: (_peerId, stream) => {
@@ -569,7 +583,25 @@ export const RoomView: React.FC<RoomViewProps> = ({
           }
         },
         onPeerDisconnected: (peerId) => {
-          setParticipants((prev) => prev.filter((p) => p.id !== peerId));
+          setParticipants((prev) => {
+            const remaining = prev.filter((p) => p.id !== peerId);
+
+            // Remaining coordinator immediately syncs the accurate remaining count to Appwrite
+            const isCoordinator =
+              room.hostId === currentUserId ||
+              (!remaining.some((p) => p.id === room.hostId) && remaining.every((p) => currentUserId <= p.id));
+            if (isCoordinator) {
+              const liveCount = Math.min(MAX_PARTICIPANTS, Math.max(1, remaining.length + 1));
+              databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                COLLECTIONS.ROOMS,
+                roomId,
+                { participantCount: liveCount }
+              ).catch((err) => console.warn('Failed to sync mesh participant count on disconnect:', err));
+            }
+
+            return remaining;
+          });
         },
         onPeerConnected: (peerId) => {
           console.log(`P2P mesh peer connected: ${peerId}`);
@@ -638,8 +670,47 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
     const handleBeforeUnload = () => {
       webrtcRef.current?.announceLeave();
+
+      // If this user was the only person on stage, reliably reset participantCount to 0 via keepalive
+      if (participantsRef.current.length === 0) {
+        try {
+          const url = `${APPWRITE_ENDPOINT}/databases/${APPWRITE_DATABASE_ID}/collections/${COLLECTIONS.ROOMS}/documents/${roomId}`;
+          fetch(url, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Appwrite-Project': APPWRITE_PROJECT_ID
+            },
+            body: JSON.stringify({
+              data: { participantCount: 0 }
+            }),
+            keepalive: true
+          }).catch(() => {});
+        } catch {}
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
+    // Periodic presence verification heartbeat to heal any drift
+    const presenceHeartbeat = setInterval(() => {
+      if (!isMounted || !room || !webrtcRef.current) return;
+      const isCoordinator =
+        room.hostId === currentUserId ||
+        (!participantsRef.current.some((p) => p.id === room.hostId) &&
+          participantsRef.current.every((p) => currentUserId <= p.id));
+      if (!isCoordinator) return;
+
+      const liveCount = Math.min(MAX_PARTICIPANTS, Math.max(1, participantsRef.current.length + 1));
+      if (room.participantCount !== liveCount) {
+        databases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          COLLECTIONS.ROOMS,
+          roomId,
+          { participantCount: liveCount }
+        ).catch(() => {});
+      }
+    }, 20000);
 
     // Subscribe to Realtime room updates
     const roomChannel = `databases.${APPWRITE_DATABASE_ID}.collections.${COLLECTIONS.ROOMS}.documents.${roomId}`;
@@ -694,19 +765,28 @@ export const RoomView: React.FC<RoomViewProps> = ({
     return () => {
       isMounted = false;
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      clearInterval(presenceHeartbeat);
       unsubscribeRoom();
       unsubscribeSignaling();
 
       if (room) {
-        databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
-          .then((d) => {
-            const prev = typeof d.participantCount === 'number' ? d.participantCount : 1;
-            const newCount = Math.max(0, prev - 1);
-            return databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
-              participantCount: newCount
-            });
-          })
-          .catch(() => {});
+        // If this user was the last one in the room, authoritatively reset participantCount to 0
+        if (participantsRef.current.length === 0) {
+          databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+            participantCount: 0
+          }).catch(() => {});
+        } else {
+          databases.getDocument<RoomDocument>(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId)
+            .then((d) => {
+              const prev = typeof d.participantCount === 'number' ? d.participantCount : 1;
+              const newCount = Math.max(0, prev - 1);
+              return databases.updateDocument(APPWRITE_DATABASE_ID, COLLECTIONS.ROOMS, roomId, {
+                participantCount: newCount
+              });
+            })
+            .catch(() => {});
+        }
       }
 
       if (webrtcRef.current) {

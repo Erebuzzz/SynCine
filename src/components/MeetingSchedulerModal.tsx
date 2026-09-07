@@ -5,6 +5,7 @@ import {
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
   RoomDocument,
+  MAX_PARTICIPANTS,
   generateRoomCode,
   formatRoomCode
 } from '../lib/appwrite';
@@ -210,9 +211,9 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
           {
             name: title.trim(),
             hostId: currentUser.$id,
-            mediaMode,
-            participantCount: 1,
-            maxParticipants: 4,
+            mediaMode: 'screen',
+            participantCount: 0,
+            maxParticipants: MAX_PARTICIPANTS,
             syncState: '',
             isPermanent: true,
             expiresAt: ''

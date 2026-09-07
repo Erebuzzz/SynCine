@@ -892,4 +892,33 @@ export class WebRTCEngine {
       this.localScreenStream = undefined;
     }
   }
+
+  public getActivePeerCount(): number {
+    let count = 0;
+    for (const pc of this.peers.values()) {
+      if (
+        pc.connectionState === 'connected' ||
+        pc.iceConnectionState === 'connected' ||
+        pc.iceConnectionState === 'completed'
+      ) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public getActivePeerIds(): string[] {
+    const ids: string[] = [];
+    for (const [peerId, pc] of this.peers.entries()) {
+      if (
+        pc.connectionState !== 'closed' &&
+        pc.connectionState !== 'failed' &&
+        pc.iceConnectionState !== 'closed' &&
+        pc.iceConnectionState !== 'failed'
+      ) {
+        ids.push(peerId);
+      }
+    }
+    return ids;
+  }
 }
