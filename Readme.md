@@ -244,13 +244,13 @@ Create a `.env` file in the project root:
 ```ini
 # Client Variables (Exposed to Vite bundle)
 VITE_APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
-VITE_APPWRITE_PROJECT_ID=6a97c0ed000188adaed0
+VITE_APPWRITE_PROJECT_ID=your_appwrite_project_id
 VITE_APPWRITE_DATABASE_ID=syncine_db
 VITE_MAX_PARTICIPANTS=4
 
 # Server Provisioning & Function Execution (Private)
 APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
-APPWRITE_PROJECT_ID=6a97c0ed000188adaed0
+APPWRITE_PROJECT_ID=your_appwrite_project_id
 APPWRITE_DATABASE_ID=syncine_db
 APPWRITE_API_KEY=your_appwrite_admin_api_key
 ```

@@ -28,7 +28,7 @@ jobs:
         run: npm run build
         env:
           VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1' }}
-          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0' }}
+          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID }}
           VITE_APPWRITE_DATABASE_ID: ${{ secrets.VITE_APPWRITE_DATABASE_ID || 'syncine_db' }}
           VITE_MAX_PARTICIPANTS: 4
 

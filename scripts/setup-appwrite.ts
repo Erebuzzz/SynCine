@@ -3,9 +3,15 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-const projectId = process.env.APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
+const projectId = process.env.APPWRITE_PROJECT_ID;
 const apiKey = process.env.APPWRITE_API_KEY;
 const dbId = process.env.APPWRITE_DATABASE_ID || 'syncine_db';
+
+if (!projectId) {
+  console.warn('APPWRITE_PROJECT_ID is not set in environment or .env file.');
+  console.warn('Please define APPWRITE_PROJECT_ID before running this setup script.');
+  process.exit(1);
+}
 
 if (!apiKey) {
   console.warn('APPWRITE_API_KEY is not set in environment or .env file.');

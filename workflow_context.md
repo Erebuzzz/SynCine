@@ -7,7 +7,7 @@ This document preserves the current implementation state, architectural decision
 - **Thematic Origin:** S+C interlocking convergence (Syn + Cine: united collaborative cinema)
 - **Application Type:** Real-time synchronized collaborative movie streaming platform (WebRTC mesh + Appwrite Cloud)
 - **Appwrite Endpoint:** `https://sgp.cloud.appwrite.io/v1`
-- **Appwrite Project ID:** `6a97c0ed000188adaed0`
+- **Appwrite Project ID:** `<CONFIGURED_APPWRITE_PROJECT_ID>`
 - **Database ID:** `syncine_db`
 - **Registered Platforms:**
   - `syncine.vercel.app`
@@ -59,7 +59,7 @@ The interface follows an Apple-minimal, editorial cinema design system:
 - **`src/components/NotFound.tsx`:** Custom 404 page with playable cinema arcade game.
 
 ## 4. Implemented Schema & Collections (Appwrite Cloud)
-All collections have been provisioned in `syncine_db` on project `6a97c0ed000188adaed0`:
+All collections have been provisioned in `syncine_db` on the active Appwrite project:
 1. **`rooms` collection:**
    - `name` (string, size: 64, required)
    - `hostId` (string, size: 36, required)
@@ -232,10 +232,9 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 
 ## 20. Resilient YouTube Watchroom Schema & Appwrite Project Scoping
 - **Appwrite Project Scoping Context:**
-  - In Appwrite Cloud, API keys are strictly project-scoped. An API key generated in project `69e76bf4000773ccd6e1` ("Confluxa") has permissions only within `69e76bf4000773ccd6e1`.
-  - Project `69e76bf4000773ccd6e1` has all YouTube attributes provisioned (`youtubeVideoId`, `youtubeUrl`, `isLocked`, and `mediaMode: ['screen', 'local_file', 'youtube']`).
-  - Project `6a97c0ed000188adaed0` ("SynCine") has the initial schema from September 2, 2026, where `mediaMode` is restricted to `('screen', 'local_file')` and `youtubeVideoId` is not defined.
-  - Passing `youtubeVideoId` or `mediaMode: 'youtube'` directly into `databases.createDocument` on project `6a97c0ed000188adaed0` previously caused Appwrite to reject room creation with HTTP 400 (`Invalid document structure: Unknown attribute: "youtubeVideoId"`).
+  - In Appwrite Cloud, API keys are strictly project-scoped. An API key generated in an external project has permissions only within that specific project.
+  - Initial database versions lacked custom YouTube attributes (`youtubeVideoId`, `youtubeUrl`, `isLocked`, and `mediaMode: ['screen', 'local_file', 'youtube']`).
+  - Passing `youtubeVideoId` or `mediaMode: 'youtube'` directly into `databases.createDocument` previously caused Appwrite to reject room creation with HTTP 400 (`Invalid document structure: Unknown attribute: "youtubeVideoId"`).
 - **Resilient Fallback Implementation:**
   1. **Dual-Path Creation (`App.tsx`):**
      - First attempts primary creation with native attributes (`mediaMode: 'youtube'`, `youtubeVideoId`, `youtubeUrl`).
@@ -251,15 +250,14 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
 - **Verification:**
   - Vitest: 8/8 test files passed (36/36 unit tests, including dedicated `normalizeRoomDocument` tests).
   - TypeScript & Vite Build: `npm run build` compiled cleanly in 5.15s.
-  - Live API Verification: Verified primary rejection and instant fallback creation/cleanup against project `6a97c0ed000188adaed0` with HTTP 201 Created and HTTP 204 Deleted.
+  - Live API Verification: Verified primary rejection and instant fallback creation/cleanup with HTTP 201 Created and HTTP 204 Deleted.
 
 ## 21. Database Migration & Provisioning Complete
-- **Project 69e76bf4000773ccd6e1 Cleanup:**
-  - Database `syncine_db` was permanently deleted from project `69e76bf4000773ccd6e1` via REST call (`DELETE /databases/syncine_db`, status: 204 No Content).
-  - Verified via GET `/databases` that project `69e76bf4000773ccd6e1` now contains only `confluxa_db`.
-- **Project 6a97c0ed000188adaed0 Full Native Provisioning:**
-  - Active project ID confirmed as `6a97c0ed000188adaed0` across `.env`, `mcp_config.json`, and client configurations.
-  - Updated `mcp_config.json` and `.env` with the project API key (`standard_11172...`).
+- **Database Cleanup:**
+  - Verified project database isolation and verified that only production database instances remain active.
+- **Full Native Provisioning on Active Project:**
+  - Active project ID confirmed and configured via `.env` and environment variables.
+  - Configured admin API key with required scopes.
   - Scopes enabled: `collections.*`, `attributes.*`, `documents.*`, `databases.*`.
   - Schema attributes fully created and set to status `available`:
     - `rooms`: `name`, `hostId`, `syncState`, `mediaMode` (`['screen', 'local_file', 'youtube']`), `participantCount`, `maxParticipants`, `isPermanent`, `expiresAt`, `youtubeVideoId`, `youtubeUrl`, `isLocked`.
@@ -267,7 +265,7 @@ All collections have been provisioned in `syncine_db` on project `6a97c0ed000188
     - `messages`: `roomId`, `senderId`, `senderName`, `content`.
   - Provisioning script `setup-appwrite.ts` executed and finished successfully.
 - **Verification:**
-  - Live Client API Verification: Created native YouTube watchroom on project `6a97c0ed000188adaed0` directly with client permissions: status 201 Created with native `mediaMode: 'youtube'`, `youtubeVideoId: 'dQw4w9WgXcQ'`. Cleaned up with status 204 Deleted.
+  - Live Client API Verification: Created native YouTube watchroom directly with client permissions: status 201 Created with native `mediaMode: 'youtube'`, `youtubeVideoId: 'dQw4w9WgXcQ'`. Cleaned up with status 204 Deleted.
   - Vitest: 8/8 test files passed (36/36 unit tests).
   - Production Build: `npm run build` compiled cleanly in 5.21s.
 

@@ -3,7 +3,7 @@ import type { RealtimeResponseEvent } from 'appwrite';
 export type { RealtimeResponseEvent };
 
 export const APPWRITE_ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
-export const APPWRITE_PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID || '6a97c0ed000188adaed0';
+export const APPWRITE_PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID || '';
 export const APPWRITE_DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || 'syncine_db';
 export const MAX_PARTICIPANTS = Number(import.meta.env.VITE_MAX_PARTICIPANTS) || 4;
 
